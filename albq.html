@@ -149,8 +149,6 @@ textarea.services-editor { min-height:320px; resize:vertical; }
 .verified-warning { color:#aa0000; font-size:13px; margin-top:4px; min-height:1.1em; }
 .tag-controls-row { margin-top:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
 .assigned-tags-line { font-size:14px; }
-.pdf-attachments-list { margin:6px 0 8px; display:grid; gap:6px; }
-.pdf-attachment-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
 .reload-resources-wrap { margin-top:16px; text-align:right; }
 .reload-resources-wrap .button { font-size:14px; padding:7px 10px; }
 .app-toast {
@@ -485,36 +483,6 @@ function generateResourceId(){
     .join("");
 }
 
-function filenameFromPath(path){
-  const clean = String(path || "").split(/[?#]/)[0];
-  return clean.split("/").filter(Boolean).pop() || "";
-}
-
-function safePDFFileName(name){
-  const fallback = "attachment.pdf";
-  const base = filenameFromPath(name) || fallback;
-  const safe = base.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || fallback;
-  return /\.pdf$/i.test(safe) ? safe : `${safe}.pdf`;
-}
-
-function stablePDFIdFromPath(path, fallback = "pdf"){
-  const text = String(path || fallback);
-  let hash = 2166136261;
-  for(let i = 0; i < text.length; i += 1){
-    hash ^= text.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return `pdf-${(hash >>> 0).toString(16)}`;
-}
-
-function pdfNameFromPath(path){
-  return filenameFromPath(path) || "PDF";
-}
-
-function buildPDFStoragePath(resourceId, attachmentId, fileName){
-  return `pdfs/${encodeURIComponent(resourceId || "resource")}/${attachmentId}-${safePDFFileName(fileName)}`;
-}
-
 function showToast(message, options = {}){
   let toast = document.getElementById("appToast");
   if(!toast){
@@ -576,48 +544,9 @@ function normalizeResourceVerifiedOn(r){
   if("verifiedDate" in r) delete r.verifiedDate;
 }
 
-function normalizeResourcePDFs(r){
-  // Canonical: pdfs array of { id, name, path }. Legacy pdf path is preserved.
-  if(!r || typeof r !== "object") return;
-  const attachments = [];
-  const seenPaths = new Set();
-
-  if(Array.isArray(r.pdfs)){
-    r.pdfs.forEach((pdf, index) => {
-      if(!pdf || typeof pdf !== "object") return;
-      const path = typeof pdf.path === "string" ? pdf.path.trim() : "";
-      if(!path || seenPaths.has(path)) return;
-      seenPaths.add(path);
-      const id = String(pdf.id || "").trim() || stablePDFIdFromPath(`${path}:${index}`);
-      attachments.push({
-        id,
-        name: String(pdf.name || pdfNameFromPath(path)).trim() || "PDF",
-        path
-      });
-    });
-  }
-
-  const legacyPath = typeof r.pdf === "string" ? r.pdf.trim() : "";
-  if(legacyPath && !seenPaths.has(legacyPath)){
-    attachments.push({
-      id: stablePDFIdFromPath(legacyPath),
-      name: pdfNameFromPath(legacyPath),
-      path: legacyPath
-    });
-  }
-
-  r.pdfs = attachments;
-  if(typeof r.pdf !== "string" && "pdf" in r) delete r.pdf;
-}
-
 function normalizeDataServicesShape(data){
   if(!data.resources) return;
   data.resources.forEach(normalizeResourceServices);
-}
-
-function normalizeDataPDFShape(nextData){
-  if(!nextData || !Array.isArray(nextData.resources)) return;
-  nextData.resources.forEach(normalizeResourcePDFs);
 }
 
 function normalizeDataVerifiedOnShape(nextData){
@@ -891,63 +820,6 @@ function confirmCategoryAssignmentHint(draft){
   return confirm(`This resource has tags suggesting ${categoryList}, but ${categoryPhrase} not selected. Continue?`);
 }
 
-function getResourcePDFs(resource){
-  normalizeResourcePDFs(resource);
-  return Array.isArray(resource.pdfs) ? resource.pdfs : [];
-}
-
-function collectPDFPathsFromResource(resource, { includeLegacy = true } = {}){
-  if(!resource || typeof resource !== "object") return [];
-  const paths = [];
-  const seen = new Set();
-  getResourcePDFs(resource).forEach(pdf => {
-    const path = typeof pdf.path === "string" ? pdf.path.trim() : "";
-    if(!path || seen.has(path)) return;
-    seen.add(path);
-    paths.push(path);
-  });
-  if(includeLegacy && typeof resource.pdf === "string"){
-    const legacyPath = resource.pdf.trim();
-    if(legacyPath && !seen.has(legacyPath)) paths.push(legacyPath);
-  }
-  return paths;
-}
-
-function collectPDFPathsFromResources(resources){
-  const paths = [];
-  const seen = new Set();
-  (Array.isArray(resources) ? resources : []).forEach(resource => {
-    collectPDFPathsFromResource(resource).forEach(path => {
-      if(seen.has(path)) return;
-      seen.add(path);
-      paths.push(path);
-    });
-  });
-  return paths;
-}
-
-function removePDFAttachmentFromResource(resource, pdfId){
-  if(!resource || typeof resource !== "object") return null;
-  normalizeResourcePDFs(resource);
-  const removed = resource.pdfs.find(pdf => pdf.id === pdfId);
-  if(!removed) return null;
-  resource.pdfs = resource.pdfs.filter(pdf => pdf.id !== pdfId);
-  if(typeof resource.pdf === "string" && resource.pdf.trim() === removed.path){
-    delete resource.pdf;
-  }
-  return removed;
-}
-
-function isPDFPathReferencedInResources(resources, path){
-  const key = String(path || "").trim();
-  if(!key) return false;
-  return (Array.isArray(resources) ? resources : []).some(resource => collectPDFPathsFromResource(resource).includes(key));
-}
-
-function isPDFPathReferenced(path){
-  return isPDFPathReferencedInResources(data.resources || [], path);
-}
-
 function applyServicesBold(escapedText){
   return escapedText.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
 }
@@ -1016,7 +888,6 @@ if(!data){
 }
 
 normalizeDataServicesShape(data);
-normalizeDataPDFShape(data);
 normalizeDataTagsShape(data);
 normalizeDataVerifiedOnShape(data);
 normalizeChanges(data);
@@ -1100,12 +971,6 @@ function assertInvariants(context = "invariant check"){
     ids.add(id);
 
     if(!Array.isArray(resource.tags)) throw new Error(`${context}: resource '${id}' tags must be an array`);
-    if(!Array.isArray(resource.pdfs)) throw new Error(`${context}: resource '${id}' pdfs must be an array`);
-    resource.pdfs.forEach((pdf, pdfIdx) => {
-      if(!pdf || typeof pdf !== "object") throw new Error(`${context}: resource '${id}' pdf ${pdfIdx} must be an object`);
-      if(!pdf.id) throw new Error(`${context}: resource '${id}' pdf ${pdfIdx} is missing id`);
-      if(!pdf.path) throw new Error(`${context}: resource '${id}' pdf ${pdfIdx} is missing path`);
-    });
     const resourceTagKeys = new Set();
     resource.tags.forEach(tag => {
       if(typeof tag !== "string" || tag !== tag.trim() || !tag){
@@ -1473,7 +1338,7 @@ function runSelfTests(){
             { id:"housing", label:"Housing", displayOrder:10 }
           ],
           resources:[
-            { id:"shelter", name:"Shelter Resource", categories:["housing"], tags:[], pdfs:[], servicesText:"" }
+            { id:"shelter", name:"Shelter Resource", categories:["housing"], tags:[], servicesText:"" }
           ],
           changes:[]
         };
@@ -1544,7 +1409,7 @@ function runSelfTests(){
   tests.push({
     name: "BLANK RESOURCE CLEANUP DETECTION",
     fn: () => {
-      const blank = { name:"", description:"", phone:"", address:"", website:"", hours:"", servicesText:"", categories:[], tags:[], pdfs:[] };
+      const blank = { name:"", description:"", phone:"", address:"", website:"", hours:"", servicesText:"", categories:[], tags:[] };
       const named = { ...blank, name:"Named Resource" };
       const categorized = { ...blank, categories:["food"] };
       if(!isBlankResourceDraft(blank)) throw new Error("empty resource was not detected");
@@ -1564,8 +1429,8 @@ function runSelfTests(){
         data = {
           categories:[],
           resources:[
-            { id:"existing", name:"Existing", categories:[], tags:[], pdfs:[], servicesText:"" },
-            { id:"draft", name:"", categories:[], tags:[], pdfs:[], servicesText:"" }
+            { id:"existing", name:"Existing", categories:[], tags:[], servicesText:"" },
+            { id:"draft", name:"", categories:[], tags:[], servicesText:"" }
           ]
         };
         newResourceIds = new Set(["draft"]);
@@ -1599,9 +1464,9 @@ function runSelfTests(){
     fn: () => {
       const container = document.createElement("div");
       PrintWorkflow.renderPrintableResourceCards(container, [
-        { id:"print-one", name:"Print One", categories:[], tags:[], pdfs:[], servicesText:"" },
-        { id:"print-two", name:"Print Two", categories:[], tags:[], pdfs:[], servicesText:"" },
-        { id:"print-three", name:"Print Three", categories:[], tags:[], pdfs:[], servicesText:"" }
+        { id:"print-one", name:"Print One", categories:[], tags:[], servicesText:"" },
+        { id:"print-two", name:"Print Two", categories:[], tags:[], servicesText:"" },
+        { id:"print-three", name:"Print Three", categories:[], tags:[], servicesText:"" }
       ]);
       if(container.querySelectorAll(".resource-card").length !== 3){
         throw new Error("print resource cards were not rendered");
@@ -1825,8 +1690,8 @@ function runSelfTests(){
             { id:"health", label:"Health Care", displayOrder:2 }
           ],
           resources:[
-            { id:"bio", name:"BioLife Plasma", categories:["employment","employment","health"], tags:[], pdfs:[], servicesText:"" },
-            { id:"talecris", name:"Talecris Plasma", categories:["employment"], tags:[], pdfs:[], servicesText:"" }
+            { id:"bio", name:"BioLife Plasma", categories:["employment","employment","health"], tags:[], servicesText:"" },
+            { id:"talecris", name:"Talecris Plasma", categories:["employment"], tags:[], servicesText:"" }
           ]
         };
         const results = buildSearchResults("plasma");
@@ -1850,8 +1715,8 @@ function runSelfTests(){
         data = {
           categories:[{ id:"housing", label:"Housing", displayOrder:1 }],
           resources:[
-            { id:"parent", name:"Parent Support", categories:["housing"], tags:[], pdfs:[], servicesText:"paid utility help" },
-            { id:"uca", name:"Utah Community Action", categories:["housing"], tags:[], pdfs:[], servicesText:"Emergency rental assistance and deposit help" }
+            { id:"parent", name:"Parent Support", categories:["housing"], tags:[], servicesText:"paid utility help" },
+            { id:"uca", name:"Utah Community Action", categories:["housing"], tags:[], servicesText:"Emergency rental assistance and deposit help" }
           ]
         };
         const rentResults = buildSearchResults("rent");
@@ -1861,7 +1726,7 @@ function runSelfTests(){
         if(emergencyResults.groups[0].items[0].resourceId !== "uca") throw new Error("services result resource was incorrect");
         if(!emergencyResults.groups[0].items[0].snippet) throw new Error("services result snippet was missing");
 
-        data.resources.push({ id:"emergency-name", name:"Emergency Center", categories:["housing"], tags:[], pdfs:[], servicesText:"" });
+        data.resources.push({ id:"emergency-name", name:"Emergency Center", categories:["housing"], tags:[], servicesText:"" });
         const nameResults = buildSearchResults("emergency");
         if(nameResults.mode !== "name") throw new Error("name matches should suppress services fallback");
         if(nameResults.groups[0].items.some(item => item.resourceId === "uca")) throw new Error("services fallback appeared when name matches existed");
@@ -1883,7 +1748,7 @@ function runSelfTests(){
       try{
         data = {
           categories:[{ id:"housing", label:"Housing", displayOrder:1 }],
-          resources:[{ id:"uca", name:"Utah Community Action", categories:["housing"], tags:[], pdfs:[], servicesText:"" }]
+          resources:[{ id:"uca", name:"Utah Community Action", categories:["housing"], tags:[], servicesText:"" }]
         };
         categoryTagFilters = { housing:["Shelter"] };
         openSearchResult("housing", "uca");
@@ -2073,102 +1938,6 @@ function runSelfTests(){
     }
   });
 
-  tests.push({
-    name: "PDF MIME NORMALIZATION",
-    fn: () => {
-      const source = new Blob(["%PDF-1.6"], { type: "text/plain" });
-      const normalized = ensurePDFBlob(source);
-      if(!(normalized instanceof Blob)){
-        throw new Error("normalized value is not a Blob");
-      }
-      if(normalized.type !== "application/pdf"){
-        throw new Error(`expected application/pdf, got '${normalized.type}'`);
-      }
-    }
-  });
-
-  tests.push({
-    name: "LEGACY PDF NORMALIZATION",
-    fn: () => {
-      const resource = { id:"legacy-pdf", pdf:"assets/forms/intake.pdf" };
-      normalizeResourcePDFs(resource);
-      if(!Array.isArray(resource.pdfs) || resource.pdfs.length !== 1){
-        throw new Error("legacy pdf was not migrated into pdfs[]");
-      }
-      if(resource.pdfs[0].path !== "assets/forms/intake.pdf"){
-        throw new Error("legacy pdf path was not preserved");
-      }
-      if(resource.pdfs[0].name !== "intake.pdf"){
-        throw new Error(`expected filename label, got '${resource.pdfs[0].name}'`);
-      }
-      const once = JSON.stringify(resource.pdfs);
-      normalizeResourcePDFs(resource);
-      if(JSON.stringify(resource.pdfs) !== once){
-        throw new Error("PDF normalization is not idempotent");
-      }
-    }
-  });
-
-  tests.push({
-    name: "MULTIPLE PDF EXPORT KEYS",
-    fn: () => {
-      const keys = collectPDFPathsFromResources([{
-        id:"multi-pdf",
-        pdf:"assets/legacy.pdf",
-        pdfs:[
-          { id:"a", name:"A", path:"pdfs/multi/a-a.pdf" },
-          { id:"b", name:"B", path:"pdfs/multi/b-b.pdf" },
-          { id:"dup", name:"Dup", path:"assets/legacy.pdf" }
-        ]
-      }]);
-      const expected = ["pdfs/multi/a-a.pdf", "pdfs/multi/b-b.pdf", "assets/legacy.pdf"];
-      if(JSON.stringify(keys) !== JSON.stringify(expected)){
-        throw new Error(`unexpected export keys: ${JSON.stringify(keys)}`);
-      }
-    }
-  });
-
-  tests.push({
-    name: "MULTIPLE PDF BUTTON RENDERING",
-    fn: () => {
-      const card = buildResourceCard({
-        id:"render-pdfs",
-        name:"Render PDFs",
-        pdfs:[
-          { id:"one", name:"First form", path:"pdfs/render/one.pdf" },
-          { id:"two", name:"Second form", path:"pdfs/render/two.pdf" }
-        ],
-        servicesText:"",
-        tags:[]
-      }, { expanded:true });
-      const buttons = card.querySelectorAll(".resource-pdf-button");
-      if(buttons.length !== 2) throw new Error(`expected 2 PDF buttons, got ${buttons.length}`);
-      if(buttons[0].textContent !== "First form" || buttons[1].textContent !== "Second form"){
-        throw new Error("PDF button labels were not rendered from attachment names");
-      }
-    }
-  });
-
-  tests.push({
-    name: "REMOVE ONE PDF PRESERVES OTHERS",
-    fn: () => {
-      const resource = {
-        id:"remove-pdf",
-        pdfs:[
-          { id:"one", name:"One", path:"pdfs/remove/one.pdf" },
-          { id:"two", name:"Two", path:"pdfs/remove/two.pdf" }
-        ]
-      };
-      const removed = removePDFAttachmentFromResource(resource, "one");
-      if(!removed || removed.path !== "pdfs/remove/one.pdf"){
-        throw new Error("target PDF was not removed");
-      }
-      if(resource.pdfs.length !== 1 || resource.pdfs[0].path !== "pdfs/remove/two.pdf"){
-        throw new Error("unrelated PDF was removed");
-      }
-    }
-  });
-
   const results = tests.map(test => {
     try{
       test.fn();
@@ -2336,7 +2105,6 @@ function getCategoryUpdateMap(){
 function buildResourceCard(res,{expanded=false,showDescription=false,showStar=true}={}){
   // Shared DOM builder used by category view, favorites view, and print previews.
   normalizeResourceServices(res);
-  normalizeResourcePDFs(res);
 
   const card=document.createElement("div");
   card.className="resource-card";
@@ -2361,33 +2129,13 @@ function buildResourceCard(res,{expanded=false,showDescription=false,showStar=tr
   details.className="resource-details "+(expanded?"expanded":"collapsed");
 
   let html="";
-  const pdfs = getResourcePDFs(res);
   const websiteURL = normalizeWebsiteURL(res.website);
   if(res.phone) html+=`<div><strong>Phone:</strong> <a href="tel:${res.phone}">${res.phone}</a></div>`;
   if(res.address) html+=`<div><strong>Address:</strong> ${escapeHTML(res.address)}</div>`;
   if(websiteURL) html+=`<div><strong>Website:</strong> <a href="${websiteURL}" target="_blank">${res.website}</a></div>`;
-  if(pdfs.length === 1){
-    const label = pdfs[0].name && pdfs[0].name !== "PDF" ? pdfs[0].name : "Open PDF";
-    html+=`<div><button type="button" class="button resource-pdf-button" data-pdf-index="0">${escapeHTML(label)}</button></div>`;
-  }
-  if(pdfs.length > 1){
-    html+=`<div><strong>PDFs:</strong><div class="pdf-attachments-list">`;
-    pdfs.forEach((pdf, index) => {
-      html+=`<button type="button" class="button resource-pdf-button" data-pdf-index="${index}">${escapeHTML(pdf.name || "PDF")}</button>`;
-    });
-    html+=`</div></div>`;
-  }
   if(res.servicesText) html+=`<div><strong>Services:</strong><div class="services-rendered">${renderServicesHTML(res.servicesText)}</div></div>`;
 
   details.innerHTML=html;
-  details.querySelectorAll(".resource-pdf-button").forEach(btn => {
-    btn.onclick = async e => {
-      e.stopPropagation();
-      const index = Number(btn.dataset.pdfIndex);
-      const pdf = pdfs[index];
-      if(pdf && pdf.path) await openPDF(pdf.path);
-    };
-  });
   main.appendChild(details);
   card.appendChild(main);
   return card;
@@ -2555,7 +2303,6 @@ function undoLastDeletion(){
   if(!snapshot || !snapshot.dataSnapshot) return;
       data = snapshot.dataSnapshot;
       normalizeDataServicesShape(data);
-      normalizeDataPDFShape(data);
       normalizeDataTagsShape(data);
       normalizeDataVerifiedOnShape(data);
       normalizeChanges(data);
@@ -3066,8 +2813,6 @@ function clearChangeLog(){
 // ============================================================
 // Storage split:
 // - localStorage keeps the primary JSON snapshot ("albqData").
-// - IndexedDB keeps binary assets (PDF blobs) under string keys.
-// - resource.pdfs stores PDF metadata; resource.pdf remains legacy-compatible.
 
 function persist(){
   // Writes the canonical JSON snapshot used to restore app state on reload.
@@ -3075,166 +2820,6 @@ function persist(){
   data.appVersion = APP_VERSION;
   data.lastModified = nowISO();
   localStorage.setItem("albqData", JSON.stringify(data));
-}
-
-function openAssetsDB(){
-  // Opens the IndexedDB database used for PDF blob storage/retrieval.
-  return new Promise((resolve, reject) => {
-    if(typeof indexedDB === "undefined"){
-      reject(new Error("Asset storage is unavailable in this browser."));
-      return;
-    }
-
-    let settled = false;
-    const timeoutId = setTimeout(() => {
-      if(settled) return;
-      settled = true;
-      reject(new Error("Asset storage is unavailable right now. Reload the app and try again."));
-    }, 4000);
-
-    function finish(fn){
-      return value => {
-        if(settled) return;
-        settled = true;
-        clearTimeout(timeoutId);
-        fn(value);
-      };
-    }
-
-    let req;
-    try{
-      req = indexedDB.open("albqAssets", 1);
-    }catch(err){
-      clearTimeout(timeoutId);
-      reject(err);
-      return;
-    }
-
-    req.onupgradeneeded = e => {
-      const db = e.target.result;
-      if(!db.objectStoreNames.contains("files")){
-        db.createObjectStore("files");
-      }
-    };
-
-    req.onsuccess = finish(() => resolve(req.result));
-    req.onerror = finish(() => reject(req.error || new Error("Asset storage is unavailable in this browser.")));
-    req.onblocked = finish(() => reject(new Error("Asset storage is blocked. Close other tabs and try again.")));
-  });
-}
-
-async function saveAsset(key, blob){
-  // Generic keyed binary write used by higher-level PDF helpers.
-  const db = await openAssetsDB();
-  const tx = db.transaction("files", "readwrite");
-  tx.objectStore("files").put(blob, key);
-
-  return new Promise((resolve, reject) => {
-    tx.oncomplete = () => {
-      db.close();
-      resolve();
-    };
-    tx.onerror = () => {
-      db.close();
-      reject(tx.error);
-    };
-    tx.onabort = () => {
-      db.close();
-      reject(tx.error);
-    };
-  });
-}
-
-async function loadAsset(key){
-  // Generic keyed binary read.
-  const db = await openAssetsDB();
-  const tx = db.transaction("files", "readonly");
-  const req = tx.objectStore("files").get(key);
-
-  return new Promise((resolve, reject) => {
-    req.onsuccess = () => {
-      db.close();
-      resolve(req.result);
-    };
-    req.onerror = () => {
-      db.close();
-      reject(req.error);
-    };
-  });
-}
-
-async function getAsset(path){
-  return loadAsset(path);
-}
-
-function ensurePDFBlob(value){
-  if(value instanceof Blob){
-    return value.type === "application/pdf"
-      ? value
-      : new Blob([value], { type: "application/pdf" });
-  }
-  return new Blob([value], { type: "application/pdf" });
-}
-
-async function savePDF(key, blob){
-  // PDF-specific save wrapper to enforce PDF blob type.
-  return saveAsset(key, ensurePDFBlob(blob));
-}
-
-async function getPDF(key){
-  // Lookup PDF blob by the key/path stored in resource.pdfs[].path.
-  return getAsset(key);
-}
-
-async function deleteAsset(key){
-  const db = await openAssetsDB();
-  const tx = db.transaction("files", "readwrite");
-  tx.objectStore("files").delete(key);
-
-  return new Promise((resolve, reject) => {
-    tx.oncomplete = () => {
-      db.close();
-      resolve();
-    };
-    tx.onerror = () => {
-      db.close();
-      reject(tx.error);
-    };
-    tx.onabort = () => {
-      db.close();
-      reject(tx.error);
-    };
-  });
-}
-
-async function deletePDF(key){
-  return deleteAsset(key);
-}
-
-async function openPDF(path){
-  // Opens a resource PDF by resolving its key/path into an IndexedDB blob.
-  const pdfWindow = window.open("", "_blank");
-  if(!pdfWindow){
-    alert("Unable to open PDF window. Allow pop-ups and try again.");
-    return;
-  }
-  pdfWindow.document.title = "Loading PDF...";
-  pdfWindow.document.body.textContent = "Loading PDF...";
-  try{
-    const stored = await getPDF(path);
-    if(!stored){
-      pdfWindow.close();
-      alert("PDF not found.");
-      return;
-    }
-    const pdfBlob = ensurePDFBlob(stored);
-    const url = URL.createObjectURL(pdfBlob);
-    pdfWindow.location = url;
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
-  }catch(err){
-    pdfWindow.close();
-    alert("Unable to open PDF: " + err.message);
-  }
 }
 
 async function clearAssets(){
@@ -3413,14 +2998,6 @@ function getCategoryIdsForChange(entry){
   return Array.isArray(res && res.categories) ? res.categories.slice() : [];
 }
 
-function getChangesForCategory(categoryId, { unseenOnly = false } = {}){
-  const seen = getSeenUpdateIds();
-  return getRecentChanges().filter(entry => {
-    return getCategoryIdsForChange(entry).includes(categoryId) &&
-      (!unseenOnly || !seen.has(String(entry.id)));
-  });
-}
-
 function formatChangeEntryHTML(entry){
   const dateText = formatDateOnly(entry && entry.timestamp);
   const detail = `${entry && entry.type ? entry.type : ""} ${entry && entry.action ? entry.action : ""}`.trim();
@@ -3513,7 +3090,6 @@ function normalizePackageData(nextData){
   if(!Array.isArray(nextData.categories)) nextData.categories = [];
   if(!Array.isArray(nextData.resources)) nextData.resources = [];
   normalizeDataServicesShape(nextData);
-  normalizeDataPDFShape(nextData);
   normalizeDataTagsShape(nextData);
   normalizeDataVerifiedOnShape(nextData);
   normalizeChanges(nextData);
@@ -3549,26 +3125,6 @@ function mergeResourcePackages(localData, incomingData){
       resourceNamesUpdated: resourceMerge.updatedNames
     }
   };
-}
-
-async function mergeZipAssets(zip, mergedData){
-  const pdfKeys = collectPDFPathsFromResources(mergedData.resources);
-  const missing = [];
-
-  for(const key of pdfKeys){
-    const entry = zip.file(key);
-    if(entry && key.toLowerCase().endsWith(".pdf")){
-      const blob = await entry.async("blob");
-      await savePDF(key, blob);
-    }else{
-      let existing = null;
-      try{
-        existing = await getPDF(key);
-      }catch(_err){}
-      if(!existing) missing.push(key);
-    }
-  }
-  return missing;
 }
 
 function applyMergedData(mergedData){
@@ -3627,7 +3183,7 @@ async function saveResourcePackageBlob(target, blob){
 }
 
 async function exportPackage(){
-  // Exports package ZIP: albq-resources.json + any referenced PDF blobs.
+  // Exports package ZIP: albq-resources.json.
   if(!commitPendingEditsIfChanged()) return;
 
   if(typeof JSZip === "undefined"){
@@ -3645,15 +3201,6 @@ async function exportPackage(){
     data.packageVersion = getNextPackageVersionValue(data.packageVersion);
     packageVersionBumped = true;
     zip.file("albq-resources.json", JSON.stringify(data, null, 2));
-
-    const pdfKeys = collectPDFPathsFromResources(data.resources);
-
-    for(const key of pdfKeys){
-      const blob = await getPDF(key);
-      if(blob){
-        zip.file(key, blob);
-      }
-    }
 
     const blob = await zip.generateAsync({ type: "blob" });
     await saveResourcePackageBlob(saveTarget, blob);
@@ -3738,7 +3285,7 @@ function validateImportData(imported){
 }
 
 async function mergeImportPackage(event){
-  // Imports package ZIP, validates JSON, merges data, then stores referenced PDFs.
+  // Imports package ZIP, validates JSON, then merges data.
   if(!commitPendingEditsIfChanged()){
     event.target.remove();
     return;
@@ -3776,20 +3323,8 @@ async function mergeImportPackage(event){
     const importedChangeIds = new Set((imported.changes || []).map(entry => String(entry && entry.id || "")).filter(Boolean));
     const importedPackageVersion = normalizePackageVersionValue(imported.packageVersion);
 
-    const localResourcesWithPdf = ((data && data.resources) || [])
-      .map(r => ({ resource:r, paths:collectPDFPathsFromResource(r) }))
-      .filter(item => item.paths.length);
     const { mergedData, summary:mergeSummary } = mergeResourcePackages(data, imported);
-    const mergedById = new Map((mergedData.resources || []).map(r => [String(r && r.id || ""), r]));
-    const resourcesWithPdf = localResourcesWithPdf
-      .filter(item => {
-        const mergedResource = mergedById.get(String(item.resource && item.resource.id || ""));
-        const mergedPaths = new Set(collectPDFPathsFromResource(mergedResource));
-        return item.paths.some(path => !mergedPaths.has(path));
-      })
-      .map(item => item.resource.name);
 
-    const missingPdfPaths = await mergeZipAssets(zip, mergedData);
     applyMergedData(mergedData);
     const loadedChanges = getRecentChanges().filter(entry => importedChangeIds.has(String(entry.id || "")));
     const loadedChangeSummaries = loadedChanges.length
@@ -3810,22 +3345,6 @@ async function mergeImportPackage(event){
       showRecentChangeLog = false;
       view = "recent-updates";
       safeRender();
-    }
-    const warningBlocks = [];
-    if(resourcesWithPdf.length > 0){
-      warningBlocks.push(
-        "The following PDFs were not preserved:\n\n" +
-        resourcesWithPdf.map(name => `• ${name}`).join("\n")
-      );
-    }
-    if(missingPdfPaths.length > 0){
-      warningBlocks.push(
-        "The package referenced PDF files that were not found in the zip:\n\n" +
-        missingPdfPaths.map(path => `• ${path}`).join("\n")
-      );
-    }
-    if(warningBlocks.length){
-      alert(warningBlocks.join("\n\n"));
     }
     showToast("Resource package merged. You can delete the package zip when you are done.");
   }catch(e){
@@ -4217,9 +3736,6 @@ function resourceEditorDraft(){
   if(!nameEl || !phoneEl || !addressEl || !websiteEl || !hoursEl || !descEl || !servicesEl || !tagsEl) return null;
   const verifiedEl = document.getElementById("res_verified_on");
   const verifiedOn = verifiedEl ? verifiedEl.value.trim() : "";
-  const pdfs = editing?.kind === "resource"
-    ? getResourcePDFs(data.resources[editing.idx]).map(pdf => ({ ...pdf }))
-    : [];
   const tags = parseResourceTagsInput(tagsEl.value);
 
   return {
@@ -4230,7 +3746,6 @@ function resourceEditorDraft(){
     hours: hoursEl.value.trim(),
     description: descEl.value,
     servicesText: servicesEl.value,
-    pdfs,
     verifiedOn,
     categories: Array.from(document.querySelectorAll(".resCat"))
       .filter(cb=>cb.checked)
@@ -4481,11 +3996,6 @@ function applyResourceDraft(idx, draft){
   // Apply validated resource draft into canonical data model.
   const res = data.resources[idx];
   if(!res) return;
-  res.pdfs = Array.isArray(draft.pdfs) ? draft.pdfs.map(pdf => ({ ...pdf })) : [];
-  normalizeResourcePDFs(res);
-  if(typeof res.pdf === "string" && !res.pdfs.some(pdf => pdf.path === res.pdf.trim())){
-    delete res.pdf;
-  }
   res.name = draft.name || res.name;
   res.phone = draft.phone;
   res.address = draft.address;
@@ -4982,7 +4492,7 @@ function editCategory(idx){
 /* ---------- Admin: Resources ---------- */
 
 function renderAdminResources(container){
-  // Resource management view (browse list, edit mode, tags, PDF association).
+  // Resource management view (browse list, edit mode, and tags).
   if(adminResourceEditMode && !selectedResourceId && data.resources[0] && data.resources[0].id){
     selectedResourceId = data.resources[0].id;
   }
@@ -5106,7 +4616,6 @@ function newResource(){
     id: resourceId,
     name: "",
     description: "",
-    pdfs: [],
     servicesText: "",
     tags: [],
     verifiedOn: null
@@ -5152,7 +4661,7 @@ function isBlankResourceDraft(resource){
   if(!resource) return false;
   const hasText = ["name", "description", "phone", "address", "website", "hours", "servicesText"]
     .some(key => String(resource[key] || "").trim());
-  const hasLists = ["categories", "tags", "pdfs"]
+  const hasLists = ["categories", "tags"]
     .some(key => Array.isArray(resource[key]) && resource[key].length);
   return !hasText && !hasLists;
 }
@@ -5230,7 +4739,6 @@ function editResource(idx){
 
   normalizeResourceServices(res);
   normalizeResourceVerifiedOn(res);
-  normalizeResourcePDFs(res);
   res.tags = normalizeResourceTags(res.tags);
   const verifiedDisplay = formatVerifiedOnForDisplay(res.verifiedOn);
   const tagInputValue = formatResourceTagsInput(res.tags);
@@ -5328,29 +4836,6 @@ function editResource(idx){
   const servicesPreviewBtn = document.getElementById("res_services_preview_btn");
   const servicesPreviewBox = document.getElementById("res_services_preview");
   const doneBtn = document.getElementById("res_done_btn");
-  const servicesBlock = servicesEl ? servicesEl.parentElement : null;
-  const pdfs = getResourcePDFs(res);
-  const pdfSection = document.createElement("div");
-  pdfSection.style.marginBottom = "12px";
-  pdfSection.innerHTML = `
-    <div><strong>PDF attachments</strong></div>
-    <div class="pdf-attachments-list">
-      ${pdfs.length ? pdfs.map(pdf => `
-        <div class="pdf-attachment-row">
-          <span>${escapeHTML(pdf.name || "PDF")}</span>
-          <button class="button" type="button" data-remove-pdf-id="${escapeHTML(pdf.id)}">Remove PDF</button>
-        </div>
-      `).join("") : `<div>No PDFs attached.</div>`}
-    </div>
-    <input type="file" id="pdfPicker" accept="application/pdf" multiple style="display:none">
-    <button class="button" type="button" id="attachPdfBtn">Attach PDF</button>
-  `;
-  if(servicesBlock){
-    editor.insertBefore(pdfSection, servicesBlock);
-  }else{
-    editor.appendChild(pdfSection);
-  }
-
   function refreshServicesPreview(){
     if(!servicesEl || !servicesPreviewBox) return;
     servicesPreviewBox.innerHTML = renderServicesHTML(servicesEl.value);
@@ -5422,53 +4907,6 @@ function editResource(idx){
     };
     verifiedInput.addEventListener("input", updateVerifiedDisplayAndWarning);
   }
-
-  const picker = document.getElementById("pdfPicker");
-  const attachPdfBtn = document.getElementById("attachPdfBtn");
-  if(attachPdfBtn && picker) attachPdfBtn.onclick = () => picker.click();
-  if(picker) picker.onchange = async e => {
-    const files = Array.from((e.target.files || [])).filter(file => file && (/\.pdf$/i.test(file.name) || file.type === "application/pdf"));
-    if(!files.length) return;
-    if(!commitPendingEditsIfChanged()) return;
-
-    const current = data.resources[idx];
-    if(!current) return;
-    normalizeResourcePDFs(current);
-    try{
-      for(const file of files){
-        const id = generateResourceId();
-        const key = buildPDFStoragePath(current.id, id, file.name);
-        await savePDF(key, file);
-        current.pdfs.push({ id, name:file.name || "PDF", path:key });
-      }
-      current.lastModified = nowISO();
-      persist();
-      editResource(idx);
-    }catch(err){
-      alert("Unable to attach PDF: " + err.message);
-    }
-  };
-
-  pdfSection.querySelectorAll("[data-remove-pdf-id]").forEach(btn => {
-    btn.onclick = async () => {
-      if(!commitPendingEditsIfChanged()) return;
-      const current = data.resources[idx];
-      if(!current) return;
-      const pdfId = btn.getAttribute("data-remove-pdf-id");
-      const removed = removePDFAttachmentFromResource(current, pdfId);
-      if(!removed) return;
-      try{
-        current.lastModified = nowISO();
-        persist();
-        if(!isPDFPathReferenced(removed.path)){
-          await deletePDF(removed.path);
-        }
-        editResource(idx);
-      }catch(err){
-        alert("Unable to remove PDF: " + err.message);
-      }
-    };
-  });
 
   function validateEditorState(){
     const draft = resourceEditorDraft();
