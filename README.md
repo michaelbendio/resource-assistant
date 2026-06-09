@@ -1,4 +1,4 @@
-# ALBQ Resource Assistant
+# Albuquerque TSO resources
 
 Single-file HTML resource assistant based on the existing TSO app design.
 

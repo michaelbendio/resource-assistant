@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>ALBQ Resource Assistant</title>
+<title>Albuquerque TSO resources</title>
 
 <!-- ===== APP CSS START ===== -->
 <style>
@@ -372,14 +372,14 @@ textarea.services-editor { min-height:320px; resize:vertical; }
 -->
 
 <div id="appErrorBanner" style="display:none; position:fixed; top:0; left:0; right:0; background:#ffd9d9; border-bottom:2px solid #c00; z-index:9999; padding:10px; font-size:16px;">
-  <strong>ALBQ Resource Assistant error</strong>
+  <strong>Albuquerque TSO resources error</strong>
   <pre id="appErrorDetails" style="white-space:pre-wrap;"></pre>
   <button class="button" id="appErrorCopy">Copy</button>
   <button class="button" id="appErrorDismiss">Dismiss</button>
 </div>
 
 <div class="topbar">
-  <div class="title" id="appTitle">ALBQ Resource Assistant</div>
+  <div class="title" id="appTitle">Albuquerque TSO resources</div>
   <div class="tabs">
     <span id="tabSearch" role="button" aria-label="Search" title="Search">&#128269;</span>
     <span id="tabCategories">Categories</span>
@@ -1005,7 +1005,7 @@ function renderServicesHTML(text){
 const seed = JSON.parse(document.getElementById("seed-data").textContent);
 // Main persisted app data snapshot (categories/resources + metadata).
 let data = JSON.parse(localStorage.getItem("albqData") || "null");
-const APP_VERSION = "1.5.0";
+const APP_VERSION = "0.1";
 const DEBUG = new URLSearchParams(location.search).has("debug");
 const UPDATE_SEEN_STORAGE_KEY = "albqRecentUpdatesSeen";
 const CATEGORY_REMINDER_TEXT = "If you notice resources that need to be added or updated, use Admin to make changes or export a resource package.";
@@ -2601,7 +2601,7 @@ function render(){
     if(pendingRecentUpdates.length){
       const note = document.createElement("div");
       note.className = "category-card";
-      note.innerHTML = `<div>${pendingRecentUpdates.length} new updates loaded.</div><div>Click ALBQ Resource Assistant at any time to review updates.</div>`;
+      note.innerHTML = `<div>${pendingRecentUpdates.length} new updates loaded.</div><div>Click Albuquerque TSO resources at any time to review updates.</div>`;
       appView.appendChild(note);
     }
     renderCategoryReminder();
