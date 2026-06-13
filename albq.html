@@ -522,6 +522,15 @@ function generateResourceId(){
     .map(b => b.toString(16).padStart(2,"0"))
     .join("");
 }
+function slugifyId(value){
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || generateResourceId();
+}
 
 function showToast(message, options = {}){
   let toast = document.getElementById("appToast");
@@ -582,6 +591,72 @@ function normalizeDataInformationShape(data){
 function normalizeDataVerifiedOnShape(nextData){
   if(!nextData || !Array.isArray(nextData.resources)) return;
   nextData.resources.forEach(normalizeResourceVerifiedOn);
+}
+
+const DEFAULT_CATEGORY_PRESET_VERSION = 1;
+const DEFAULT_CATEGORY_LABELS = [
+  "Addiction",
+  "Children/Pregnancy",
+  "Clothing/Household",
+  "Disability",
+  "Domestic Violence",
+  "Education",
+  "Employment",
+  "Financial Assistance",
+  "Reentry Support",
+  "Food",
+  "Medical, Dental, Vision",
+  "Homeless Services",
+  "Housing",
+  "ID Recovery",
+  "Immigration",
+  "Legal",
+  "Mental Health",
+  "Miscellaneous",
+  "Seniors",
+  "Transportation",
+  "Utilities, Phone, Internet",
+  "Veterans"
+];
+
+function applyDefaultCategoryPreset(nextData){
+  if(!nextData || typeof nextData !== "object") return false;
+  if(nextData.categoryPresetVersion === DEFAULT_CATEGORY_PRESET_VERSION) return false;
+  if(!Array.isArray(nextData.categories)) nextData.categories = [];
+
+  const seen = new Set();
+  nextData.categories.forEach(category => {
+    const id = String(category && category.id || "").trim().toLowerCase();
+    const label = String(category && category.label || "").trim().toLowerCase();
+    if(id) seen.add(id);
+    if(label) seen.add(label);
+  });
+
+  const timestamp = nowISO();
+  DEFAULT_CATEGORY_LABELS.forEach((label, index) => {
+    const labelKey = label.toLowerCase();
+    if(seen.has(labelKey)) return;
+
+    let id = slugifyId(label);
+    let suffix = 2;
+    while(seen.has(id)){
+      id = `${slugifyId(label)}-${suffix}`;
+      suffix += 1;
+    }
+
+    nextData.categories.push({
+      id,
+      label,
+      active: true,
+      lastModified: timestamp,
+      displayOrder: (index + 1) * 10
+    });
+    seen.add(id);
+    seen.add(labelKey);
+  });
+
+  nextData.categoryPresetVersion = DEFAULT_CATEGORY_PRESET_VERSION;
+  return true;
 }
 
 function formatMMYYFromDate(d){
@@ -1018,6 +1093,9 @@ const CATEGORY_REMINDER_TEXT = "If you notice resources that need to be added or
 
 if(!data){
   data = seed;
+}
+const appliedCategoryPreset = applyDefaultCategoryPreset(data);
+if(!localStorage.getItem("albqData") || appliedCategoryPreset){
   localStorage.setItem("albqData", JSON.stringify(data));
 }
 
@@ -1572,6 +1650,44 @@ function runSelfTests(){
       if(!Array.isArray(data.categories)) throw new Error("categories array missing");
       const ids = data.resources.map(r => String(r && r.id || ""));
       if(new Set(ids).size !== ids.length) throw new Error("resource ids are not unique");
+    }
+  });
+
+  tests.push({
+    name: "DEFAULT CATEGORY PRESET",
+    fn: () => {
+      const sample = { categories:[], resources:[] };
+      const applied = applyDefaultCategoryPreset(sample);
+      if(!applied) throw new Error("category preset was not applied");
+      if(sample.categoryPresetVersion !== DEFAULT_CATEGORY_PRESET_VERSION){
+        throw new Error("category preset version was not recorded");
+      }
+      if(sample.categories.length !== DEFAULT_CATEGORY_LABELS.length){
+        throw new Error(`expected ${DEFAULT_CATEGORY_LABELS.length} preset categories, got ${sample.categories.length}`);
+      }
+      if(!sample.categories.some(category => category.label === "Utilities, Phone, Internet")){
+        throw new Error("missing Utilities, Phone, Internet category");
+      }
+      sample.categories = sample.categories.filter(category => category.label !== "Addiction");
+      applyDefaultCategoryPreset(sample);
+      if(sample.categories.some(category => category.label === "Addiction")){
+        throw new Error("deleted preset category was recreated after version marker");
+      }
+    }
+  });
+
+  tests.push({
+    name: "DEFAULT CATEGORY PRESET DEDUPES",
+    fn: () => {
+      const sample = {
+        categories:[
+          { id:"housing", label:"Housing", displayOrder:10 }
+        ],
+        resources:[]
+      };
+      applyDefaultCategoryPreset(sample);
+      const housingMatches = sample.categories.filter(category => String(category.label || "").toLowerCase() === "housing");
+      if(housingMatches.length !== 1) throw new Error("Housing category was duplicated");
     }
   });
 
