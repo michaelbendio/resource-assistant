@@ -176,6 +176,15 @@ textarea.services-editor { min-height:320px; resize:vertical; }
 .resource-editor-grid .span-2 { grid-column:span 2; }
 .resource-editor-grid label input,
 .resource-editor-grid label textarea { width:100%; box-sizing:border-box; }
+.resource-info-guidance { margin:6px 0 10px; }
+.resource-info-section { margin-top:8px; }
+.resource-info-section-label { display:block; font-weight:bold; margin-bottom:3px; }
+.resource-info-section textarea,
+.resource-info-additional textarea { width:100%; box-sizing:border-box; }
+.resource-info-additional { margin-top:10px; }
+.resource-info-rendered .resource-info-section { margin-top:0; }
+.resource-info-rendered .resource-info-section + .resource-info-section,
+.resource-info-rendered .resource-info-additional-rendered { margin-top:6px; }
 #res_name { text-align:left; width:100%; box-sizing:border-box; }
 .verified-warning { color:#aa0000; font-size:13px; margin-top:4px; min-height:1.1em; }
 .tag-controls-row { margin-top:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
@@ -541,22 +550,12 @@ function showToast(message, options = {}){
 // ============================================================
 // DATA NORMALIZATION
 // ============================================================
-// Normalize legacy/imported records into a single canonical shape so rendering,
-// editing, and persistence logic only handle one schema.
+// Normalize imported records into the canonical shape used by rendering,
+// editing, and persistence.
 
-function normalizeResourceServices(r){
-  // Canonical: servicesText string. Legacy: services array of lines.
+function normalizeResourceInformation(r){
   if(!r || typeof r !== "object") return false;
-  if(typeof r.servicesText === "string"){
-    delete r.services;
-    return false;
-  }
-  if(Array.isArray(r.services)){
-    r.servicesText = r.services.join("\n");
-    delete r.services;
-    return true;
-  }
-  if(!r.servicesText) r.servicesText = "";
+  if(typeof r.informationText !== "string") r.informationText = "";
   return false;
 }
 
@@ -575,9 +574,9 @@ function normalizeResourceVerifiedOn(r){
   if("verifiedDate" in r) delete r.verifiedDate;
 }
 
-function normalizeDataServicesShape(data){
+function normalizeDataInformationShape(data){
   if(!data.resources) return;
-  data.resources.forEach(normalizeResourceServices);
+  data.resources.forEach(normalizeResourceInformation);
 }
 
 function normalizeDataVerifiedOnShape(nextData){
@@ -851,11 +850,91 @@ function confirmCategoryAssignmentHint(draft){
   return confirm(`This resource has tags suggesting ${categoryList}, but ${categoryPhrase} not selected. Continue?`);
 }
 
-function applyServicesBold(escapedText){
-  return escapedText.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
+const INFORMATION_SECTIONS = [
+  { key:"offered", label:"What is offered" },
+  { key:"eligibility", label:"Eligibility" },
+  { key:"expect", label:"What to expect" },
+  { key:"connect", label:"How to connect" }
+];
+const INFORMATION_ADDITIONAL_LABEL = "Additional text:";
+
+function trimOuterBlankLines(lines){
+  const next = lines.slice();
+  while(next.length && next[0].trim() === "") next.shift();
+  while(next.length && next[next.length - 1].trim() === "") next.pop();
+  return next;
 }
 
-function renderServicesHTML(text){
+function emptyInformationDraft(){
+  return INFORMATION_SECTIONS.reduce((draft, section) => {
+    draft[section.key] = "";
+    return draft;
+  }, { additional:"" });
+}
+
+function parseInformationText(text){
+  const normalized = String(text || "").replace(/\r\n?/g, "\n");
+  const draft = emptyInformationDraft();
+  const buckets = INFORMATION_SECTIONS.reduce((acc, section) => {
+    acc[section.key] = [];
+    return acc;
+  }, { additional:[] });
+  let currentKey = "additional";
+
+  normalized.split("\n").forEach(line => {
+    const trimmed = line.trim();
+    if(trimmed === INFORMATION_ADDITIONAL_LABEL){
+      currentKey = "additional";
+      return;
+    }
+
+    const section = INFORMATION_SECTIONS.find(item => {
+      const escapedLabel = item.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return new RegExp(`^\\*\\*${escapedLabel}:\\*\\*(?:\\s*(.*))?$`).test(trimmed);
+    });
+
+    if(section){
+      currentKey = section.key;
+      const escapedLabel = section.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const match = trimmed.match(new RegExp(`^\\*\\*${escapedLabel}:\\*\\*(?:\\s*(.*))?$`));
+      if(match && match[1]) buckets[currentKey].push(match[1]);
+      return;
+    }
+
+    buckets[currentKey].push(line);
+  });
+
+  Object.keys(draft).forEach(key => {
+    draft[key] = trimOuterBlankLines(buckets[key] || []).join("\n");
+  });
+  return draft;
+}
+
+function composeInformationText(draft){
+  const parts = [];
+  INFORMATION_SECTIONS.forEach(section => {
+    const body = String(draft && draft[section.key] || "").trim();
+    if(!body) return;
+    parts.push(`**${section.label}:**`);
+    parts.push(body);
+  });
+  const additional = String(draft && draft.additional || "").trim();
+  if(additional){
+    parts.push(INFORMATION_ADDITIONAL_LABEL);
+    parts.push(additional);
+  }
+  return parts.join("\n");
+}
+
+function applyInformationMarkup(escapedText){
+  return escapedText
+    .replace(/__\*\*([^_\n][\s\S]*?)\*\*__/g, "<strong><u>$1</u></strong>")
+    .replace(/\*\*__([^*\n][\s\S]*?)__\*\*/g, "<strong><u>$1</u></strong>")
+    .replace(/\*\*([^*\n]+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/__([^_\n]+?)__/g, "<u>$1</u>");
+}
+
+function renderInformationMarkupHTML(text){
   const normalized = String(text || "").replace(/\r\n?/g, "\n");
   const lines = normalized.split("\n");
   const out = [];
@@ -879,7 +958,7 @@ function renderServicesHTML(text){
     }
 
     if(bulletMatch){
-      const bulletText = applyServicesBold(escapeHTML(bulletMatch[1]));
+      const bulletText = applyInformationMarkup(escapeHTML(bulletMatch[1]));
       listItems.push(`<li>${bulletText}</li>`);
       return;
     }
@@ -889,11 +968,35 @@ function renderServicesHTML(text){
       out.push('<div class="services-line services-blank">&nbsp;</div>');
       return;
     }
-    out.push(`<div class="services-line">${applyServicesBold(escapeHTML(line))}</div>`);
+    out.push(`<div class="services-line">${applyInformationMarkup(escapeHTML(line))}</div>`);
   });
 
   flushList();
   return out.join("");
+}
+
+function renderInformationHTML(text){
+  const draft = parseInformationText(text);
+  const out = [];
+
+  INFORMATION_SECTIONS.forEach(section => {
+    const body = String(draft[section.key] || "").trim();
+    if(!body) return;
+    out.push(
+      `<div class="resource-info-section">` +
+      `<strong>${escapeHTML(section.label)}:</strong>` +
+      `<div class="resource-info-body">${renderInformationMarkupHTML(body)}</div>` +
+      `</div>`
+    );
+  });
+
+  const additional = String(draft.additional || "").trim();
+  if(additional){
+    out.push(`<div class="resource-info-additional-rendered">${renderInformationMarkupHTML(additional)}</div>`);
+  }
+
+  if(out.length) return out.join("");
+  return renderInformationMarkupHTML(text);
 }
 
 // ============================================================
@@ -918,7 +1021,7 @@ if(!data){
   localStorage.setItem("albqData", JSON.stringify(data));
 }
 
-normalizeDataServicesShape(data);
+normalizeDataInformationShape(data);
 normalizeDataTagsShape(data);
 normalizeDataVerifiedOnShape(data);
 normalizeChanges(data);
@@ -1236,7 +1339,7 @@ function runSelfTests(){
         lastModified:"2026-01-01T00:00:00.000Z",
         categories:[],
         resources:[
-          { id:"r1", name:"Resource One", description:"Old", servicesText:"", lastModified:"2026-01-01T00:00:00.000Z" }
+          { id:"r1", name:"Resource One", description:"Old", informationText:"", lastModified:"2026-01-01T00:00:00.000Z" }
         ],
         changes:[]
       };
@@ -1246,8 +1349,8 @@ function runSelfTests(){
         lastModified:"2026-02-01T00:00:00.000Z",
         categories:[],
         resources:[
-          { id:"r1", name:"Resource One", description:"New", servicesText:"", lastModified:"2026-02-01T00:00:00.000Z" },
-          { id:"r2", name:"Resource Two", description:"Added", servicesText:"", lastModified:"2026-02-01T00:00:00.000Z" }
+          { id:"r1", name:"Resource One", description:"New", informationText:"", lastModified:"2026-02-01T00:00:00.000Z" },
+          { id:"r2", name:"Resource Two", description:"Added", informationText:"", lastModified:"2026-02-01T00:00:00.000Z" }
         ],
         changes:[]
       };
@@ -1369,7 +1472,7 @@ function runSelfTests(){
             { id:"housing", label:"Housing", displayOrder:10 }
           ],
           resources:[
-            { id:"shelter", name:"Shelter Resource", categories:["housing"], tags:[], servicesText:"" }
+            { id:"shelter", name:"Shelter Resource", categories:["housing"], tags:[], informationText:"" }
           ],
           changes:[]
         };
@@ -1419,8 +1522,8 @@ function runSelfTests(){
         data = {
           categories:[],
           resources:[
-            { id:"zeta", name:"Zeta Resource", categories:[], tags:[], servicesText:"" },
-            { id:"alpha", name:"Alpha Resource", categories:[], tags:[], servicesText:"" }
+            { id:"zeta", name:"Zeta Resource", categories:[], tags:[], informationText:"" },
+            { id:"alpha", name:"Alpha Resource", categories:[], tags:[], informationText:"" }
           ],
           changes:[]
         };
@@ -1492,7 +1595,7 @@ function runSelfTests(){
   tests.push({
     name: "BLANK RESOURCE CLEANUP DETECTION",
     fn: () => {
-      const blank = { name:"", description:"", phone:"", address:"", website:"", hours:"", servicesText:"", categories:[], tags:[] };
+      const blank = { name:"", description:"", phone:"", address:"", website:"", hours:"", informationText:"", categories:[], tags:[] };
       const named = { ...blank, name:"Named Resource" };
       const categorized = { ...blank, categories:["food"] };
       if(!isBlankResourceDraft(blank)) throw new Error("empty resource was not detected");
@@ -1512,8 +1615,8 @@ function runSelfTests(){
         data = {
           categories:[],
           resources:[
-            { id:"existing", name:"Existing", categories:[], tags:[], servicesText:"" },
-            { id:"draft", name:"", categories:[], tags:[], servicesText:"" }
+            { id:"existing", name:"Existing", categories:[], tags:[], informationText:"" },
+            { id:"draft", name:"", categories:[], tags:[], informationText:"" }
           ]
         };
         newResourceIds = new Set(["draft"]);
@@ -1547,9 +1650,9 @@ function runSelfTests(){
     fn: () => {
       const container = document.createElement("div");
       PrintWorkflow.renderPrintableResourceCards(container, [
-        { id:"print-one", name:"Print One", categories:[], tags:[], servicesText:"" },
-        { id:"print-two", name:"Print Two", categories:[], tags:[], servicesText:"" },
-        { id:"print-three", name:"Print Three", categories:[], tags:[], servicesText:"" }
+        { id:"print-one", name:"Print One", categories:[], tags:[], informationText:"" },
+        { id:"print-two", name:"Print Two", categories:[], tags:[], informationText:"" },
+        { id:"print-three", name:"Print Three", categories:[], tags:[], informationText:"" }
       ]);
       if(container.querySelectorAll(".resource-card").length !== 3){
         throw new Error("print resource cards were not rendered");
@@ -1707,18 +1810,18 @@ function runSelfTests(){
             { id:"education", label:"Education", displayOrder:3 }
           ],
           resources:[
-            { id:"target", name:"Community Action", categories:["food"], tags:["Food","List"], servicesText:"Community Action" },
-            { id:"list-food", name:"Food Pantries", categories:["food"], tags:["List"], servicesText:"Community-Action\ncommunity action" },
-            { id:"list-housing", name:"Housing Lists", categories:["housing","food"], tags:["List"], servicesText:"community action" },
-            { id:"not-list", name:"Caseworker Note", categories:["food"], tags:["Food"], servicesText:"Community Action" },
-            { id:"ged", name:"GED", categories:["education"], tags:["Education"], servicesText:"" },
-            { id:"can", name:"CAN", categories:["education"], tags:["Education"], servicesText:"" },
-            { id:"ican", name:"ICAN", categories:["education"], tags:["Education"], servicesText:"" },
-            { id:"aid", name:"Aid", categories:["education"], tags:["Education"], servicesText:"" },
-            { id:"story", name:"My Story Matters", categories:["education"], tags:["Education"], servicesText:"" },
-            { id:"list-education", name:"Education Lists", categories:["education"], tags:["List"], servicesText:"GED preparation, earn a GED, abridged notes, American Fork resources, vacancy listings, Captain Your Story - My Story Matters, GED." },
-            { id:"long-guide", name:"Long Education Guide", categories:["education"], tags:["Education"], servicesText:longText },
-            { id:"short-guide", name:"Short Education Note", categories:["education"], tags:["Education"], servicesText:"GED preparation and My Story Matters" }
+            { id:"target", name:"Community Action", categories:["food"], tags:["Food","List"], informationText:"Community Action" },
+            { id:"list-food", name:"Food Pantries", categories:["food"], tags:["List"], informationText:"Community-Action\ncommunity action" },
+            { id:"list-housing", name:"Housing Lists", categories:["housing","food"], tags:["List"], informationText:"community action" },
+            { id:"not-list", name:"Caseworker Note", categories:["food"], tags:["Food"], informationText:"Community Action" },
+            { id:"ged", name:"GED", categories:["education"], tags:["Education"], informationText:"" },
+            { id:"can", name:"CAN", categories:["education"], tags:["Education"], informationText:"" },
+            { id:"ican", name:"ICAN", categories:["education"], tags:["Education"], informationText:"" },
+            { id:"aid", name:"Aid", categories:["education"], tags:["Education"], informationText:"" },
+            { id:"story", name:"My Story Matters", categories:["education"], tags:["Education"], informationText:"" },
+            { id:"list-education", name:"Education Lists", categories:["education"], tags:["List"], informationText:"GED preparation, earn a GED, abridged notes, American Fork resources, vacancy listings, Captain Your Story - My Story Matters, GED." },
+            { id:"long-guide", name:"Long Education Guide", categories:["education"], tags:["Education"], informationText:longText },
+            { id:"short-guide", name:"Short Education Note", categories:["education"], tags:["Education"], informationText:"GED preparation and My Story Matters" }
           ]
         };
 
@@ -1773,8 +1876,8 @@ function runSelfTests(){
             { id:"health", label:"Health Care", displayOrder:2 }
           ],
           resources:[
-            { id:"bio", name:"BioLife Plasma", categories:["employment","employment","health"], tags:[], servicesText:"" },
-            { id:"talecris", name:"Talecris Plasma", categories:["employment"], tags:[], servicesText:"" }
+            { id:"bio", name:"BioLife Plasma", categories:["employment","employment","health"], tags:[], informationText:"" },
+            { id:"talecris", name:"Talecris Plasma", categories:["employment"], tags:[], informationText:"" }
           ]
         };
         const results = buildSearchResults("plasma");
@@ -1791,28 +1894,28 @@ function runSelfTests(){
   });
 
   tests.push({
-    name: "SEARCH SERVICES FALLBACK",
+    name: "SEARCH INFORMATION FALLBACK",
     fn: () => {
       const previousData = data;
       try{
         data = {
           categories:[{ id:"housing", label:"Housing", displayOrder:1 }],
           resources:[
-            { id:"parent", name:"Parent Support", categories:["housing"], tags:[], servicesText:"paid utility help" },
-            { id:"uca", name:"Utah Community Action", categories:["housing"], tags:[], servicesText:"Emergency rental assistance and deposit help" }
+            { id:"parent", name:"Parent Support", categories:["housing"], tags:[], informationText:"paid utility help" },
+            { id:"uca", name:"Utah Community Action", categories:["housing"], tags:[], informationText:"Emergency rental assistance and deposit help" }
           ]
         };
         const rentResults = buildSearchResults("rent");
         if(rentResults.mode !== "none") throw new Error("rent should not match parent or rental");
         const emergencyResults = buildSearchResults("emergency");
-        if(emergencyResults.mode !== "services") throw new Error(`expected services mode, got ${emergencyResults.mode}`);
-        if(emergencyResults.groups[0].items[0].resourceId !== "uca") throw new Error("services result resource was incorrect");
-        if(!emergencyResults.groups[0].items[0].snippet) throw new Error("services result snippet was missing");
+        if(emergencyResults.mode !== "information") throw new Error(`expected information mode, got ${emergencyResults.mode}`);
+        if(emergencyResults.groups[0].items[0].resourceId !== "uca") throw new Error("information result resource was incorrect");
+        if(!emergencyResults.groups[0].items[0].snippet) throw new Error("information result snippet was missing");
 
-        data.resources.push({ id:"emergency-name", name:"Emergency Center", categories:["housing"], tags:[], servicesText:"" });
+        data.resources.push({ id:"emergency-name", name:"Emergency Center", categories:["housing"], tags:[], informationText:"" });
         const nameResults = buildSearchResults("emergency");
-        if(nameResults.mode !== "name") throw new Error("name matches should suppress services fallback");
-        if(nameResults.groups[0].items.some(item => item.resourceId === "uca")) throw new Error("services fallback appeared when name matches existed");
+        if(nameResults.mode !== "name") throw new Error("name matches should suppress information fallback");
+        if(nameResults.groups[0].items.some(item => item.resourceId === "uca")) throw new Error("information fallback appeared when name matches existed");
       }finally{
         data = previousData;
       }
@@ -1831,7 +1934,7 @@ function runSelfTests(){
       try{
         data = {
           categories:[{ id:"housing", label:"Housing", displayOrder:1 }],
-          resources:[{ id:"uca", name:"Utah Community Action", categories:["housing"], tags:[], servicesText:"" }]
+          resources:[{ id:"uca", name:"Utah Community Action", categories:["housing"], tags:[], informationText:"" }]
         };
         categoryTagFilters = { housing:["Shelter"] };
         openSearchResult("housing", "uca");
@@ -1947,9 +2050,9 @@ function runSelfTests(){
   });
 
   tests.push({
-    name: "SERVICES RENDERER",
+    name: "INFORMATION RENDERER",
     fn: () => {
-      const html = renderServicesHTML("One\n\n* bullet\n---\n**bold**");
+      const html = renderInformationHTML("One\n\n* bullet\n---\n**bold**");
       if(typeof html !== "string" || !html.length) throw new Error("renderer returned empty output");
       const host = document.createElement("div");
       try{
@@ -1967,29 +2070,23 @@ function runSelfTests(){
   });
 
   tests.push({
-    name: "SERVICES TEXT PRESERVATION",
+    name: "INFORMATION TEXT PRESERVATION",
     fn: () => {
-      const resource = { services:["old line"], servicesText:"**bold**\n* bullet\n---" };
-      normalizeResourceServices(resource);
-      if(resource.servicesText !== "**bold**\n* bullet\n---"){
-        throw new Error("servicesText was overwritten by legacy services[]");
-      }
-      if("services" in resource){
-        throw new Error("legacy services[] was not cleared after preserving servicesText");
+      const resource = { informationText:"**bold**\n* bullet\n---" };
+      normalizeResourceInformation(resource);
+      if(resource.informationText !== "**bold**\n* bullet\n---"){
+        throw new Error("informationText was not preserved");
       }
     }
   });
 
   tests.push({
-    name: "EMPTY SERVICES TEXT IS CANONICAL",
+    name: "MISSING INFORMATION TEXT IS CANONICAL",
     fn: () => {
-      const resource = { services:["legacy line"], servicesText:"" };
-      normalizeResourceServices(resource);
-      if(resource.servicesText !== ""){
-        throw new Error("empty servicesText was replaced by legacy services[]");
-      }
-      if("services" in resource){
-        throw new Error("legacy services[] was not cleared when servicesText existed");
+      const resource = {};
+      normalizeResourceInformation(resource);
+      if(resource.informationText !== ""){
+        throw new Error("missing informationText was not normalized to empty string");
       }
     }
   });
@@ -2187,7 +2284,7 @@ function getCategoryUpdateMap(){
 
 function buildResourceCard(res,{expanded=false,showDescription=false,showStar=true}={}){
   // Shared DOM builder used by category view, favorites view, and print previews.
-  normalizeResourceServices(res);
+  normalizeResourceInformation(res);
 
   const card=document.createElement("div");
   card.className="resource-card";
@@ -2216,7 +2313,7 @@ function buildResourceCard(res,{expanded=false,showDescription=false,showStar=tr
   if(res.phone) html+=`<div><strong>Phone:</strong> <a href="tel:${res.phone}">${res.phone}</a></div>`;
   if(res.address) html+=`<div><strong>Address:</strong> ${escapeHTML(res.address)}</div>`;
   if(websiteURL) html+=`<div><strong>Website:</strong> <a href="${websiteURL}" target="_blank">${res.website}</a></div>`;
-  if(res.servicesText) html+=`<div><strong>Services:</strong><div class="services-rendered">${renderServicesHTML(res.servicesText)}</div></div>`;
+  if(res.informationText) html+=`<div><strong>Information:</strong><div class="services-rendered resource-info-rendered">${renderInformationHTML(res.informationText)}</div></div>`;
 
   details.innerHTML=html;
   main.appendChild(details);
@@ -2385,7 +2482,7 @@ function undoLastDeletion(){
   const snapshot = getUndoSnapshot();
   if(!snapshot || !snapshot.dataSnapshot) return;
       data = snapshot.dataSnapshot;
-      normalizeDataServicesShape(data);
+      normalizeDataInformationShape(data);
       normalizeDataTagsShape(data);
       normalizeDataVerifiedOnShape(data);
       normalizeChanges(data);
@@ -2746,8 +2843,8 @@ const PrintWorkflow = {
     if(resource.phone) html += `<div class="print-list-field"><strong>Phone:</strong> ${escapeHTML(resource.phone)}</div>`;
     if(resource.address) html += `<div class="print-list-field"><strong>Address:</strong> ${escapeHTML(resource.address)}</div>`;
     if(resource.website) html += `<div class="print-list-field"><strong>Website:</strong> ${escapeHTML(resource.website)}</div>`;
-    if(resource.servicesText){
-      html += `<div class="print-list-field"><strong>Services:</strong><div class="services-rendered">${renderServicesHTML(resource.servicesText)}</div></div>`;
+    if(resource.informationText){
+      html += `<div class="print-list-field"><strong>Information:</strong><div class="services-rendered resource-info-rendered">${renderInformationHTML(resource.informationText)}</div></div>`;
     }
     flyer.innerHTML = html;
     return flyer;
@@ -3172,7 +3269,7 @@ function normalizePackageData(nextData){
   if(!nextData || typeof nextData !== "object") nextData = {};
   if(!Array.isArray(nextData.categories)) nextData.categories = [];
   if(!Array.isArray(nextData.resources)) nextData.resources = [];
-  normalizeDataServicesShape(nextData);
+  normalizeDataInformationShape(nextData);
   normalizeDataTagsShape(nextData);
   normalizeDataVerifiedOnShape(nextData);
   normalizeChanges(nextData);
@@ -3521,13 +3618,13 @@ function isReferenceNameSearchable(resourceName){
   return /[A-Z]/.test(rawName) && rawName === rawName.toUpperCase();
 }
 
-function servicesTextReferencesName(servicesText, resourceName){
+function informationTextReferencesName(informationText, resourceName){
   if(!isReferenceNameSearchable(resourceName)) return false;
-  return textContainsTokenPhrase(servicesText, resourceName);
+  return textContainsTokenPhrase(informationText, resourceName);
 }
 
-function getReferenceSnippet(servicesText, resourceName){
-  const text = String(servicesText || "").replace(/\s+/g, " ").trim();
+function getReferenceSnippet(informationText, resourceName){
+  const text = String(informationText || "").replace(/\s+/g, " ").trim();
   if(!text) return "";
 
   const lowerText = text.toLowerCase();
@@ -3614,15 +3711,15 @@ function buildSearchResults(query){
   groups = [];
   groupMap = new Map();
   resources.forEach(resource => {
-    if(!textContainsTokenPhrase(resource && resource.servicesText, cleanQuery)) return;
+    if(!textContainsTokenPhrase(resource && resource.informationText, cleanQuery)) return;
     getResourceCategoryEntriesForSearch(resource).forEach(category => {
       addSearchResult(groupMap, groups, category, resource, {
-        snippet:getReferenceSnippet(resource && resource.servicesText, cleanQuery)
+        snippet:getReferenceSnippet(resource && resource.informationText, cleanQuery)
       });
     });
   });
 
-  return { query:cleanQuery, mode:groups.length ? "services" : "none", groups:sortSearchResultGroups(groups) };
+  return { query:cleanQuery, mode:groups.length ? "information" : "none", groups:sortSearchResultGroups(groups) };
 }
 
 function sortSearchResultGroups(groups){
@@ -3656,7 +3753,7 @@ function resourceHasListTag(resource){
 
 function resourceIsListStyle(resource){
   if(resourceHasListTag(resource)) return true;
-  return String(resource && resource.servicesText || "").trim().length > 500;
+  return String(resource && resource.informationText || "").trim().length > 500;
 }
 
 function findReferencingLists(resourceOrName){
@@ -3675,8 +3772,8 @@ function findReferencingLists(resourceOrName){
     const resourceId = String(resource && resource.id || "");
     if(targetId && resourceId === targetId) return;
     if(!resourceIsListStyle(resource)) return;
-    const servicesText = String(resource && resource.servicesText || "");
-    if(!servicesTextReferencesName(servicesText, needle)) return;
+    const informationText = String(resource && resource.informationText || "");
+    if(!informationTextReferencesName(informationText, needle)) return;
 
     const listName = String(resource && resource.name || "(Unnamed list)");
     const key = String(resource && resource.id || listName).toLowerCase();
@@ -3687,7 +3784,7 @@ function findReferencingLists(resourceOrName){
       categoryLabels: categoryEntries.map(category => category.label),
       categoryOrder: Math.min(...categoryEntries.map(category => category.order)),
       listName,
-      snippet: getReferenceSnippet(servicesText, needle)
+      snippet: getReferenceSnippet(informationText, needle)
     });
   });
 
@@ -3813,13 +3910,19 @@ function resourceEditorDraft(){
   const websiteEl = document.getElementById("res_website");
   const hoursEl = document.getElementById("res_hours");
   const descEl = document.getElementById("res_description");
-  const servicesEl = document.getElementById("res_services");
   const tagsEl = document.getElementById("res_tags");
   const updateEl = document.getElementById("res_update_description");
-  if(!nameEl || !phoneEl || !addressEl || !websiteEl || !hoursEl || !descEl || !servicesEl || !tagsEl) return null;
+  if(!nameEl || !phoneEl || !addressEl || !websiteEl || !hoursEl || !descEl || !tagsEl) return null;
   const verifiedEl = document.getElementById("res_verified_on");
   const verifiedOn = verifiedEl ? verifiedEl.value.trim() : "";
   const tags = parseResourceTagsInput(tagsEl.value);
+  const informationDraft = emptyInformationDraft();
+  INFORMATION_SECTIONS.forEach(section => {
+    const field = document.getElementById(`res_info_${section.key}`);
+    informationDraft[section.key] = field ? field.value : "";
+  });
+  const additionalEl = document.getElementById("res_info_additional");
+  informationDraft.additional = additionalEl ? additionalEl.value : "";
 
   return {
     name: nameEl.value.trim(),
@@ -3828,7 +3931,7 @@ function resourceEditorDraft(){
     website: websiteEl.value.trim(),
     hours: hoursEl.value.trim(),
     description: descEl.value,
-    servicesText: servicesEl.value,
+    informationText: composeInformationText(informationDraft),
     verifiedOn,
     categories: Array.from(document.querySelectorAll(".resCat"))
       .filter(cb=>cb.checked)
@@ -4085,7 +4188,7 @@ function applyResourceDraft(idx, draft){
   res.website = draft.website;
   res.hours = draft.hours;
   res.description = draft.description;
-  res.servicesText = draft.servicesText;
+  res.informationText = draft.informationText;
   const verifiedValidation = validateVerifiedOnInput(draft.verifiedOn);
   res.verifiedOn = verifiedValidation.valid ? verifiedValidation.normalized : null;
   if("reviewedOn" in res) delete res.reviewedOn;
@@ -4790,7 +4893,7 @@ function newResource(){
     id: resourceId,
     name: "",
     description: "",
-    servicesText: "",
+    informationText: "",
     tags: [],
     verifiedOn: null
   };
@@ -4833,7 +4936,7 @@ function discardNewResourceDraft(resourceId){
 
 function isBlankResourceDraft(resource){
   if(!resource) return false;
-  const hasText = ["name", "description", "phone", "address", "website", "hours", "servicesText"]
+  const hasText = ["name", "description", "phone", "address", "website", "hours", "informationText"]
     .some(key => String(resource[key] || "").trim());
   const hasLists = ["categories", "tags"]
     .some(key => Array.isArray(resource[key]) && resource[key].length);
@@ -4911,11 +5014,12 @@ function editResource(idx){
   selectedResourceId = res.id || selectedResourceId;
   editing = { kind: "resource", idx };
 
-  normalizeResourceServices(res);
+  normalizeResourceInformation(res);
   normalizeResourceVerifiedOn(res);
   res.tags = normalizeResourceTags(res.tags);
   const verifiedDisplay = formatVerifiedOnForDisplay(res.verifiedOn);
   const tagInputValue = formatResourceTagsInput(res.tags);
+  const informationDraft = parseInformationText(res.informationText || "");
   const tagSuggestions = normalizeResourceTags([...res.tags, ...getAllTags(res.id)])
     .sort((a,b)=>a.localeCompare(b, undefined, { sensitivity:"base" }));
 
@@ -4984,17 +5088,31 @@ function editResource(idx){
       ${catChecks}
     </div>
 
-    <label style="display:block; font-weight:bold; margin-top:12px;">Services</label>
+    <label style="display:block; font-weight:bold; margin-top:12px;">Information</label>
     <div class="services-control-block">
       <div class="services-control-header">
         <div class="services-preview-toggle">
-          <button class="button primary" type="button" id="res_services_edit_btn">Edit</button>
-          <button class="button" type="button" id="res_services_preview_btn">Preview</button>
+          <button class="button primary" type="button" id="res_information_edit_btn">Edit</button>
+          <button class="button" type="button" id="res_information_preview_btn">Preview</button>
         </div>
-        <div class="services-hint">Bullets: start line with "* " | Bold: **text** | Divider: ---</div>
+        <div class="services-hint resource-info-guidance">
+          Use the section headings as a guide. Blank sections will not be shown. Text in Additional text appears after the guided sections without its own heading.<br>
+          Formatting: use * at the start of a line for bullets, **bold** for bold text, __underline__ for underline, and --- on its own line for a horizontal line.
+        </div>
       </div>
-      <textarea id="res_services" class="big services-editor">${escapeHTML(res.servicesText || "")}</textarea>
-      <div id="res_services_preview" class="services-preview-box services-rendered hidden"></div>
+      <div id="res_information_editor">
+        ${INFORMATION_SECTIONS.map(section => `
+          <div class="resource-info-section">
+            <label class="resource-info-section-label" for="res_info_${escapeHTML(section.key)}">${escapeHTML(section.label)}:</label>
+            <textarea id="res_info_${escapeHTML(section.key)}" class="big resource-info-input" style="min-height:76px;">${escapeHTML(informationDraft[section.key] || "")}</textarea>
+          </div>
+        `).join("")}
+        <div class="resource-info-additional">
+          <label class="resource-info-section-label" for="res_info_additional">Additional text:</label>
+          <textarea id="res_info_additional" class="big resource-info-input" style="min-height:90px;">${escapeHTML(informationDraft.additional || "")}</textarea>
+        </div>
+      </div>
+      <div id="res_information_preview" class="services-preview-box services-rendered resource-info-rendered hidden"></div>
     </div><br>
   `;
 
@@ -5005,34 +5123,43 @@ function editResource(idx){
   const nameEl = document.getElementById("res_name");
   const updateEl = document.getElementById("res_update_description");
   const tagsEl = document.getElementById("res_tags");
-  const servicesEl = document.getElementById("res_services");
-  const servicesEditBtn = document.getElementById("res_services_edit_btn");
-  const servicesPreviewBtn = document.getElementById("res_services_preview_btn");
-  const servicesPreviewBox = document.getElementById("res_services_preview");
+  const informationEditor = document.getElementById("res_information_editor");
+  const informationEditBtn = document.getElementById("res_information_edit_btn");
+  const informationPreviewBtn = document.getElementById("res_information_preview_btn");
+  const informationPreviewBox = document.getElementById("res_information_preview");
   const doneBtn = document.getElementById("res_done_btn");
-  function refreshServicesPreview(){
-    if(!servicesEl || !servicesPreviewBox) return;
-    servicesPreviewBox.innerHTML = renderServicesHTML(servicesEl.value);
+  function getInformationDraftFromEditor(){
+    const draft = emptyInformationDraft();
+    INFORMATION_SECTIONS.forEach(section => {
+      const field = document.getElementById(`res_info_${section.key}`);
+      draft[section.key] = field ? field.value : "";
+    });
+    const additionalEl = document.getElementById("res_info_additional");
+    draft.additional = additionalEl ? additionalEl.value : "";
+    return draft;
+  }
+  function refreshInformationPreview(){
+    if(!informationPreviewBox) return;
+    informationPreviewBox.innerHTML = renderInformationHTML(composeInformationText(getInformationDraftFromEditor()));
   }
 
-  function setServicesEditorMode(mode){
-    if(!servicesEl || !servicesPreviewBox || !servicesEditBtn || !servicesPreviewBtn) return;
+  function setInformationEditorMode(mode){
+    if(!informationEditor || !informationPreviewBox || !informationEditBtn || !informationPreviewBtn) return;
     const previewMode = mode === "preview";
-    servicesEl.classList.toggle("hidden", previewMode);
-    servicesPreviewBox.classList.toggle("hidden", !previewMode);
-    servicesEditBtn.classList.toggle("primary", !previewMode);
-    servicesPreviewBtn.classList.toggle("primary", previewMode);
-    if(previewMode) refreshServicesPreview();
+    informationEditor.classList.toggle("hidden", previewMode);
+    informationPreviewBox.classList.toggle("hidden", !previewMode);
+    informationEditBtn.classList.toggle("primary", !previewMode);
+    informationPreviewBtn.classList.toggle("primary", previewMode);
+    if(previewMode) refreshInformationPreview();
   }
 
-  if(servicesEditBtn && servicesPreviewBtn){
-    servicesEditBtn.onclick = () => setServicesEditorMode("edit");
-    servicesPreviewBtn.onclick = () => setServicesEditorMode("preview");
+  if(informationEditBtn && informationPreviewBtn){
+    informationEditBtn.onclick = () => setInformationEditorMode("edit");
+    informationPreviewBtn.onclick = () => setInformationEditorMode("preview");
   }
-  if(servicesEl){
-    servicesEl.addEventListener("input", refreshServicesPreview);
-  }
-  setServicesEditorMode("preview");
+  Array.from(document.querySelectorAll(".resource-info-input"))
+    .forEach(field => field.addEventListener("input", refreshInformationPreview));
+  setInformationEditorMode("edit");
 
   function getCurrentTagKeys(){
     return new Set(parseResourceTagsInput(tagsEl ? tagsEl.value : "").map(tag => tag.toLowerCase()));
