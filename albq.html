@@ -180,7 +180,7 @@ textarea.services-editor { min-height:320px; resize:vertical; }
 .resource-info-section { margin-top:8px; }
 .resource-info-section-label { display:block; font-weight:bold; margin-bottom:3px; }
 .resource-info-section textarea,
-.resource-info-additional textarea { width:100%; box-sizing:border-box; }
+.resource-info-additional textarea { width:100%; box-sizing:border-box; overflow:hidden; resize:none; }
 .resource-info-additional { margin-top:10px; }
 .resource-info-rendered .resource-info-section { margin-top:0; }
 .resource-info-rendered .resource-info-section + .resource-info-section,
@@ -1072,6 +1072,12 @@ function renderInformationHTML(text){
 
   if(out.length) return out.join("");
   return renderInformationMarkupHTML(text);
+}
+
+function fitTextareaToText(textarea){
+  if(!textarea) return;
+  textarea.style.height = "auto";
+  textarea.style.height = `${textarea.scrollHeight}px`;
 }
 
 // ============================================================
@@ -2192,6 +2198,25 @@ function runSelfTests(){
       normalizeResourceInformation(resource);
       if(resource.informationText !== "**bold**\n* bullet\n---"){
         throw new Error("informationText was not preserved");
+      }
+    }
+  });
+
+  tests.push({
+    name: "INFORMATION TEXTAREA AUTO FIT",
+    fn: () => {
+      const textarea = document.createElement("textarea");
+      try{
+        textarea.className = "big resource-info-input";
+        textarea.style.width = "240px";
+        textarea.value = Array(12).fill("Line of resource information").join("\n");
+        document.body.appendChild(textarea);
+        fitTextareaToText(textarea);
+        if(textarea.clientHeight < textarea.scrollHeight){
+          throw new Error("textarea did not expand to fit content");
+        }
+      }finally{
+        textarea.remove();
       }
     }
   });
@@ -5273,8 +5298,14 @@ function editResource(idx){
     informationEditBtn.onclick = () => setInformationEditorMode("edit");
     informationPreviewBtn.onclick = () => setInformationEditorMode("preview");
   }
-  Array.from(document.querySelectorAll(".resource-info-input"))
-    .forEach(field => field.addEventListener("input", refreshInformationPreview));
+  const informationInputs = Array.from(document.querySelectorAll(".resource-info-input"));
+  informationInputs.forEach(field => {
+    fitTextareaToText(field);
+    field.addEventListener("input", () => {
+      fitTextareaToText(field);
+      refreshInformationPreview();
+    });
+  });
   setInformationEditorMode("edit");
 
   function getCurrentTagKeys(){
