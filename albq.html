@@ -1092,7 +1092,7 @@ function fitTextareaToText(textarea){
 const seed = JSON.parse(document.getElementById("seed-data").textContent);
 // Main persisted app data snapshot (categories/resources + metadata).
 let data = JSON.parse(localStorage.getItem("albqData") || "null");
-const APP_VERSION = "0.11";
+const APP_VERSION = "0.12";
 const DEBUG = new URLSearchParams(location.search).has("debug");
 const UPDATE_SEEN_STORAGE_KEY = "albqRecentUpdatesSeen";
 const CATEGORY_REMINDER_TEXT = "Report bugs or request enhancments to Elder Bendio (michaelbendio@gmail.com)"
@@ -2839,6 +2839,19 @@ function render(){
     if(showUpdateInfo){
       appView.innerHTML += `<div class="category-card"><div>App version: ${escapeHTML(data.appVersion || APP_VERSION)}</div><div>Last modified: ${escapeHTML(formatDateOnly(data.lastModified))}</div></div>`;
       appView.innerHTML += `<div class="category-card"><strong>Resource Package ${escapeHTML(String(resourcePackageVersion))}:</strong>${packageChanges.length ? `<ul>${packageChanges.map(change => `<li>${escapeHTML(change)}</li>`).join("")}</ul>` : `<div>No resource package updates loaded.</div>`}</div>`;
+      const backToCategories = document.createElement("button");
+      backToCategories.type = "button";
+      backToCategories.className = "button primary";
+      backToCategories.textContent = "View Categories";
+      backToCategories.onclick = () => {
+        showUpdateInfo = false;
+        showRecentChangeLog = false;
+        recentUpdateDetail = null;
+        pendingRecentUpdates = [];
+        view = "categories";
+        safeRender();
+      };
+      appView.appendChild(backToCategories);
     }
     if(showRecentChangeLog && !entries.length){
       appView.innerHTML += `<p>No recent updates.</p>`;
