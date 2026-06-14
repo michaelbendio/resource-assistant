@@ -1092,7 +1092,7 @@ function fitTextareaToText(textarea){
 const seed = JSON.parse(document.getElementById("seed-data").textContent);
 // Main persisted app data snapshot (categories/resources + metadata).
 let data = JSON.parse(localStorage.getItem("albqData") || "null");
-const APP_VERSION = "0.1";
+const APP_VERSION = "0.11";
 const DEBUG = new URLSearchParams(location.search).has("debug");
 const UPDATE_SEEN_STORAGE_KEY = "albqRecentUpdatesSeen";
 const CATEGORY_REMINDER_TEXT = "Report bugs or request enhancments to Elder Bendio (michaelbendio@gmail.com)"
