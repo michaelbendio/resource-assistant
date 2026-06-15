@@ -1,0 +1,298 @@
+{
+  "categories": [
+    {
+      "id": "addiction",
+      "label": "Addiction",
+      "active": true,
+      "lastModified": "2026-06-13T18:14:01.692Z",
+      "displayOrder": 10
+    },
+    {
+      "id": "children-pregnancy",
+      "label": "Children/Pregnancy",
+      "active": true,
+      "lastModified": "2026-06-13T18:14:01.692Z",
+      "displayOrder": 20
+    },
+    {
+      "id": "clothing-household",
+      "label": "Clothing/Household",
+      "active": true,
+      "lastModified": "2026-06-13T18:14:01.692Z",
+      "displayOrder": 30
+    },
+    {
+      "id": "disability",
+      "label": "Disability",
+      "active": true,
+      "lastModified": "2026-06-13T18:14:01.692Z",
+      "displayOrder": 40
+    },
+    {
+      "id": "domestic-violence",
+      "label": "Domestic Violence",
+      "active": true,
+      "lastModified": "2026-06-13T18:14:01.692Z",
+      "displayOrder": 50
+    },
+    {
+      "id": "education",
+      "label": "Education",
+      "active": true,
+      "lastModified": "2026-06-13T18:14:01.692Z",
+      "displayOrder": 60
+    },
+    {
+      "id": "employment",
+      "label": "Employment",
+      "active": true,
+      "lastModified": "2026-06-13T18:14:01.692Z",
+      "displayOrder": 70
+    },
+    {
+      "id": "financial-assistance",
+      "label": "Financial Assistance",
+      "active": true,
+      "lastModified": "2026-06-13T18:14:01.692Z",
+      "displayOrder": 80
+    },
+    {
+      "id": "reentry-support",
+      "label": "Reentry Support",
+      "active": true,
+      "lastModified": "2026-06-13T18:14:01.692Z",
+      "displayOrder": 90
+    },
+    {
+      "id": "food",
+      "label": "Food",
+      "active": true,
+      "lastModified": "2026-06-13T18:14:01.692Z",
+      "displayOrder": 100
+    },
+    {
+      "id": "medical-dental-vision",
+      "label": "Medical, Dental, Vision",
+      "active": true,
+      "lastModified": "2026-06-13T18:14:01.692Z",
+      "displayOrder": 110
+    },
+    {
+      "id": "homeless-services",
+      "label": "Homeless Services",
+      "active": true,
+      "lastModified": "2026-06-13T18:14:01.692Z",
+      "displayOrder": 120
+    },
+    {
+      "id": "housing",
+      "label": "Housing",
+      "active": true,
+      "lastModified": "2026-06-13T18:14:01.692Z",
+      "displayOrder": 130
+    },
+    {
+      "id": "id-recovery",
+      "label": "ID Recovery",
+      "active": true,
+      "lastModified": "2026-06-13T18:14:01.692Z",
+      "displayOrder": 140
+    },
+    {
+      "id": "immigration",
+      "label": "Immigration",
+      "active": true,
+      "lastModified": "2026-06-13T18:14:01.692Z",
+      "displayOrder": 150
+    },
+    {
+      "id": "legal",
+      "label": "Legal",
+      "active": true,
+      "lastModified": "2026-06-13T18:14:01.692Z",
+      "displayOrder": 160
+    },
+    {
+      "id": "mental-health",
+      "label": "Mental Health",
+      "active": true,
+      "lastModified": "2026-06-13T18:14:01.692Z",
+      "displayOrder": 170
+    },
+    {
+      "id": "miscellaneous",
+      "label": "Miscellaneous",
+      "active": true,
+      "lastModified": "2026-06-13T18:14:01.692Z",
+      "displayOrder": 180
+    },
+    {
+      "id": "seniors",
+      "label": "Seniors",
+      "active": true,
+      "lastModified": "2026-06-13T18:14:01.692Z",
+      "displayOrder": 190
+    },
+    {
+      "id": "transportation",
+      "label": "Transportation",
+      "active": true,
+      "lastModified": "2026-06-13T18:14:01.692Z",
+      "displayOrder": 200
+    },
+    {
+      "id": "utilities-phone-internet",
+      "label": "Utilities, Phone, Internet",
+      "active": true,
+      "lastModified": "2026-06-13T18:14:01.692Z",
+      "displayOrder": 210
+    },
+    {
+      "id": "veterans",
+      "label": "Veterans",
+      "active": true,
+      "lastModified": "2026-06-13T18:14:01.692Z",
+      "displayOrder": 220
+    }
+  ],
+  "resources": [
+    {
+      "id": "5e6382c8c6c947a8dac40d61fbb1a21f",
+      "name": "Alamosa Health and Social Service Center",
+      "description": "Provides emergency food, utility assistance, and seasonal services and activities.",
+      "informationText": "Additional text:\n**1. __Alamosa Health & Social Services Center__**\n• Address: 6900 Gonzales Rd. SW, Albuquerque, NM 87121\n• Phone: (505) 836-8800\n**2. __John Marshall Health & Social Services Center__**\n• Address: 1500 Walter St. SE, Albuquerque, NM 87102\n• Phone: (505) 848-1345\n**3. __Ruth M. Adams Health & Social Services Center (aka East Central Health)__**\n• Address: 7525 Zuni Rd. SE, Albuquerque, NM 87108\n• Phone: (505) 767-5700\n**4. __Dede Feldman Los Griegos Health and Social Services Center:__**\n• Address: 1231 Candelaria N",
+      "tags": [],
+      "verifiedOn": null,
+      "phone": "",
+      "address": "",
+      "website": "",
+      "hours": "",
+      "categories": [
+        "addiction",
+        "clothing-household",
+        "food",
+        "housing",
+        "utilities-phone-internet"
+      ],
+      "lastModified": "2026-06-13T18:25:42.715Z"
+    },
+    {
+      "id": "36422cb0588541dd96885f803b38ef5a",
+      "name": "Food handout",
+      "description": "For people who don't want to wait.",
+      "informationText": "Additional text:\n**Holy Family Catholic Church Pantry**, 562 Dr SW, 505-908-4721\nEvery Tuesday and Thursday 8:30-10:00 am\n**Our Lady of Fatima Pantry**, 4020 Lomas Blvd NE\nThursdays 3:30-4:30 pm\n**Assumption Holy Ghost Pantry**, 811 Guaymas Pl NE, 505-346-1500 ext 4\nEvery 1st and 3rd Thursday 1-3:30 pm\n**San Martin de Porres**, 8301 Camino San Martin, 505-720-4885\n2nd Thursday of the month 11am-12:30pm\n**St Francis Xavier Pantry**, 4020 Lomas Blvd NE\nEvery 3rd Friday Noon-2pm\n**Nativity of the Blessed Virgin Mary Pantry**, 9502 4th St NW, 505-898-5253\nEvery 3rd Saturday of the month 1-3 pm. Drive up at the Parish Hall after Registration",
+      "tags": [],
+      "verifiedOn": null,
+      "phone": "",
+      "address": "",
+      "website": "",
+      "hours": "",
+      "categories": [
+        "food"
+      ],
+      "lastModified": "2026-06-13T18:29:29.861Z"
+    },
+    {
+      "id": "898733b6ae2f695a6c79a0262cd5f64c",
+      "name": "GoodWill Opportunity Center",
+      "description": "Helps people needing housing support or those who are reentering the workforce, and people facing barriers in employment. ",
+      "informationText": "**What is offered:**\n* free career fairs\n* digital literacy classes\n* youth employment programs\n* wellness and life-skills classes\n* a mobile app with online resources and access to career specialists.\n**Eligibility:**\nHomeless persons or near homeless veterans\nAdditional text:\n**Main services:**\n* Job placement assistance\n* Job skills training\n* Veteran’s services\n* Community social services (partner organizations that can help with healthcare, housing, mental health and other needs).",
+      "tags": [],
+      "verifiedOn": null,
+      "phone": "(505)-881-6401",
+      "address": "5000 San Mateo Blvd. NE",
+      "website": "https://www.goodwillnm.org/?utm_source=google&utm_medium=Yext",
+      "hours": "M-F 8am-5pm, walk-in from 8amm-4:30pm.",
+      "categories": [
+        "employment",
+        "homeless-services",
+        "housing",
+        "veterans"
+      ],
+      "lastModified": "2026-06-13T18:39:50.707Z"
+    },
+    {
+      "id": "b14c97a348355b484179fc066ffd7643",
+      "name": "Supportive Housing Coalition of New Mexico",
+      "description": "Provides: Permanent supportive housing coordination, housing advocacy, and system‑level collaboration\nNote: Does not provide direct shelter intake.",
+      "informationText": "Additional text:\n**Amity Foundation** – Social services, reentry, and rehabilitation programs\n**A Better Way of Living, Inc.** – Transitional and supportive housing\n* Resources: [greatnonprofits.org], [nonprofitlocator.org]\n* Phone: (505)-332-9164\n* Hours: Mon-Fri. From 9AM-4:30PM\n* Address: 2823 Richmond Drive NE\n* Albuquerque, NM 87107\n* Website: https://abetterwaynm.org/contact/\n* Information: Supports people with developmental disabilities to help them realize their potential in different areas of life such as  work, education, leisure, and relationships.\n**Amistad** - 1706 Centro Familiar SW 505-877-0371\n* Teen shelter for ages 12-17 yrs old 24-hour shelter\n**Family Promise** - 505-268-0331\n* Shelter for families with minor children\n**Haven House** - 505-896-4869\n* Shelter for victims of domestic violence and their children (Rio Rancho) - Domestic Violence\n**Noon day Ministry** - 2400 Second NW 505-246-8001\n* Day shelter Tues - Fri. 9 a.m. - 1 p.m., Sunday 11 a.m. - 1 p.m.\n**Valencia Shelter** - 505-565-3100\n* Shelter for women and children (Belen) Domestic violence",
+      "tags": [],
+      "verifiedOn": null,
+      "phone": "(505) 243-9799",
+      "address": "625 Silver Ave SW, Suite 195, Albuauerque, NM 87102",
+      "website": "https://shcnm.org",
+      "hours": "M-F 9am-5pm",
+      "categories": [
+        "children-pregnancy",
+        "domestic-violence",
+        "homeless-services"
+      ],
+      "lastModified": "2026-06-13T18:49:24.965Z"
+    }
+  ],
+  "categoryPresetVersion": 1,
+  "tags": [],
+  "changes": [
+    {
+      "id": "resource:5e6382c8c6c947a8dac40d61fbb1a21f:2026-06-13T18:25:42.715Z:a9d966",
+      "type": "resource",
+      "action": "added",
+      "targetId": "5e6382c8c6c947a8dac40d61fbb1a21f",
+      "targetName": "Alamosa Health and Social Service Center",
+      "description": "added",
+      "timestamp": "2026-06-13T18:25:42.715Z",
+      "categoryIds": [
+        "addiction",
+        "clothing-household",
+        "food",
+        "housing",
+        "utilities-phone-internet"
+      ]
+    },
+    {
+      "id": "resource:36422cb0588541dd96885f803b38ef5a:2026-06-13T18:29:29.861Z:b5c901",
+      "type": "resource",
+      "action": "added",
+      "targetId": "36422cb0588541dd96885f803b38ef5a",
+      "targetName": "Food handout",
+      "description": "added",
+      "timestamp": "2026-06-13T18:29:29.861Z",
+      "categoryIds": [
+        "food"
+      ]
+    },
+    {
+      "id": "resource:898733b6ae2f695a6c79a0262cd5f64c:2026-06-13T18:39:50.707Z:7f3a58",
+      "type": "resource",
+      "action": "added",
+      "targetId": "898733b6ae2f695a6c79a0262cd5f64c",
+      "targetName": "GoodWill Opportunity Center",
+      "description": "added",
+      "timestamp": "2026-06-13T18:39:50.707Z",
+      "categoryIds": [
+        "employment",
+        "homeless-services",
+        "housing",
+        "veterans"
+      ]
+    },
+    {
+      "id": "resource:b14c97a348355b484179fc066ffd7643:2026-06-13T18:49:24.965Z:26020f",
+      "type": "resource",
+      "action": "added",
+      "targetId": "b14c97a348355b484179fc066ffd7643",
+      "targetName": "Supportive Housing Coalition of New Mexico",
+      "description": "added",
+      "timestamp": "2026-06-13T18:49:24.965Z",
+      "categoryIds": [
+        "children-pregnancy",
+        "domestic-violence",
+        "homeless-services"
+      ]
+    }
+  ],
+  "lastLoadedPackageInfo": null,
+  "appVersion": "0.1",
+  "lastModified": "2026-06-13T18:50:02.486Z",
+  "packageVersion": 2
+}

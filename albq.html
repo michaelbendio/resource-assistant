@@ -459,8 +459,6 @@ textarea.services-editor { min-height:320px; resize:vertical; }
 }
 </script>
 
-<script src="jszip.min.js"></script>
-
 <!-- ===== APP JS START ===== -->
 <script>
 /* ============================================================
@@ -2703,7 +2701,7 @@ function render(){
     const reloadBtn = document.createElement("button");
     reloadBtn.type = "button";
     reloadBtn.className = "button secondary";
-    reloadBtn.textContent = "Merge resource package";
+    reloadBtn.textContent = "Merge resources";
     reloadBtn.onclick = beginMergeImportPackage;
     reloadWrap.appendChild(reloadBtn);
     appView.appendChild(reloadWrap);
@@ -3084,7 +3082,7 @@ function renderAdmin(){
 
   container.innerHTML = `
     <div style="margin-bottom:20px;">
-      <button class="button primary" onclick="exportPackage()">Save Resource Package</button>
+      <button class="button primary" onclick="exportPackage()">Save Resources</button>
       ${hasChangeLog ? `
         <button class="button" onclick="showChangeLog()">Show change log</button>
         <button class="button" onclick="clearChangeLog()">Clear change log</button>
@@ -3470,16 +3468,16 @@ function applyMergedData(mergedData){
 
 async function beginResourcePackageSave(){
   // Request a save target up front so browsers can honor the user gesture.
-  const suggestedName = "albq-resource-package.zip";
+  const suggestedName = "albq-resources.json";
   if(typeof window.showSaveFilePicker === "function"){
     const handle = await window.showSaveFilePicker({
-      id: "albq-resource-package",
+      id: "albq-resources",
       startIn: "downloads",
       suggestedName,
       types: [{
         description: "ALBQ resource package",
         accept: {
-          "application/zip": [".zip"]
+          "application/json": [".json"]
         }
       }]
     });
@@ -3507,7 +3505,7 @@ async function saveResourcePackageBlob(target, blob){
   try{
     const a = document.createElement("a");
     a.href = url;
-    a.download = target && target.suggestedName ? target.suggestedName : "albq-resource-package.zip";
+    a.download = target && target.suggestedName ? target.suggestedName : "albq-resources.json";
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -3517,29 +3515,22 @@ async function saveResourcePackageBlob(target, blob){
 }
 
 async function exportPackage(){
-  // Exports package ZIP: albq-resources.json.
+  // Exports a plain JSON resource package.
   if(!commitPendingEditsIfChanged()) return;
-
-  if(typeof JSZip === "undefined"){
-    alert("ZIP support is unavailable. Reload the app and try again.");
-    return;
-  }
 
   let previousPackageVersion;
   let packageVersionBumped = false;
   try{
     const saveTarget = await beginResourcePackageSave();
-    const zip = new JSZip();
     normalizePackageData(data);
     previousPackageVersion = data.packageVersion;
     data.packageVersion = getNextPackageVersionValue(data.packageVersion);
     packageVersionBumped = true;
-    zip.file("albq-resources.json", JSON.stringify(data, null, 2));
 
-    const blob = await zip.generateAsync({ type: "blob" });
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     await saveResourcePackageBlob(saveTarget, blob);
     persist();
-    showToast("Resource package saved");
+    showToast("Resources saved");
   }catch(err){
     if(err && err.name === "AbortError") return;
     if(packageVersionBumped) data.packageVersion = previousPackageVersion;
@@ -3548,12 +3539,12 @@ async function exportPackage(){
 }
 
 function beginMergeImportPackage(){
-  // Opens a package ZIP picker for merge-based resource reload.
+  // Opens a JSON package picker for merge-based resource reload.
   if(!commitPendingEditsIfChanged()) return;
 
   const input = document.createElement("input");
   input.type = "file";
-  input.accept = ".zip";
+  input.accept = ".json";
   input.style.display = "none";
   input.onchange = mergeImportPackage;
   document.body.appendChild(input);
@@ -3619,7 +3610,7 @@ function validateImportData(imported){
 }
 
 async function mergeImportPackage(event){
-  // Imports package ZIP, validates JSON, then merges data.
+  // Imports package JSON, validates it, then merges data.
   if(!commitPendingEditsIfChanged()){
     event.target.remove();
     return;
@@ -3632,17 +3623,7 @@ async function mergeImportPackage(event){
   }
 
   try{
-    if(typeof JSZip === "undefined"){
-      throw new Error("ZIP support is unavailable. Reload the app and try again.");
-    }
-    const zip = await JSZip.loadAsync(file);
-    const jsonFile = zip.file("albq-resources.json");
-    if(!jsonFile){
-      alert("Package missing albq-resources.json");
-      return;
-    }
-
-    const jsonText = await jsonFile.async("string");
+    const jsonText = await file.text();
     const imported = JSON.parse(jsonText);
 
     const report = validateImportData(imported);
@@ -3680,7 +3661,7 @@ async function mergeImportPackage(event){
       view = "recent-updates";
       safeRender();
     }
-    showToast("Resource package merged. You can delete the package zip when you are done.");
+    showToast("Resources merged successfully.");
   }catch(e){
     alert("Load failed: " + e.message);
   }finally{
