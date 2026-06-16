@@ -1645,7 +1645,7 @@ function runSelfTests(){
         render();
         const tip = appView.querySelector(".one-time-tip");
         if(!tip) throw new Error("one-time tip was not rendered");
-        if(tip.textContent !== "Click on a category to see its resources. Click a resource to see details. Click 🖨️ to include it in the printed handout."){
+        if(tip.textContent !== "Click on a category to see its resources. Click a resource to see details. Click ⬜ to include it in the printed handout."){
           throw new Error("one-time tip wording changed");
         }
         const style = getComputedStyle(tip);
@@ -2991,7 +2991,7 @@ function render(){
     if(showOneTimeTip){
       const tip = document.createElement("div");
       tip.className = "one-time-tip";
-      tip.textContent = "Click on a category to see its resources. Click a resource to see details. Click 🖨️ to include it in the printed handout.";
+      tip.textContent = "Click on a category to see its resources. Click a resource to see details. Click ⬜ to include it in the printed handout.";
       tip.onclick = () => {
         showOneTimeTip = false;
         localStorage.setItem(ONE_TIME_TIP_STORAGE_KEY, "1");
