@@ -87,6 +87,7 @@ textarea {
 .topbar .help-button { color:white; border:1px solid rgba(255,255,255,.6); border-radius:4px; background:transparent; padding:2px 8px; font:inherit; }
 .one-time-tip { margin:0 0 12px; padding:10px 12px; border:2px solid #aa0000; border-radius:6px; background:#fff5f5; color:#aa0000; font-size:11px; font-weight:bold; }
 .category-print-banner { margin:0 0 12px; padding:9px 12px; border:1px solid #c8d6e6; border-left:4px solid #003366; border-radius:6px; background:#f7fbff; color:#1f2d3d; font-size:16px; line-height:1.35; }
+.print-empty-instruction { color:#aa0000; }
 textarea.big { width:100%; min-height:80px; }
 textarea.services-editor { min-height:320px; resize:vertical; }
 .services-control-block { margin:10px 0 12px; }
@@ -453,7 +454,7 @@ textarea.services-editor { min-height:320px; resize:vertical; }
 <div id="printModal" class="hidden">
   <div id="printContentWrapper">
     <button class="button" id="printCloseBtn" onclick="closePrintPreview()">Close</button>
-    <button class="button primary" onclick="doPrint()">Print</button>
+    <button class="button primary" id="printActionBtn" onclick="doPrint()">Print</button>
     <button class="button" id="printNextBtn" onclick="nextPrintStep()">Next</button>
     <div id="printProgress" style="margin:10px 0 12px; font-size:14px; color:#555;"></div>
     <div id="printContent"></div>
@@ -1662,6 +1663,43 @@ function runSelfTests(){
   });
 
   tests.push({
+    name: "MERGE RESOURCES AVAILABLE BELOW STARTUP CATEGORIES",
+    fn: () => {
+      const previousData = data;
+      const previousView = view;
+      const previousShowOneTimeTip = showOneTimeTip;
+      try{
+        data = {
+          appVersion:APP_VERSION,
+          lastModified:nowISO(),
+          categories:DEFAULT_CATEGORY_LABELS.map((label, index) => ({
+            id:slugifyId(label),
+            label,
+            displayOrder:(index + 1) * 10
+          })),
+          resources:[],
+          changes:[]
+        };
+        view = "categories";
+        showOneTimeTip = false;
+        render();
+        const grid = appView.querySelector(".grid");
+        const buttons = Array.from(appView.querySelectorAll("button"));
+        const mergeButtons = buttons.filter(button => button.textContent === "Merge Resources");
+        if(mergeButtons.length !== 1) throw new Error(`expected one merge resources button, got ${mergeButtons.length}`);
+        if(!grid) throw new Error("categories grid was not rendered");
+        if(!(grid.compareDocumentPosition(mergeButtons[0]) & Node.DOCUMENT_POSITION_FOLLOWING)){
+          throw new Error("merge resources button should appear below the category grid");
+        }
+      }finally{
+        data = previousData;
+        view = previousView;
+        showOneTimeTip = previousShowOneTimeTip;
+      }
+    }
+  });
+
+  tests.push({
     name: "CATEGORY PRINT INSTRUCTION BANNER",
     fn: () => {
       const previousData = data;
@@ -1926,6 +1964,61 @@ function runSelfTests(){
         throw new Error("print packet does not start with the first list resource");
       }
       PrintWorkflow.close();
+    }
+  });
+
+  tests.push({
+    name: "PRINT PREVIEW HAS NO PROGRESS MESSAGE",
+    fn: () => {
+      const previousQueue = PrintWorkflow.queue;
+      const previousCurrentIndex = PrintWorkflow.currentIndex;
+      try{
+        PrintWorkflow.queue = [{
+          label:"Print Selection",
+          render: () => {}
+        }];
+        PrintWorkflow.currentIndex = 0;
+        PrintWorkflow.updateUI();
+        if((printProgress.textContent || "").trim()){
+          throw new Error(`unexpected print progress '${printProgress.textContent}'`);
+        }
+      }finally{
+        PrintWorkflow.queue = previousQueue;
+        PrintWorkflow.currentIndex = previousCurrentIndex;
+        PrintWorkflow.updateUI();
+      }
+    }
+  });
+
+  tests.push({
+    name: "EMPTY PRINT SELECTION HIDES PRINT ACTION",
+    fn: () => {
+      const previousData = data;
+      const previousPrintSelection = printSelection;
+      try{
+        data = {
+          categories:[],
+          resources:[{ id:"print-empty-source", name:"Print Empty Source", categories:[], tags:[], informationText:"" }],
+          changes:[]
+        };
+        printSelection = [];
+        PrintWorkflow.startPrintSelection();
+        if(!printActionBtn.classList.contains("hidden")){
+          throw new Error("print button should be hidden when no resources are selected");
+        }
+        const instruction = printContent.querySelector(".print-empty-instruction");
+        if(!instruction) throw new Error("empty print instruction was not rendered");
+        if(instruction.textContent !== "Click ⬜ next to a resource to include it in the printed handout."){
+          throw new Error(`unexpected empty print instruction '${instruction.textContent}'`);
+        }
+        if(getComputedStyle(instruction).color !== "rgb(170, 0, 0)"){
+          throw new Error(`empty print instruction should be red, got ${getComputedStyle(instruction).color}`);
+        }
+        PrintWorkflow.close();
+      }finally{
+        data = previousData;
+        printSelection = previousPrintSelection;
+      }
     }
   });
 
@@ -2882,6 +2975,18 @@ function render(){
     appView.appendChild(categoryMessage);
   }
 
+  function renderMergeResourcesButton(){
+    const reloadWrap = document.createElement("div");
+    reloadWrap.className = "reload-resources-wrap";
+    const reloadBtn = document.createElement("button");
+    reloadBtn.type = "button";
+    reloadBtn.className = "button secondary";
+    reloadBtn.textContent = "Merge Resources";
+    reloadBtn.onclick = beginMergeImportPackage;
+    reloadWrap.appendChild(reloadBtn);
+    appView.appendChild(reloadWrap);
+  }
+
   if(view==="categories"){
     if(showOneTimeTip){
       const tip = document.createElement("div");
@@ -2926,15 +3031,7 @@ function render(){
 
     appView.appendChild(grid);
 
-    const reloadWrap = document.createElement("div");
-    reloadWrap.className = "reload-resources-wrap";
-    const reloadBtn = document.createElement("button");
-    reloadBtn.type = "button";
-    reloadBtn.className = "button secondary";
-    reloadBtn.textContent = "Merge Resources";
-    reloadBtn.onclick = beginMergeImportPackage;
-    reloadWrap.appendChild(reloadBtn);
-    appView.appendChild(reloadWrap);
+    renderMergeResourcesButton();
   }
 
   if(view==="category"){
@@ -3236,13 +3333,13 @@ const PrintWorkflow = {
     const active = this.queue.length > 0 && this.currentIndex >= 0 && this.currentIndex < this.queue.length;
     const isLastStep = active && this.currentIndex === this.queue.length - 1;
     printCloseBtn.classList.toggle("hidden", active && !isLastStep);
+    printActionBtn.classList.toggle("hidden", !active);
     printNextBtn.classList.toggle("hidden", !active || isLastStep);
     if(!active){
       printProgress.textContent = "";
       return;
     }
-    const step = this.queue[this.currentIndex];
-    printProgress.textContent = `Printing ${this.currentIndex + 1} of ${this.queue.length}: ${step.label}. Use double-sided printing in the print dialog.`;
+    printProgress.textContent = "";
   },
 
   showStep(){
@@ -3339,7 +3436,7 @@ const PrintWorkflow = {
     this.queue = this.buildQueue();
     if(!this.queue.length){
       this.openPreviewContent(container => {
-        container.innerHTML = "<p>No resources are selected for printing.</p><p>Click 🖨️ on a resource to include it in the printed handout.</p>";
+        container.innerHTML = "<p>No resources are selected for printing.</p><p class=\"print-empty-instruction\">Click ⬜ next to a resource to include it in the printed handout.</p>";
       });
       return;
     }
