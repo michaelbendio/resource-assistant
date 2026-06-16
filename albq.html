@@ -1099,7 +1099,7 @@ function fitTextareaToText(textarea){
 const seed = JSON.parse(document.getElementById("seed-data").textContent);
 // Main persisted app data snapshot (categories/resources + metadata).
 let data = JSON.parse(localStorage.getItem("albqData") || "null");
-const APP_VERSION = "0.1.5";
+const APP_VERSION = "0.1.6";
 const DEBUG = new URLSearchParams(location.search).has("debug");
 const UPDATE_SEEN_STORAGE_KEY = "albqRecentUpdatesSeen";
 const PRINT_SELECTION_STORAGE_KEY = "albqPrintSelection";
@@ -1644,7 +1644,7 @@ function runSelfTests(){
         render();
         const tip = appView.querySelector(".one-time-tip");
         if(!tip) throw new Error("one-time tip was not rendered");
-        if(tip.textContent !== "Click a resource to see details. Click 🖨️ to include it in the printed handout."){
+        if(tip.textContent !== "Click on a category to see its resources. Click a resource to see details. Click 🖨️ to include it in the printed handout."){
           throw new Error("one-time tip wording changed");
         }
         const style = getComputedStyle(tip);
@@ -1900,6 +1900,32 @@ function runSelfTests(){
       if(container.firstElementChild && container.firstElementChild.classList.contains("print-resource-separator")){
         throw new Error("separator was inserted before the first resource");
       }
+    }
+  });
+
+  tests.push({
+    name: "PRINT PREVIEW STARTS WITH RESOURCE CONTENT",
+    fn: () => {
+      PrintWorkflow.openPreview([
+        { id:"print-start", name:"Print Start", categories:[], tags:[], informationText:"" }
+      ]);
+      if(/Suggested Resources/.test(printContent.textContent || "")){
+        throw new Error("print preview still includes Suggested Resources header");
+      }
+      if(!printContent.firstElementChild || !printContent.firstElementChild.classList.contains("resource-card")){
+        throw new Error("print preview does not start with the first resource card");
+      }
+
+      PrintWorkflow.renderPrintSelectionPacket([], [
+        { id:"print-list-start", name:"Print List Start", categories:[], tags:[], informationText:"List information." }
+      ]);
+      if(/Suggested Resources/.test(printContent.textContent || "")){
+        throw new Error("print packet still includes Suggested Resources header");
+      }
+      if(!printContent.firstElementChild || !printContent.firstElementChild.classList.contains("print-list-flyer")){
+        throw new Error("print packet does not start with the first list resource");
+      }
+      PrintWorkflow.close();
     }
   });
 
@@ -2577,11 +2603,13 @@ function showUserHelp(){
         <h3>Print Preview and Printing</h3>
         <p>Click 🖨️ in the top bar to open Print Preview.</p>
         <p>Click 🖨️ to disable printing for a resource.</p>
-        <p>Review the selected resources and print the list.</p>
+        <p>Review the selected resources and print the handout.</p>
+        <p>To save the handout as a PDF, choose Print, select Print to PDF as the printer, then click Print and choose where to save the file.</p>
         <h3>Application Information</h3>
         <p>Click Albuquerque TSO Resources to see the current version number and recent updates and changes.</p>
         <h3>Merging Resource Updates</h3>
-        <p>Click the Merge Resources button to import updated resource information when you are notified that updates are available.</p>
+        <p>Click Categories in the top bar. The Merge Resources button is below the categories on the right side.</p>
+        <p>Use Merge Resources to import updated resource information when you are notified that updates are available.</p>
       </div>
     </div>
   `;
@@ -2858,7 +2886,7 @@ function render(){
     if(showOneTimeTip){
       const tip = document.createElement("div");
       tip.className = "one-time-tip";
-      tip.textContent = "Click a resource to see details. Click 🖨️ to include it in the printed handout.";
+      tip.textContent = "Click on a category to see its resources. Click a resource to see details. Click 🖨️ to include it in the printed handout.";
       tip.onclick = () => {
         showOneTimeTip = false;
         localStorage.setItem(ONE_TIME_TIP_STORAGE_KEY, "1");
@@ -3232,7 +3260,6 @@ const PrintWorkflow = {
 
   openPreview(resources){
     this.openPreviewContent(container => {
-      container.innerHTML="<h2>Suggested Resources</h2><p>Click 🖨️ to disable printing for a resource.</p>";
       this.renderPrintableResourceCards(container, resources);
     });
   },
@@ -3291,7 +3318,6 @@ const PrintWorkflow = {
 
   renderPrintSelectionPacket(normalSelections, listSelections){
     this.openPreviewContent(container => {
-      container.innerHTML = "<h2>Suggested Resources</h2><p>Click 🖨️ to disable printing for a resource.</p>";
       if(normalSelections.length){
         this.renderPrintableResourceCards(container, normalSelections);
       }
@@ -3313,7 +3339,7 @@ const PrintWorkflow = {
     this.queue = this.buildQueue();
     if(!this.queue.length){
       this.openPreviewContent(container => {
-        container.innerHTML = "<h2>Suggested Resources</h2><p>No resources are selected for printing.</p><p>Click 🖨️ on a resource to include it in the printed handout.</p>";
+        container.innerHTML = "<p>No resources are selected for printing.</p><p>Click 🖨️ on a resource to include it in the printed handout.</p>";
       });
       return;
     }
