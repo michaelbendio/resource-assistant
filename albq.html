@@ -29,12 +29,14 @@ body { font-family: -apple-system, sans-serif; margin:0; padding:0; font-size:18
   gap:24px;
 }
 
-.topbar .tabs span {
+.topbar .tabs span,
+.topbar .tabs button {
   cursor:pointer;
   opacity:.9;
 }
 
-.topbar .tabs span:hover {
+.topbar .tabs span:hover,
+.topbar .tabs button:hover {
   opacity:1;
 }
 
@@ -69,8 +71,7 @@ body { font-family: -apple-system, sans-serif; margin:0; padding:0; font-size:18
 .grid { display:grid; gap:12px; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); }
 .category-card, .resource-card { border:1px solid #ddd; padding:12px; border-radius:6px; background:white; }
 .resource-card { position:relative; }
-.star { position:absolute; left:8px; top:8px; cursor:pointer; font-size:18px; }
-.star.fav { color:gold; }
+.print-selection-toggle { position:absolute; left:8px; top:8px; cursor:pointer; font-size:18px; border:0; background:transparent; padding:0; line-height:1; }
 .resource-main { margin-left:24px; }
 .resource-details.collapsed { display:none; }
 .button { padding:10px 14px; margin:4px 0; cursor:pointer; }
@@ -83,6 +84,8 @@ textarea {
 .button.primary { background:#003366; color:white; }
 .button.secondary { background:#f7f7f7; color:#333; border:1px solid #bbb; }
 .button.danger { background:#aa0000; color:white; }
+.topbar .help-button { color:white; border:1px solid rgba(255,255,255,.6); border-radius:4px; background:transparent; padding:2px 8px; font:inherit; }
+.one-time-tip { margin:0 0 12px; padding:10px 12px; border:1px solid #c8d6e6; border-radius:6px; background:#f2f7fc; color:#1d3557; font-size:16px; }
 textarea.big { width:100%; min-height:80px; }
 textarea.services-editor { min-height:320px; resize:vertical; }
 .services-control-block { margin:10px 0 12px; }
@@ -396,6 +399,10 @@ textarea.services-editor { min-height:320px; resize:vertical; }
     break-before: page;
     page-break-before: always;
   }
+
+  .print-disabled {
+    display: none !important;
+  }
 }
 </style>
 <!-- ===== APP CSS END ===== -->
@@ -417,11 +424,12 @@ textarea.services-editor { min-height:320px; resize:vertical; }
 </div>
 
 <div class="topbar">
-  <div class="title" id="appTitle">Albuquerque TSO resources</div>
+  <div class="title" id="appTitle">Albuquerque TSO Resources</div>
   <div class="tabs">
     <span id="tabSearch" role="button" aria-label="Search" title="Search">&#128269;</span>
     <span id="tabCategories">Categories</span>
-    <span id="tabFavorites">Favorites (0)</span>
+    <span id="tabPrintSelection" role="button" aria-label="Print Preview">🖨️ (0)</span>
+    <button id="helpButton" class="help-button" type="button">Help</button>
     <span id="tabAdmin">Admin</span>
   </div>
 </div>
@@ -780,7 +788,7 @@ function buildAdminDeleteConfirmation(kind, name){
     return [
       `Are you sure you want to delete the resource '${name}'?`,
       "",
-      "This removes it from all categories and Favorites.",
+      "This removes it from all categories and the print selection.",
       "Undo will be available in Admin to restore what you deleted."
     ].join("\n");
   }
@@ -1085,14 +1093,17 @@ function fitTextareaToText(textarea){
 // 1) Read embedded seed.
 // 2) Load saved snapshot from localStorage (or seed if missing).
 // 3) Normalize startup data to canonical shapes.
-// 4) Load persisted favorites, then initialize transient UI state.
+// 4) Load persisted print selections, then initialize transient UI state.
 
 const seed = JSON.parse(document.getElementById("seed-data").textContent);
 // Main persisted app data snapshot (categories/resources + metadata).
 let data = JSON.parse(localStorage.getItem("albqData") || "null");
-const APP_VERSION = "0.12";
+const APP_VERSION = "0.13";
 const DEBUG = new URLSearchParams(location.search).has("debug");
 const UPDATE_SEEN_STORAGE_KEY = "albqRecentUpdatesSeen";
+const PRINT_SELECTION_STORAGE_KEY = "albqPrintSelection";
+const LEGACY_FAVORITES_STORAGE_KEY = "albqFavorites";
+const ONE_TIME_TIP_STORAGE_KEY = "albqPrintSelectionTipSeen";
 const CATEGORY_REMINDER_TEXT = "Report bugs or request enhancments to Elder Bendio (michaelbendio@gmail.com)"
 
 if(!data){
@@ -1110,9 +1121,8 @@ normalizeChanges(data);
 normalizeLastLoadedPackageInfo(data);
 data.appVersion = APP_VERSION;
 
-// Favorites persist separately to keep starring lightweight across views.
-let favorites = JSON.parse(localStorage.getItem("albqFavorites") || "[]");
-if(!Array.isArray(favorites)) favorites = [];
+let printSelection = loadPrintSelection();
+sanitizePrintSelection();
 if(DEBUG) assertInvariants("startup");
 // Remaining fields are runtime UI state; they are not persisted directly.
 let view = "categories";
@@ -1138,6 +1148,7 @@ let pendingRecentUpdates = [];
 let recentUpdateDetail = null;
 let showUpdateInfo = false;
 let showRecentChangeLog = true;
+let showOneTimeTip = localStorage.getItem(ONE_TIME_TIP_STORAGE_KEY) !== "1";
 let allowBlankUpdateDescriptionOnce = false;
 let newCategoryIds = new Set();
 let newResourceIds = new Set();
@@ -1177,7 +1188,7 @@ function safeCall(label, fn){
 function assertInvariants(context = "invariant check"){
   if(!data || !Array.isArray(data.resources)) throw new Error(`${context}: data.resources must be an array`);
   if(!Array.isArray(data.categories)) throw new Error(`${context}: data.categories must be an array`);
-  if(!Array.isArray(favorites)) throw new Error(`${context}: favorites must be an array`);
+  if(!Array.isArray(printSelection)) throw new Error(`${context}: printSelection must be an array`);
 
   const ids = new Set();
   data.resources.forEach((resource, idx) => {
@@ -1205,8 +1216,8 @@ function assertInvariants(context = "invariant check"){
   });
 
   const resourceIds = new Set(data.resources.map(r => String(r && r.id || "")));
-  const badFavorite = favorites.find(id => !resourceIds.has(String(id || "")));
-  if(badFavorite) throw new Error(`${context}: favorite '${badFavorite}' does not reference a valid resource`);
+  const badPrintSelection = printSelection.find(id => !resourceIds.has(String(id || "")));
+  if(badPrintSelection) throw new Error(`${context}: print selection '${badPrintSelection}' does not reference a valid resource`);
 }
 
 function safeRender(label = "render"){
@@ -1787,6 +1798,41 @@ function runSelfTests(){
   });
 
   tests.push({
+    name: "PRINT SELECTION STATE",
+    fn: () => {
+      const previousData = data;
+      const previousPrintSelection = printSelection;
+      const container = document.createElement("div");
+      try{
+        data = {
+          categories:[],
+          resources:[
+            { id:"normal", name:"Normal Resource", categories:[], tags:[], informationText:"" },
+            { id:"list", name:"List Resource", categories:[], tags:["List"], informationText:"" }
+          ]
+        };
+        printSelection = ["normal", "list"];
+        const groups = PrintWorkflow.getPrintSelectionGroups();
+        if(groups.normalSelections.length !== 1) throw new Error("normal print selection missing");
+        if(groups.listSelections.length !== 1) throw new Error("list print selection missing");
+        printSelection = ["normal"];
+        PrintWorkflow.renderPrintableResourceCards(container, data.resources);
+        if(container.querySelectorAll(".resource-card").length !== 2){
+          throw new Error("disabled preview row was removed");
+        }
+        const disabled = container.querySelector(".resource-card.print-disabled");
+        if(!disabled || !/List Resource/.test(disabled.textContent || "")){
+          throw new Error("disabled preview row was not marked");
+        }
+      }finally{
+        data = previousData;
+        printSelection = previousPrintSelection;
+        container.remove();
+      }
+    }
+  });
+
+  tests.push({
     name: "LIST TAG CANONICALIZATION",
     fn: () => {
       const resource = { tags:["This resource is a list", "Women"] };
@@ -2319,8 +2365,12 @@ function setAdminVisibility(visible){
   }
 }
 
+const tabPrintSelection = document.getElementById("tabPrintSelection");
+const helpButton = document.getElementById("helpButton");
+const tabSearch = document.getElementById("tabSearch");
 tabCategories.onclick = ()=>{ setView("categories"); };
-tabFavorites.onclick = ()=>{ setView("favorites"); };
+if(tabPrintSelection) tabPrintSelection.onclick = ()=>{ startPrintSelectionPreview(); };
+if(helpButton) helpButton.onclick = ()=>{ showUserHelp(); };
 tabAdmin.onclick = ()=>{ setView("admin"); };
 
 function syncSearchPanel(){
@@ -2361,7 +2411,6 @@ function performSearch(query){
   safeRender();
 }
 
-const tabSearch = document.getElementById("tabSearch");
 if(tabSearch) tabSearch.onclick = toggleSearchPanel;
 const searchButton = document.getElementById("searchButton");
 if(searchButton){
@@ -2401,6 +2450,40 @@ function toggleUpdateInfoView(){
 }
 if(appTitle) appTitle.onclick = toggleUpdateInfoView;
 
+function showUserHelp(){
+  const modal = getReferenceModal();
+  modal.innerHTML = `
+    <div class="reference-modal-panel" role="dialog" aria-modal="true" aria-labelledby="userHelpTitle">
+      <div class="reference-modal-header">
+        <div id="userHelpTitle" class="reference-modal-title">User Help</div>
+        <button class="button reference-modal-close" type="button">Close</button>
+      </div>
+      <div class="reference-modal-body">
+        <h3>Finding Resources</h3>
+        <p>Select a category to view available resources.</p>
+        <p>Click a resource to display additional information such as services, phone numbers, addresses, websites, and notes.</p>
+        <p>Click the resource again to hide the additional information.</p>
+        <h3>Search</h3>
+        <p>Use Search to find resources by text appearing in the resource information.</p>
+        <h3>Selecting Resources for Printing</h3>
+        <p>⬜ Resource is not selected for printing.</p>
+        <p>🖨️ Resource is selected for printing.</p>
+        <h3>Print Preview and Printing</h3>
+        <p>Click 🖨️ in the top bar to open Print Preview.</p>
+        <p>Click 🖨️ to disable printing for a resource.</p>
+        <p>Review the selected resources and print the list.</p>
+        <h3>Application Information</h3>
+        <p>Click Albuquerque TSO Resources to see the current version number and recent updates and changes.</p>
+        <h3>Merging Resource Updates</h3>
+        <p>Click the Merge Resources button to import updated resource information when you are notified that updates are available.</p>
+      </div>
+    </div>
+  `;
+  const closeBtn = modal.querySelector(".reference-modal-close");
+  if(closeBtn) closeBtn.addEventListener("click", closeReferenceModal);
+  modal.classList.remove("hidden");
+}
+
 function getUnseenUpdates(){
   const seen = getSeenUpdateIds();
   return getRecentChanges().filter(entry => !seen.has(String(entry.id)));
@@ -2421,8 +2504,8 @@ function getCategoryUpdateMap(){
 // RENDERING — RESOURCES
 // ============================================================
 
-function buildResourceCard(res,{expanded=false,showDescription=false,showStar=true}={}){
-  // Shared DOM builder used by category view, favorites view, and print previews.
+function buildResourceCard(res,{expanded=false,showDescription=false,showPrintToggle=true}={}){
+  // Shared DOM builder used by category view, print-selection view, and print previews.
   normalizeResourceInformation(res);
 
   const card=document.createElement("div");
@@ -2431,12 +2514,14 @@ function buildResourceCard(res,{expanded=false,showDescription=false,showStar=tr
     handleAdminListReferenceInspection(event, res);
   }, true);
 
-  if(showStar){
-    const star=document.createElement("div");
-    star.className="star"+(favorites.includes(res.id)?" fav":"");
-    star.textContent="★";
-    star.onclick=e=>{e.stopPropagation(); toggleFav(res.id);};
-    card.appendChild(star);
+  if(showPrintToggle){
+    const toggle=document.createElement("button");
+    toggle.type = "button";
+    toggle.className="print-selection-toggle";
+    toggle.setAttribute("aria-label", isSelectedForPrinting(res.id) ? "Disable printing for this resource" : "Enable printing for this resource");
+    toggle.textContent=getPrintSelectionIcon(res.id);
+    toggle.onclick=e=>{e.stopPropagation(); togglePrintSelection(res.id);};
+    card.appendChild(toggle);
   }
 
   const main=document.createElement("div");
@@ -2634,7 +2719,7 @@ function undoLastDeletion(){
 
 function render(){
   // Main view router: decides which screen to draw from current app state.
-  tabFavorites.textContent=`Favorites (${favorites.length})`;
+  updatePrintSelectionIndicator();
   tabAdmin.style.display = isAdminVisible ? "" : "none";
   syncSearchPanel();
   appView.classList.toggle("hidden", view==="admin");
@@ -2664,6 +2749,17 @@ function render(){
   }
 
   if(view==="categories"){
+    if(showOneTimeTip){
+      const tip = document.createElement("div");
+      tip.className = "one-time-tip";
+      tip.textContent = "Click a resource to see details. Click 🖨️ to include it in the printed handout.";
+      tip.onclick = () => {
+        showOneTimeTip = false;
+        localStorage.setItem(ONE_TIME_TIP_STORAGE_KEY, "1");
+        safeRender();
+      };
+      appView.appendChild(tip);
+    }
     if(pendingRecentUpdates.length){
       const note = document.createElement("div");
       note.className = "category-card";
@@ -2701,7 +2797,7 @@ function render(){
     const reloadBtn = document.createElement("button");
     reloadBtn.type = "button";
     reloadBtn.className = "button secondary";
-    reloadBtn.textContent = "Merge resources";
+    reloadBtn.textContent = "Merge Resources";
     reloadBtn.onclick = beginMergeImportPackage;
     reloadWrap.appendChild(reloadBtn);
     appView.appendChild(reloadWrap);
@@ -2865,29 +2961,82 @@ function render(){
     pendingRecentUpdates = [];
   }
 
-  if(view==="favorites"){
-    const { normalFavs, listFavs } = PrintWorkflow.getFavoriteGroups();
-    const favs=[...normalFavs, ...listFavs];
-    if(!favs.length){ appView.innerHTML="<p>No favorites selected.</p>"; return; }
+  if(view==="print-selection"){
+    const { normalSelections, listSelections } = PrintWorkflow.getPrintSelectionGroups();
+    const selections=[...normalSelections, ...listSelections];
+    if(!selections.length){ appView.innerHTML="<p>No resources selected for printing.</p>"; return; }
 
     const btn=document.createElement("button");
     btn.textContent="Print Preview";
     btn.className="button primary";
-    btn.onclick=startFavoritesPacketPrint;
+    btn.onclick=startPrintSelectionPreview;
     appView.appendChild(btn);
 
-    favs.forEach(res=> appView.appendChild(buildResourceCard(res,{expanded:true})));
+    selections.forEach(res=> appView.appendChild(buildResourceCard(res,{expanded:true})));
   }
 }
 
-/* ---------- Favorites ---------- */
+/* ---------- Print Selection ---------- */
 
-function toggleFav(id){
-  const set=new Set(favorites);
-  set.has(id)?set.delete(id):set.add(id);
-  favorites=[...set];
-  localStorage.setItem("albqFavorites",JSON.stringify(favorites));
-  safeRender();
+function loadPrintSelection(){
+  let raw = localStorage.getItem(PRINT_SELECTION_STORAGE_KEY);
+  if(raw === null){
+    raw = localStorage.getItem(LEGACY_FAVORITES_STORAGE_KEY);
+    if(raw !== null){
+      localStorage.setItem(PRINT_SELECTION_STORAGE_KEY, raw);
+      localStorage.removeItem(LEGACY_FAVORITES_STORAGE_KEY);
+    }
+  }
+  let parsed = [];
+  try{
+    parsed = JSON.parse(raw || "[]");
+  }catch(e){
+    parsed = [];
+  }
+  return Array.isArray(parsed) ? parsed.map(id => String(id || "")).filter(Boolean) : [];
+}
+
+function savePrintSelection(){
+  localStorage.setItem(PRINT_SELECTION_STORAGE_KEY, JSON.stringify(printSelection));
+  localStorage.removeItem(LEGACY_FAVORITES_STORAGE_KEY);
+}
+
+function sanitizePrintSelection(){
+  const resourceIds = new Set((data.resources || []).map(resource => String(resource && resource.id || "")));
+  const filtered = printSelection.filter(id => resourceIds.has(String(id || "")));
+  if(filtered.length !== printSelection.length){
+    printSelection = filtered;
+    savePrintSelection();
+  }
+}
+
+function isSelectedForPrinting(id){
+  return printSelection.includes(String(id || ""));
+}
+
+function getPrintSelectionIcon(id){
+  return isSelectedForPrinting(id) ? "🖨️" : "⬜";
+}
+
+function getPrintSelectionResources(){
+  const selectedIds = new Set(printSelection.map(id => String(id || "")));
+  return data.resources.filter(resource => selectedIds.has(String(resource.id || "")));
+}
+
+function updatePrintSelectionIndicator(){
+  if(tabPrintSelection) tabPrintSelection.textContent = `🖨️ (${printSelection.length})`;
+}
+
+function togglePrintSelection(id, { rerender = true } = {}){
+  const cleanId = String(id || "");
+  if(!cleanId) return;
+  if(!data.resources.some(resource => String(resource && resource.id || "") === cleanId)) return;
+  const set=new Set(printSelection);
+  set.has(cleanId)?set.delete(cleanId):set.add(cleanId);
+  printSelection=[...set];
+  savePrintSelection();
+  updatePrintSelectionIndicator();
+  if(rerender) safeRender();
 }
 
 /* ---------- Print ---------- */
@@ -2906,34 +3055,34 @@ const PrintWorkflow = {
     });
   },
 
-  getFavoriteGroups(){
-    // "List" resources are separated so favorites packet output can render flyers.
-    const normalFavs = [];
-    const listFavs = [];
+  getPrintSelectionGroups(){
+    // "List" resources are separated so print selection packet output can render flyers.
+    const normalSelections = [];
+    const listSelections = [];
 
-    data.resources.filter(r=>favorites.includes(r.id)).forEach(res => {
+    getPrintSelectionResources().forEach(res => {
       if(this.isListResource(res)){
-        listFavs.push(res);
+        listSelections.push(res);
       }else{
-        normalFavs.push(res);
+        normalSelections.push(res);
       }
     });
 
-    return { normalFavs, listFavs };
+    return { normalSelections, listSelections };
   },
 
   buildQueue(){
-    const { normalFavs, listFavs } = this.getFavoriteGroups();
-    if(!normalFavs.length && !listFavs.length) return [];
-    if(!listFavs.length){
+    const { normalSelections, listSelections } = this.getPrintSelectionGroups();
+    if(!normalSelections.length && !listSelections.length) return [];
+    if(!listSelections.length){
       return [{
-        label:"Favorites",
-        render: () => this.renderFavorites()
+        label:"Print Selection",
+        render: () => this.renderPrintSelection(normalSelections)
       }];
     }
     return [{
-      label:"Favorites",
-      render: () => this.renderFavoritesPacket()
+      label:"Print Selection",
+      render: () => this.renderPrintSelectionPacket(normalSelections, listSelections)
     }];
   },
 
@@ -2965,7 +3114,7 @@ const PrintWorkflow = {
 
   openPreview(resources){
     this.openPreviewContent(container => {
-      container.innerHTML="<h2>Suggested Resources</h2>";
+      container.innerHTML="<h2>Suggested Resources</h2><p>Click 🖨️ to disable printing for a resource.</p>";
       this.renderPrintableResourceCards(container, resources);
     });
   },
@@ -2975,23 +3124,34 @@ const PrintWorkflow = {
       if(index > 0){
         const separator = document.createElement("hr");
         separator.className = "print-resource-separator";
+        separator.classList.toggle("print-disabled", !isSelectedForPrinting(res.id));
         container.appendChild(separator);
       }
-      const card=buildResourceCard(res,{expanded:true,showStar:false});
+      const card=buildResourceCard(res,{expanded:true});
+      card.classList.toggle("print-disabled", !isSelectedForPrinting(res.id));
+      const toggle = card.querySelector(".print-selection-toggle");
+      if(toggle){
+        toggle.onclick = e => {
+          e.stopPropagation();
+          togglePrintSelection(res.id, { rerender:false });
+          this.showStep();
+          safeRender();
+        };
+      }
       container.appendChild(card);
     });
   },
 
-  renderFavorites(){
-    const { normalFavs } = this.getFavoriteGroups();
-    this.openPreview(normalFavs);
+  renderPrintSelection(normalSelections){
+    this.openPreview(normalSelections);
   },
 
   buildListFlyer(resource, shouldPageBreak){
     const flyer = document.createElement("section");
     flyer.className = "print-list-flyer" + (shouldPageBreak ? " print-list-flyer-page-break" : "");
+    flyer.classList.toggle("print-disabled", !isSelectedForPrinting(resource.id));
 
-    let html = `<h2>${escapeHTML(resource.name || "")}</h2>`;
+    let html = `<button type="button" class="print-selection-toggle" style="position:static; margin-right:8px;">${getPrintSelectionIcon(resource.id)}</button><h2 style="display:inline;">${escapeHTML(resource.name || "")}</h2>`;
     if(resource.phone) html += `<div class="print-list-field"><strong>Phone:</strong> ${escapeHTML(resource.phone)}</div>`;
     if(resource.address) html += `<div class="print-list-field"><strong>Address:</strong> ${escapeHTML(resource.address)}</div>`;
     if(resource.website) html += `<div class="print-list-field"><strong>Website:</strong> ${escapeHTML(resource.website)}</div>`;
@@ -2999,33 +3159,46 @@ const PrintWorkflow = {
       html += `<div class="print-list-field"><strong>Information:</strong><div class="services-rendered resource-info-rendered">${renderInformationHTML(resource.informationText)}</div></div>`;
     }
     flyer.innerHTML = html;
+    const toggle = flyer.querySelector(".print-selection-toggle");
+    if(toggle){
+      toggle.onclick = e => {
+        e.stopPropagation();
+        togglePrintSelection(resource.id, { rerender:false });
+        this.showStep();
+        safeRender();
+      };
+    }
     return flyer;
   },
 
-  renderFavoritesPacket(){
-    const { normalFavs, listFavs } = this.getFavoriteGroups();
+  renderPrintSelectionPacket(normalSelections, listSelections){
     this.openPreviewContent(container => {
-      if(normalFavs.length){
-        container.innerHTML = "<h2>Suggested Resources</h2>";
-        this.renderPrintableResourceCards(container, normalFavs);
+      container.innerHTML = "<h2>Suggested Resources</h2><p>Click 🖨️ to disable printing for a resource.</p>";
+      if(normalSelections.length){
+        this.renderPrintableResourceCards(container, normalSelections);
       }
 
-      listFavs.forEach((resource, index) => {
-        container.appendChild(this.buildListFlyer(resource, normalFavs.length > 0 || index > 0));
+      listSelections.forEach((resource, index) => {
+        container.appendChild(this.buildListFlyer(resource, normalSelections.length > 0 || index > 0));
       });
     });
   },
 
   renderSingleListResource(resourceId){
-    const { listFavs } = this.getFavoriteGroups();
-    const resource = listFavs.find(res => res.id === resourceId);
+    const { listSelections } = this.getPrintSelectionGroups();
+    const resource = listSelections.find(res => res.id === resourceId);
     if(!resource) return;
     this.openPreview([resource]);
   },
 
-  startFavoritesPacket(){
+  startPrintSelection(){
     this.queue = this.buildQueue();
-    if(!this.queue.length) return;
+    if(!this.queue.length){
+      this.openPreviewContent(container => {
+        container.innerHTML = "<h2>Suggested Resources</h2><p>No resources are selected for printing.</p><p>Click 🖨️ on a resource to include it in the printed handout.</p>";
+      });
+      return;
+    }
     this.currentIndex = 0;
     this.showStep();
   },
@@ -3045,6 +3218,8 @@ const PrintWorkflow = {
 
   doPrint(){
     this.initiatedByButton = true;
+    const disabled = Array.from(printContent.querySelectorAll(".print-disabled"));
+    disabled.forEach(el => el.setAttribute("data-print-hidden", "true"));
     window.print();
     clearAllCategoryFilters(false);
   },
@@ -3055,7 +3230,7 @@ const PrintWorkflow = {
   }
 };
 
-function startFavoritesPacketPrint(){ PrintWorkflow.startFavoritesPacket(); }
+function startPrintSelectionPreview(){ PrintWorkflow.startPrintSelection(); }
 function nextPrintStep(){ PrintWorkflow.next(); }
 function closePrintPreview(){ PrintWorkflow.close(); }
 function doPrint(){ PrintWorkflow.doPrint(); }
@@ -5579,9 +5754,9 @@ window.addEventListener("keydown", (e) => {
   safeRender();
 }, true);
 
-/* ---------- Hidden Favorites Reset Hotkey ---------- */
+/* ---------- Hidden Print Selection Reset Hotkey ---------- */
 /*
-  Ctrl + Alt + Shift + F  => clear Favorites and reload.
+  Ctrl + Alt + Shift + F  => clear print selection and reload.
   No confirmation; low stakes.
 */
 window.addEventListener("keydown", (e) => {
@@ -5594,7 +5769,8 @@ window.addEventListener("keydown", (e) => {
   e.preventDefault();
   e.stopPropagation();
 
-  localStorage.removeItem("albqFavorites");
+  localStorage.removeItem(PRINT_SELECTION_STORAGE_KEY);
+  localStorage.removeItem(LEGACY_FAVORITES_STORAGE_KEY);
   location.reload();
 }, true);
 
