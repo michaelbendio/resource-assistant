@@ -1099,12 +1099,13 @@ function fitTextareaToText(textarea){
 const seed = JSON.parse(document.getElementById("seed-data").textContent);
 // Main persisted app data snapshot (categories/resources + metadata).
 let data = JSON.parse(localStorage.getItem("albqData") || "null");
-const APP_VERSION = "0.14";
+const APP_VERSION = "0.1.5";
 const DEBUG = new URLSearchParams(location.search).has("debug");
 const UPDATE_SEEN_STORAGE_KEY = "albqRecentUpdatesSeen";
 const PRINT_SELECTION_STORAGE_KEY = "albqPrintSelection";
 const LEGACY_FAVORITES_STORAGE_KEY = "albqFavorites";
 const ONE_TIME_TIP_STORAGE_KEY = "albqPrintSelectionTipSeen";
+const RESOURCE_PACKAGE_FILENAME = "albq-resources.json";
 const CATEGORY_REMINDER_TEXT = "Report bugs or request enhancments to Elder Bendio (michaelbendio@gmail.com)"
 
 if(!data){
@@ -1420,6 +1421,36 @@ function runSelfTests(){
       const summary = formatPackageChangeSummary(createChangeEntry("resource", "updated", "career-education", "Career Education", "Formatted the services"));
       if(summary !== "Career Education - Formatted the services"){
         throw new Error(`unexpected package change summary '${summary}'`);
+      }
+    }
+  });
+
+  tests.push({
+    name: "PACKAGE SAVE DOWNLOAD FILENAME",
+    fn: () => {
+      const originalCreateObjectURL = URL.createObjectURL;
+      const originalRevokeObjectURL = URL.revokeObjectURL;
+      const originalClick = HTMLAnchorElement.prototype.click;
+      let clicked = null;
+      try{
+        URL.createObjectURL = () => "blob:albq-test";
+        URL.revokeObjectURL = () => {};
+        HTMLAnchorElement.prototype.click = function(){
+          clicked = {
+            href: this.getAttribute("href"),
+            download: this.getAttribute("download"),
+            type: this.getAttribute("type")
+          };
+        };
+        downloadResourcePackageBlob(RESOURCE_PACKAGE_FILENAME, new Blob(["{}"], { type:"application/json" }));
+        if(!clicked) throw new Error("download link was not clicked");
+        if(clicked.href !== "blob:albq-test") throw new Error("download link did not use object URL");
+        if(clicked.download !== RESOURCE_PACKAGE_FILENAME) throw new Error(`download filename was '${clicked.download}'`);
+        if(clicked.type !== "application/json") throw new Error("download link should advertise JSON");
+      }finally{
+        URL.createObjectURL = originalCreateObjectURL;
+        URL.revokeObjectURL = originalRevokeObjectURL;
+        HTMLAnchorElement.prototype.click = originalClick;
       }
     }
   });
@@ -3730,7 +3761,7 @@ function applyMergedData(mergedData){
 
 async function beginResourcePackageSave(){
   // Request a save target up front so browsers can honor the user gesture.
-  const suggestedName = "albq-resources.json";
+  const suggestedName = RESOURCE_PACKAGE_FILENAME;
   if(typeof window.showSaveFilePicker === "function"){
     const handle = await window.showSaveFilePicker({
       id: "albq-resources",
@@ -3748,7 +3779,26 @@ async function beginResourcePackageSave(){
   return { kind:"download", suggestedName };
 }
 
+function downloadResourcePackageBlob(fileName, blob){
+  const cleanFileName = fileName || RESOURCE_PACKAGE_FILENAME;
+  const downloadBlob = blob.type === "application/octet-stream"
+    ? blob
+    : new Blob([blob], { type:"application/octet-stream" });
+  const url = URL.createObjectURL(downloadBlob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = cleanFileName;
+  a.type = "application/json";
+  a.rel = "noopener";
+  a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 async function saveResourcePackageBlob(target, blob){
+  const fileName = target && target.suggestedName ? target.suggestedName : RESOURCE_PACKAGE_FILENAME;
   if(target && target.kind === "file-handle" && target.handle){
     const writable = await target.handle.createWritable();
     try{
@@ -3763,17 +3813,7 @@ async function saveResourcePackageBlob(target, blob){
     return;
   }
 
-  const url = URL.createObjectURL(blob);
-  try{
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = target && target.suggestedName ? target.suggestedName : "albq-resources.json";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  }finally{
-    URL.revokeObjectURL(url);
-  }
+  downloadResourcePackageBlob(fileName, blob);
 }
 
 async function exportPackage(){
@@ -3792,7 +3832,7 @@ async function exportPackage(){
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     await saveResourcePackageBlob(saveTarget, blob);
     persist();
-    showToast("Resources saved");
+    showToast(`Resources saved to ${RESOURCE_PACKAGE_FILENAME}`);
   }catch(err){
     if(err && err.name === "AbortError") return;
     if(packageVersionBumped) data.packageVersion = previousPackageVersion;
