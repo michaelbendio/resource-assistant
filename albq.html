@@ -478,18 +478,22 @@ Agents must modify only the relevant section.
 
 SECTION ORDER
 
-STATE
 UTILITIES
 DATA NORMALIZATION
-PERSISTENCE
-UNDO SYSTEM
+STATE
 SAFETY HARNESS
 SELF TESTS
 RENDERING — GENERAL
-RENDERING — CATEGORIES
 RENDERING — RESOURCES
-ADMIN MODE
+RENDERING — CATEGORIES
+UNDO SYSTEM
+PRINT SELECTION
+PRINT WORKFLOW
 EVENT HANDLERS
+ADMIN MODE
+PERSISTENCE AND RESOURCE PACKAGES
+SEARCH AND REFERENCE LOOKUPS
+ADMIN EDITORS
 
 SUBSYSTEMS
 
@@ -504,11 +508,6 @@ AGENT EDITING RULES
 2. Do not move section banners.
 3. Do not duplicate rendering logic across sections.
 4. Prefer minimal diffs rather than rewriting blocks.
-
-See also:
-AGENTS.md
-docs/code-map.md
-docs/architecture/ADR-001-print-workflow.md
 ============================================================ */
 
 // ============================================================
@@ -567,8 +566,10 @@ function showToast(message, options = {}){
 // ============================================================
 // DATA NORMALIZATION
 // ============================================================
-// Normalize imported records into the canonical shape used by rendering,
-// editing, and persistence.
+// Data can come from three places: embedded seed JSON, localStorage, and imported
+// albq-resources.json files. These helpers convert older or partial records into
+// the canonical shapes expected by rendering, admin editing, persistence, and
+// package merging.
 
 function normalizeResourceInformation(r){
   if(!r || typeof r !== "object") return false;
@@ -602,6 +603,8 @@ function normalizeDataVerifiedOnShape(nextData){
 }
 
 const DEFAULT_CATEGORY_PRESET_VERSION = 1;
+// Fresh installs start with these empty categories so users can merge or enter
+// resources without first building the navigation structure by hand.
 const DEFAULT_CATEGORY_LABELS = [
   "Addiction",
   "Children/Pregnancy",
@@ -897,6 +900,8 @@ const TAG_CATEGORY_HINTS = [
   }
 ];
 
+// Tags are stored on resources. These hints warn admins when tags imply a
+// category assignment that was probably missed.
 function getSuggestedCategoriesFromTags(tags){
   const tagKeys = new Set(normalizeResourceTags(tags).map(tag => tag.toLowerCase()));
   return TAG_CATEGORY_HINTS
@@ -941,6 +946,9 @@ const INFORMATION_SECTIONS = [
 ];
 const INFORMATION_ADDITIONAL_LABEL = "Additional text:";
 
+// Resource "Information" is stored as plain text with simple markdown-like
+// section headings. The admin editor splits that text into fields, then composes
+// it back into the same storage format before saving.
 function trimOuterBlankLines(lines){
   const next = lines.slice();
   while(next.length && next[0].trim() === "") next.shift();
@@ -1100,7 +1108,7 @@ function fitTextareaToText(textarea){
 const seed = JSON.parse(document.getElementById("seed-data").textContent);
 // Main persisted app data snapshot (categories/resources + metadata).
 let data = JSON.parse(localStorage.getItem("albqData") || "null");
-const APP_VERSION = "0.1.6";
+const APP_VERSION = "0.1.7";
 const DEBUG = new URLSearchParams(location.search).has("debug");
 const UPDATE_SEEN_STORAGE_KEY = "albqRecentUpdatesSeen";
 const PRINT_SELECTION_STORAGE_KEY = "albqPrintSelection";
@@ -1127,7 +1135,9 @@ data.appVersion = APP_VERSION;
 let printSelection = loadPrintSelection();
 sanitizePrintSelection();
 if(DEBUG) assertInvariants("startup");
-// Remaining fields are runtime UI state; they are not persisted directly.
+// Remaining fields are runtime UI state; they are not persisted directly. They
+// describe the currently visible view, selected admin row, open editor, filters,
+// and temporary update-review screens.
 let view = "categories";
 let currentCategory = null;
 let isSearchOpen = false;
@@ -2565,6 +2575,9 @@ if(selfTestCloseBtn){
 // ============================================================
 // RENDERING — GENERAL
 // ============================================================
+// Rendering is state-driven. Event handlers mutate the small set of runtime
+// state variables above, then call safeRender() or safeRenderAdmin(). The main
+// render() function below clears and rebuilds the active view from scratch.
 
 function setView(nextView){
   if(nextView === "admin" && !isAdminVisible) return;
@@ -2730,6 +2743,9 @@ function getCategoryUpdateMap(){
 // ============================================================
 // RENDERING — RESOURCES
 // ============================================================
+// Resource cards are shared across category lists, print previews, and admin
+// reference checks. Keep resource-card behavior here so all surfaces agree on
+// print toggles, details expansion, and information formatting.
 
 function buildResourceCard(res,{expanded=false,showDescription=false,showPrintToggle=true}={}){
   // Shared DOM builder used by category view, print-selection view, and print previews.
@@ -2775,6 +2791,8 @@ function buildResourceCard(res,{expanded=false,showDescription=false,showPrintTo
 // ============================================================
 // RENDERING — CATEGORIES
 // ============================================================
+// Category view helpers handle tag-based filtering within the selected category.
+// Filters are transient UI state; they are not saved into the resource package.
 
 function getCategoryFilterTags(categoryId){
   return Array.isArray(categoryTagFilters[categoryId]) ? categoryTagFilters[categoryId] : [];
@@ -2904,6 +2922,9 @@ function renderSearchResultsView(){
 // ============================================================
 // UNDO SYSTEM
 // ============================================================
+// Undo is intentionally narrow: destructive admin deletes save one complete data
+// snapshot in localStorage. Restoring that snapshot is simpler and safer than
+// trying to reverse individual category/resource/tag mutations.
 
 function getUndoSnapshot(){
   try{
@@ -2945,7 +2966,8 @@ function undoLastDeletion(){
 /* ---------- Render ---------- */
 
 function render(){
-  // Main view router: decides which screen to draw from current app state.
+  // Main view router. Every branch below owns one screen and appends its DOM into
+  // appView. Admin mode is special because adminView has its own shell.
   updatePrintSelectionIndicator();
   tabAdmin.style.display = isAdminVisible ? "" : "none";
   syncSearchPanel();
@@ -3213,6 +3235,8 @@ function render(){
 }
 
 /* ---------- Print Selection ---------- */
+// Print selection replaced the older Favorites concept. The legacy key is still
+// read once so existing browsers keep their selected resources after upgrading.
 
 function loadPrintSelection(){
   let raw = localStorage.getItem(PRINT_SELECTION_STORAGE_KEY);
@@ -3286,6 +3310,8 @@ function togglePrintSelection(id, { rerender = true } = {}){
 
 // PrintWorkflow is a small queue-based state machine for print preview/packet flow.
 // Each queue entry has a label and render function so print steps stay data-driven.
+// The queue currently has one visible step, but keeping this as a queue preserves
+// the separation between normal resource cards and list-style flyer output.
 const PrintWorkflow = {
   queue: [],
   currentIndex: -1,
@@ -3488,6 +3514,9 @@ window.addEventListener("afterprint", () => {
 // ============================================================
 // ADMIN MODE
 // ============================================================
+// Admin mode is hidden behind a keyboard shortcut. It edits the same data object
+// used by public views, but writes through commitPendingEditsIfChanged() so
+// navigation does not silently discard form edits.
 
 function renderAdmin(){
   // Admin shell plus tab routing; detailed panels render in dedicated helpers below.
@@ -3561,6 +3590,11 @@ function clearChangeLog(){
 // ============================================================
 // Storage split:
 // - localStorage keeps the primary JSON snapshot ("albqData").
+// - localStorage also keeps small UI state such as print selection, undo, and
+//   seen update ids under separate keys.
+// - Save Resources exports the same canonical JSON shape used internally.
+// - Merge Resources imports another canonical JSON file and resolves conflicts
+//   by lastModified timestamps where possible.
 
 function persist(){
   // Writes the canonical JSON snapshot used to restore app state on reload.
@@ -3778,6 +3812,9 @@ function buildPackageMergeSummary(summary){
 }
 
 function chooseMergeObject(localItem, incomingItem){
+  // Package merging is conservative: keep local data unless the incoming item is
+  // clearly newer, and fall back to incoming data only when no timestamps can
+  // establish a winner.
   if(!localItem && incomingItem) return { item:incomingItem, changed:true };
   if(localItem && !incomingItem) return { item:localItem, changed:false };
 
@@ -3798,6 +3835,8 @@ function chooseMergeObject(localItem, incomingItem){
 }
 
 function mergeItemsById(localItems, incomingItems, options = {}){
+  // Categories and resources both merge by stable id. The counters/names returned
+  // here are only for user-facing "what changed" summaries after import.
   const localList = Array.isArray(localItems) ? localItems : [];
   const incomingList = Array.isArray(incomingItems) ? incomingItems : [];
   const incomingById = new Map(incomingList.map(item => [String(item && item.id || ""), item]).filter(([id]) => id));
@@ -3847,6 +3886,8 @@ function normalizePackageData(nextData){
 }
 
 function mergeResourcePackages(localData, incomingData){
+  // Merge into cloned normalized objects so a failed import cannot partially
+  // mutate the user's current data.
   const local = normalizePackageData(cloneDataObject(localData));
   const incoming = normalizePackageData(cloneDataObject(incomingData));
   const categoryMerge = mergeItemsById(local.categories, incoming.categories, { kind:"categories" });
@@ -4099,6 +4140,9 @@ async function mergeImportPackage(event){
 /* =========================
    Admin UI
 ========================= */
+// The functions below support both user search and admin-only "referenced by"
+// inspection. A resource can be referenced by long list-style resources, so
+// matching uses normalized token phrases instead of raw substring checks.
 
 function getReferenceCategoryEntries(resource){
   const categoryIds = Array.isArray(resource && resource.categories)
@@ -4654,6 +4698,8 @@ function openAdminCategoryResourceById(resourceId){
 }
 
 function openCategoryOrderEditor(){
+  // The order editor sorts a stable draft row list for display, then writes back
+  // normalized 10,20,30... displayOrder values on OK.
   if(!commitPendingEditsIfChanged()) return;
   const rows = data.categories.map((cat, idx) => {
     const rawOrder = cat.displayOrder;
@@ -4831,6 +4877,8 @@ function confirmBlankUpdateDescription(draft){
 function commitPendingEditsIfChanged(){
   // Editor commit pattern:
   // UI fields -> draft snapshot -> validation -> apply canonical update -> persist.
+  // This runs before view/tab changes and before package save/import. Returning
+  // false blocks navigation so the admin can correct invalid or undescribed edits.
   if(!editing) return true;
 
   let nextSnapshot = "";
@@ -4895,6 +4943,8 @@ function commitPendingEditsIfChanged(){
 }
 
 /* ---------- Admin: Categories ---------- */
+// Category admin owns category labels, display order, deletion, and the helper
+// list of resources assigned to the selected category.
 
 function renderAdminCategories(container){
   // Category management view (list, editor, order controls, and related actions).
@@ -5285,6 +5335,8 @@ function editCategory(idx){
 }
 
 /* ---------- Admin: Resources ---------- */
+// Resource admin owns the large resource editor. It normalizes tags, categories,
+// verification dates, and structured information text before saving.
 
 function renderAdminResources(container){
   // Resource management view (browse list, edit mode, and tags).
@@ -5805,6 +5857,8 @@ function editResource(idx){
 }
 
 /* ---------- Admin: Tags ---------- */
+// Tags are not separate persisted records. This panel derives the tag list from
+// resources and bulk-removes a selected tag from every resource that uses it.
 
 function getResourcesUsingTag(tag){
   const normalizedTag = normalizeResourceTags([tag])[0] || "";
