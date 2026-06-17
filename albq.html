@@ -167,6 +167,23 @@ textarea.services-editor { min-height:320px; resize:vertical; }
 .resource-browse-actions { margin-top:8px; display:flex; gap:8px; align-items:center; width:100%; }
 .resource-browse-actions .spacer { flex:1; }
 .admin-panel-title { margin:0 0 4px; }
+.admin-toolbar {
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:12px;
+  margin-bottom:20px;
+}
+.admin-toolbar-actions {
+  display:flex;
+  gap:8px;
+  align-items:center;
+  flex-wrap:wrap;
+}
+.admin-toolbar-help {
+  flex:0 0 auto;
+  margin-right:92px;
+}
 .admin-action-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
 .admin-option-row { margin:0; }
 .admin-option-row + .admin-action-row { margin-top:12px; }
@@ -269,6 +286,35 @@ textarea.services-editor { min-height:320px; resize:vertical; }
 .reference-match-categories { color:#555; font-size:14px; }
 .reference-match-snippet { margin-top:3px; color:#333; font-size:14px; }
 .reference-empty { margin:0; color:#555; }
+.admin-help-content .admin-help-quick-start {
+  margin:0 0 14px;
+  padding:12px 14px;
+  border:1px solid #c8d6e5;
+  border-left:4px solid #003366;
+  border-radius:6px;
+  background:#f7fbff;
+}
+.admin-help-content h3 { margin:0 0 8px; }
+.admin-help-content details {
+  border:1px solid #dde6ef;
+  border-radius:6px;
+  margin-top:8px;
+  background:#fff;
+}
+.admin-help-content summary {
+  cursor:pointer;
+  font-weight:bold;
+  padding:10px 12px;
+}
+.admin-help-content .admin-help-section-body {
+  border-top:1px solid #dde6ef;
+  padding:10px 12px 12px;
+}
+.admin-help-content p { margin:0 0 10px; }
+.admin-help-content p:last-child { margin-bottom:0; }
+.admin-help-content ol,
+.admin-help-content ul { margin:8px 0 0 22px; padding:0; }
+.admin-help-content li { margin:4px 0; }
 
 /* Print modal */
 #printModal {
@@ -809,16 +855,7 @@ function buildAdminDeleteConfirmation(kind, name){
 }
 
 function canonicalizeResourceTag(tag){
-  const trimmed = String(tag || "").trim();
-  const key = trimmed.toLowerCase();
-  if(
-    key === "this resource is a list" ||
-    key === "this is a list" ||
-    key === "list resource"
-  ){
-    return "List";
-  }
-  return trimmed;
+  return String(tag || "").trim();
 }
 
 function normalizeResourceTags(tags){
@@ -1108,7 +1145,7 @@ function fitTextareaToText(textarea){
 const seed = JSON.parse(document.getElementById("seed-data").textContent);
 // Main persisted app data snapshot (categories/resources + metadata).
 let data = JSON.parse(localStorage.getItem("albqData") || "null");
-const APP_VERSION = "0.1.7";
+const APP_VERSION = "0.2.0";
 const DEBUG = new URLSearchParams(location.search).has("debug");
 const UPDATE_SEEN_STORAGE_KEY = "albqRecentUpdatesSeen";
 const PRINT_SELECTION_STORAGE_KEY = "albqPrintSelection";
@@ -2068,15 +2105,15 @@ function runSelfTests(){
   });
 
   tests.push({
-    name: "LIST TAG CANONICALIZATION",
+    name: "TAG TRIM AND DEDUPE",
     fn: () => {
-      const resource = { tags:["This resource is a list", "Women"] };
+      const resource = { tags:[" List ", "Women"] };
       normalizeDataTagsShape({ resources:[resource], tags:["ignored"] });
       const expected = ["List", "Women"];
       if(JSON.stringify(resource.tags) !== JSON.stringify(expected)){
         throw new Error(`expected ${JSON.stringify(expected)}, got ${JSON.stringify(resource.tags)}`);
       }
-      const deduped = normalizeResourceTags(["List", "this is a list"]);
+      const deduped = normalizeResourceTags(["List", "list"]);
       if(JSON.stringify(deduped) !== JSON.stringify(["List"])){
         throw new Error(`expected ["List"], got ${JSON.stringify(deduped)}`);
       }
@@ -2094,9 +2131,9 @@ function runSelfTests(){
       if(JSON.stringify(removed) !== JSON.stringify(["List"])){
         throw new Error(`expected GED removal, got ${JSON.stringify(removed)}`);
       }
-      const canonical = toggleResourceTag([], "this resource is a list");
-      if(JSON.stringify(canonical) !== JSON.stringify(["List"])){
-        throw new Error(`expected List canonicalization, got ${JSON.stringify(canonical)}`);
+      const addedTrimmed = toggleResourceTag([], " List ");
+      if(JSON.stringify(addedTrimmed) !== JSON.stringify(["List"])){
+        throw new Error(`expected trimmed List tag, got ${JSON.stringify(addedTrimmed)}`);
       }
       if(formatResourceTagsInput(["GED", "List"]) !== "GED\nList"){
         throw new Error("tag input formatting changed");
@@ -2158,7 +2195,7 @@ function runSelfTests(){
   tests.push({
     name: "DEFENSIVE TAG NORMALIZATION",
     fn: () => {
-      const fromString = normalizeResourceTags("Shelter, This is a list, shelter, ");
+      const fromString = normalizeResourceTags("Shelter, List, shelter, ");
       if(JSON.stringify(fromString) !== JSON.stringify(["Shelter", "List"])){
         throw new Error(`unexpected string tags ${JSON.stringify(fromString)}`);
       }
@@ -2722,6 +2759,161 @@ function showUserHelp(){
   const closeBtn = modal.querySelector(".reference-modal-close");
   if(closeBtn) closeBtn.addEventListener("click", closeReferenceModal);
   modal.classList.remove("hidden");
+}
+
+function showAdminHelp(){
+  const modal = getReferenceModal();
+  modal.innerHTML = `
+    <div class="reference-modal-panel" role="dialog" aria-modal="true" aria-labelledby="adminHelpTitle">
+      <div class="reference-modal-header">
+        <div id="adminHelpTitle" class="reference-modal-title">Admin Help</div>
+        <button class="button reference-modal-close" type="button">Close</button>
+      </div>
+      <div class="reference-modal-body admin-help-content">
+        <section class="admin-help-quick-start">
+          <h3>Quick Start: First Category and First Resource</h3>
+          <ol>
+            <li>Press <code>Ctrl+Alt+A</code>, then open <code>Admin</code>.</li>
+            <li>In <code>Categories</code>, click <code>New</code>.</li>
+            <li>Enter the category name, add an update note like <code>Added first category</code>, and click <code>Done</code>.</li>
+            <li>Open <code>Resources</code> and click <code>New</code>.</li>
+            <li>Enter the resource name and any phone, address, website, hours, description, tags, and information you have.</li>
+            <li>Check the category you created so the resource appears there.</li>
+            <li>Add an update note like <code>Added first resource</code>, then click <code>Done</code>.</li>
+            <li>Click <code>Save Resources</code> and save the file as <code>albq-resources.json</code>.</li>
+          </ol>
+        </section>
+
+        <details>
+          <summary>Before You Edit</summary>
+          <div class="admin-help-section-body">
+            <p>Always start by loading the latest resource package.</p>
+            <ol>
+              <li>Go to the Categories screen.</li>
+              <li>Click <code>Merge Resources</code>.</li>
+              <li>Choose the latest <code>albq-resources.json</code> file.</li>
+              <li>Wait for the merge to finish before making edits.</li>
+            </ol>
+            <p>This matters because resource packages are merged by <code>lastModified</code> timestamps. If you edit from an older package, a later merge can bring back old details, old tags, or old category assignments.</p>
+          </div>
+        </details>
+
+        <details>
+          <summary>Saving and Sharing Changes</summary>
+          <div class="admin-help-section-body">
+            <p>Admin edits are saved in your browser first. They are not shared with anyone else until you export a new resource package.</p>
+            <p>After a batch of edits:</p>
+            <ol>
+              <li>Click <code>Show change log</code> and review the listed changes.</li>
+              <li>Click <code>Save Resources</code>.</li>
+              <li>Save the file as <code>albq-resources.json</code>.</li>
+              <li>Share that JSON file through the normal distribution process.</li>
+            </ol>
+            <p><code>Save Resources</code> commits any open editor changes, increases the package version, and exports the current data.</p>
+          </div>
+        </details>
+
+        <details>
+          <summary>Categories</summary>
+          <div class="admin-help-section-body">
+            <p>Use <code>Categories</code> to manage the sections users see on the main screen.</p>
+            <p><code>New</code> creates a blank category. Enter the category label, optionally enter a display order, describe the update, and click <code>Done</code>.</p>
+            <p><code>Delete</code> removes the selected category. It does not delete the resources in that category, but those resources will no longer appear there. The app asks for confirmation and gives you a chance to describe the deletion.</p>
+            <p><code>Edit display order...</code> lets you reorder categories. Lower numbers appear first. When you click <code>OK</code>, the app rewrites the display order as 10, 20, 30, and so on.</p>
+            <p>The category editor also shows <code>Resources in this category</code>. Click a resource name there to open it in the resource editor.</p>
+            <p>Category labels must be unique.</p>
+          </div>
+        </details>
+
+        <details>
+          <summary>Resources</summary>
+          <div class="admin-help-section-body">
+            <p>Use <code>Resources</code> to add, edit, delete, categorize, tag, and verify resource records.</p>
+            <p>In the resource list:</p>
+            <ul>
+              <li>Click a resource to select it.</li>
+              <li>Click <code>Edit</code>, double-click the resource, or press <code>Enter</code> to edit it.</li>
+              <li>Click <code>New</code> to create a resource.</li>
+              <li>Click <code>Delete</code> or press <code>Delete</code> to remove the selected resource.</li>
+              <li>Turn on <code>Show verified dates</code> to show and sort by verification date.</li>
+            </ul>
+            <p>In the resource editor:</p>
+            <ul>
+              <li><code>Name</code> is required and must be unique.</li>
+              <li><code>Phone</code>, <code>Address</code>, <code>Website</code>, and <code>Hours</code> appear on the public resource card when filled in.</li>
+              <li><code>Verified</code> stores a <code>MM/YY</code> date. Click <code>Update</code> to fill in the current month and year.</li>
+              <li><code>Description</code> is the short public summary.</li>
+              <li><code>Describe this update</code> is used in the change log and package update summary.</li>
+              <li><code>Tags</code> can be comma-separated or entered one per line.</li>
+              <li><code>Categories</code> controls where the resource appears.</li>
+              <li><code>Information</code> is the detailed public service text.</li>
+            </ul>
+            <p>Click <code>Done</code> to save the editor. If you leave <code>Describe this update</code> blank after changing a category or resource, the app asks whether you want to describe the change or save without a description.</p>
+          </div>
+        </details>
+
+        <details>
+          <summary>Information Text</summary>
+          <div class="admin-help-section-body">
+            <p>The resource <code>Information</code> editor has guided sections:</p>
+            <ul>
+              <li><code>What is offered</code></li>
+              <li><code>Eligibility</code></li>
+              <li><code>What to expect</code></li>
+              <li><code>How to connect</code></li>
+              <li><code>Additional text</code></li>
+            </ul>
+            <p>Blank sections are hidden from the public resource view. Use <code>Preview</code> to check how the text will look.</p>
+            <p>Supported formatting:</p>
+            <ul>
+              <li>Start a line with <code>* </code> for a bullet.</li>
+              <li>Use <code>**bold**</code> for bold text.</li>
+              <li>Use <code>__underline__</code> for underlined text.</li>
+              <li>Put <code>---</code> on its own line for a divider.</li>
+            </ul>
+            <p>Use <code>Additional text</code> for details that do not fit the guided sections.</p>
+          </div>
+        </details>
+
+        <details>
+          <summary>Tags</summary>
+          <div class="admin-help-section-body">
+            <p>Tags are stored on resources. The <code>Tags</code> tab shows tags currently used by one or more resources.</p>
+            <p>Select a tag to see which resources use it. <code>Delete Tag</code> removes that tag from every listed resource, updates each changed resource, and creates change-log entries.</p>
+            <p>Before deleting tags, make sure you have loaded the latest package. If another admin later saves an older version of a resource, a merge can bring the deleted tag back.</p>
+          </div>
+        </details>
+
+        <details>
+          <summary>Change Log</summary>
+          <div class="admin-help-section-body">
+            <p>The change log tracks local admin edits. Good update descriptions make package updates easier for other admins to review.</p>
+            <p>Useful examples:</p>
+            <ul>
+              <li><code>Updated phone number</code></li>
+              <li><code>Added eligibility details</code></li>
+              <li><code>Removed duplicate housing tag</code></li>
+              <li><code>Deleted outdated resource</code></li>
+            </ul>
+            <p>After a package is merged successfully, the local change log is cleared.</p>
+          </div>
+        </details>
+
+        <details>
+          <summary>Undo</summary>
+          <div class="admin-help-section-body">
+            <p>Undo is available only for destructive deletions: category deletion, resource deletion, and tag deletion.</p>
+            <p>Only the most recent deletion can be undone. Use <code>Undo ...</code> in Admin mode to restore the saved snapshot, or <code>Clear undo</code> to remove it.</p>
+            <p>Normal edits are not undone this way. If you make a wrong normal edit, edit the item again and describe the correction.</p>
+          </div>
+        </details>
+      </div>
+    </div>
+  `;
+  const closeBtn = modal.querySelector(".reference-modal-close");
+  if(closeBtn) closeBtn.addEventListener("click", closeReferenceModal);
+  modal.classList.remove("hidden");
+  if(closeBtn) closeBtn.focus();
 }
 
 function getUnseenUpdates(){
@@ -3320,7 +3512,7 @@ const PrintWorkflow = {
   isListResource(res){
     if(!Array.isArray(res?.tags)) return false;
     return res.tags.some(tag => {
-      return canonicalizeResourceTag(tag).toLowerCase() === "list";
+      return String(tag || "").trim().toLowerCase() === "list";
     });
   },
 
@@ -3526,18 +3718,24 @@ function renderAdmin(){
   const hasChangeLog = getRecentChanges().length > 0;
 
   container.innerHTML = `
-    <div style="margin-bottom:20px;">
-      <button class="button primary" onclick="exportPackage()">Save Resources</button>
-      ${hasChangeLog ? `
-        <button class="button" onclick="showChangeLog()">Show change log</button>
-        <button class="button" onclick="clearChangeLog()">Clear change log</button>
-      ` : ""}
-      ${undo ? `
-        <button class="button" onclick="undoLastDeletion()">${escapeHTML(undoButtonLabel)}</button>
-        <button class="button" onclick="clearUndoSnapshot(); safeRenderAdmin();">Clear undo</button>
-      ` : ""}      <div style="margin-top:10px;">
-        Last Modified: ${escapeHTML(formatDateTimeUTC(data.lastModified))}
+    <div class="admin-toolbar">
+      <div>
+        <div class="admin-toolbar-actions">
+          <button class="button primary" onclick="exportPackage()">Save Resources</button>
+          ${hasChangeLog ? `
+            <button class="button" onclick="showChangeLog()">Show change log</button>
+            <button class="button" onclick="clearChangeLog()">Clear change log</button>
+          ` : ""}
+          ${undo ? `
+            <button class="button" onclick="undoLastDeletion()">${escapeHTML(undoButtonLabel)}</button>
+            <button class="button" onclick="clearUndoSnapshot(); safeRenderAdmin();">Clear undo</button>
+          ` : ""}
+        </div>
+        <div style="margin-top:10px;">
+          Last Modified: ${escapeHTML(formatDateTimeUTC(data.lastModified))}
+        </div>
       </div>
+      <button class="button admin-toolbar-help" onclick="showAdminHelp()">Help</button>
     </div>
 
     <div>
@@ -3929,7 +4127,6 @@ async function beginResourcePackageSave(){
   if(typeof window.showSaveFilePicker === "function"){
     const handle = await window.showSaveFilePicker({
       id: "albq-resources",
-      startIn: "downloads",
       suggestedName,
       types: [{
         description: "ALBQ resource package",
