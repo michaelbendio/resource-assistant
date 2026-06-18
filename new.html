@@ -1140,6 +1140,16 @@ const UPDATE_SEEN_STORAGE_KEY = "newRecentUpdatesSeen";
 const PRINT_SELECTION_STORAGE_KEY = "newPrintSelection";
 const LEGACY_FAVORITES_STORAGE_KEY = "newFavorites";
 const ONE_TIME_TIP_STORAGE_KEY = "newPrintSelectionTipSeen";
+const TIP_STORAGE_KEYS = {
+  user: ONE_TIME_TIP_STORAGE_KEY,
+  newAdminWelcome: "newAdminWelcomeTipSeen",
+  newAdminMode: "newAdminModeTipSeen"
+};
+const TIP_TEXT = {
+  user: "Click on a category to see its resources. Click a resource to see details. Click ⬜ to include it in the printed handout.",
+  newAdminWelcome: "Welcome to your new TSO Resources app. Click Ctrl+Alt+A to add an Admin button to the top blue bar. Then click it.",
+  newAdminMode: "Click Ctrl+Alt+A to hide the Admin button when you're done. Now click the gray Help button"
+};
 const TSO_NAME_STORAGE_KEY = "newTsoName";
 const RESOURCE_PACKAGE_FILENAME = "albq-resources.json";
 const CATEGORY_REMINDER_TEXT = "Report bugs or request enhancments to Elder Bendio (michaelbendio@gmail.com)"
@@ -1674,15 +1684,25 @@ function runSelfTests(){
   tests.push({
     name: "ONE-TIME TIP IS PROMINENT",
     fn: () => {
+      const previousData = data;
       const previousView = view;
       const previousShowOneTimeTip = showOneTimeTip;
+      const previousUserTipSeen = localStorage.getItem(TIP_STORAGE_KEYS.user);
+      const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
       try{
+        data = {
+          categories:[{ id:"food", label:"Food" }],
+          resources:[],
+          changes:[]
+        };
         view = "categories";
         showOneTimeTip = true;
+        localStorage.removeItem(TIP_STORAGE_KEYS.user);
+        localStorage.setItem(TSO_NAME_STORAGE_KEY, "Test");
         render();
         const tip = appView.querySelector(".one-time-tip");
         if(!tip) throw new Error("one-time tip was not rendered");
-        if(tip.textContent !== "Click on a category to see its resources. Click a resource to see details. Click ⬜ to include it in the printed handout."){
+        if(tip.textContent !== TIP_TEXT.user){
           throw new Error("one-time tip wording changed");
         }
         const style = getComputedStyle(tip);
@@ -1693,8 +1713,77 @@ function runSelfTests(){
           throw new Error(`one-time tip should be bold, got ${style.fontWeight}`);
         }
       }finally{
+        data = previousData;
         view = previousView;
         showOneTimeTip = previousShowOneTimeTip;
+        if(previousUserTipSeen === null) localStorage.removeItem(TIP_STORAGE_KEYS.user);
+        else localStorage.setItem(TIP_STORAGE_KEYS.user, previousUserTipSeen);
+        if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+        else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoName);
+      }
+    }
+  });
+
+  tests.push({
+    name: "NEW ADMIN WELCOME TIP USES ADMIN ONBOARDING TEXT",
+    fn: () => {
+      const previousData = data;
+      const previousView = view;
+      const previousShowOneTimeTip = showOneTimeTip;
+      const previousWelcomeTipSeen = localStorage.getItem(TIP_STORAGE_KEYS.newAdminWelcome);
+      const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
+      try{
+        data = { categories:[{ id:"food", label:"Food" }], resources:[], changes:[] };
+        view = "categories";
+        showOneTimeTip = true;
+        localStorage.removeItem(TIP_STORAGE_KEYS.newAdminWelcome);
+        localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+        render();
+        const tip = appView.querySelector(".one-time-tip");
+        if(!tip) throw new Error("new admin welcome tip was not rendered");
+        if(tip.textContent !== TIP_TEXT.newAdminWelcome){
+          throw new Error("new admin welcome tip wording changed");
+        }
+      }finally{
+        data = previousData;
+        view = previousView;
+        showOneTimeTip = previousShowOneTimeTip;
+        if(previousWelcomeTipSeen === null) localStorage.removeItem(TIP_STORAGE_KEYS.newAdminWelcome);
+        else localStorage.setItem(TIP_STORAGE_KEYS.newAdminWelcome, previousWelcomeTipSeen);
+        if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+        else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoName);
+      }
+    }
+  });
+
+  tests.push({
+    name: "NEW ADMIN MODE TIP POINTS TO ADMIN HELP",
+    fn: () => {
+      const previousData = data;
+      const previousView = view;
+      const previousAdminVisible = isAdminVisible;
+      const previousAdminTipSeen = localStorage.getItem(TIP_STORAGE_KEYS.newAdminMode);
+      const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
+      try{
+        data = { categories:[{ id:"food", label:"Food" }], resources:[], changes:[] };
+        view = "admin";
+        isAdminVisible = true;
+        localStorage.removeItem(TIP_STORAGE_KEYS.newAdminMode);
+        localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+        render();
+        const tip = document.querySelector("#adminView .one-time-tip");
+        if(!tip) throw new Error("new admin mode tip was not rendered");
+        if(tip.textContent !== TIP_TEXT.newAdminMode){
+          throw new Error("new admin mode tip wording changed");
+        }
+      }finally{
+        data = previousData;
+        view = previousView;
+        isAdminVisible = previousAdminVisible;
+        if(previousAdminTipSeen === null) localStorage.removeItem(TIP_STORAGE_KEYS.newAdminMode);
+        else localStorage.setItem(TIP_STORAGE_KEYS.newAdminMode, previousAdminTipSeen);
+        if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+        else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoName);
       }
     }
   });
@@ -2701,6 +2790,42 @@ function refreshAppTitle(){
 
 refreshAppTitle();
 
+function hasSeenTip(tipId){
+  const storageKey = TIP_STORAGE_KEYS[tipId];
+  return !storageKey || localStorage.getItem(storageKey) === "1";
+}
+
+function markTipSeen(tipId){
+  const storageKey = TIP_STORAGE_KEYS[tipId];
+  if(!storageKey) return;
+  localStorage.setItem(storageKey, "1");
+  if(tipId === "user") showOneTimeTip = false;
+}
+
+function isNewAdminSetupState(){
+  return !getTsoName()
+    && !(Array.isArray(data.resources) && data.resources.length);
+}
+
+function createOneTimeTip(tipId){
+  const tipText = TIP_TEXT[tipId];
+  if(!tipText || hasSeenTip(tipId)) return null;
+  const tip = document.createElement("div");
+  tip.className = "one-time-tip";
+  tip.textContent = tipText;
+  tip.onclick = () => {
+    markTipSeen(tipId);
+    safeRender();
+  };
+  return tip;
+}
+
+function getCategoryTipId(){
+  if(isNewAdminSetupState() && !hasSeenTip("newAdminWelcome")) return "newAdminWelcome";
+  if(showOneTimeTip) return "user";
+  return "";
+}
+
 function toggleUpdateInfoView(){
   if(view === "recent-updates" && showUpdateInfo){
     showUpdateInfo = false;
@@ -2855,19 +2980,21 @@ function showAdminHelp(){
         <button class="button reference-modal-close" type="button">Close</button>
       </div>
       <div class="reference-modal-body admin-help-content">
-        <section class="admin-help-quick-start">
-          <h3>Quick Start: First Category and First Resource</h3>
+        <section class="admin-help-setup">
+          <h3>Set Up This TSO Resources App</h3>
           <ol>
-            <li>Press <code>Ctrl+Alt+A</code> to enable or disable Admin mode.</li>
-            <li>When Admin mode is enabled, click <code>Admin</code> in the blue bar.</li>
-            <li>In <code>Categories</code>, click <code>New</code>.</li>
-            <li>Enter the category name, add an update note like <code>Added first category</code>, and click <code>Done</code>.</li>
-            <li>Open <code>Resources</code> and click <code>New</code>.</li>
-            <li>Enter the resource name and any phone, address, website, hours, description, tags, and information you have.</li>
-            <li>Check the category you created so the resource appears there.</li>
-            <li>Add an update note like <code>Added first resource</code>, then click <code>Done</code>.</li>
-            <li>Click <code>Save Resources</code> and save the file as <code>albq-resources.json</code>.</li>
+            <li>Click <code>Change TSO Name</code>.</li>
+            <li>Enter the name of your TSO and click <code>Save TSO Name</code>.</li>
+            <li>Check the blue title bar. It should say your TSO name followed by <code>TSO Resources</code>.</li>
+            <li>Rename the file <code>new.html</code> to match your TSO, such as <code>provo.html</code> or <code>albuquerque.html</code>.</li>
           </ol>
+          <p>The name saved in the app changes the title shown to users. Renaming <code>new.html</code> changes the file name people open.</p>
+          <p><button class="button" type="button" id="adminHelpOpenSetup">Change TSO Name</button></p>
+        </section>
+
+        <section class="admin-help-quick-start">
+          <h3>Quick Start Guide</h3>
+          <p>Stub: add your first category, add your first resource, assign the resource to the category, then click <code>Save Resources</code>.</p>
         </section>
 
         <details>
@@ -2997,7 +3124,9 @@ function showAdminHelp(){
     </div>
   `;
   const closeBtn = modal.querySelector(".reference-modal-close");
+  const setupBtn = document.getElementById("adminHelpOpenSetup");
   if(closeBtn) closeBtn.addEventListener("click", closeReferenceModal);
+  if(setupBtn) setupBtn.addEventListener("click", showAdminSetup);
   modal.classList.remove("hidden");
   if(closeBtn) closeBtn.focus();
 }
@@ -3305,16 +3434,10 @@ function render(){
   }
 
   if(view==="categories"){
-    if(showOneTimeTip){
-      const tip = document.createElement("div");
-      tip.className = "one-time-tip";
-      tip.textContent = "Click on a category to see its resources. Click a resource to see details. Click ⬜ to include it in the printed handout.";
-      tip.onclick = () => {
-        showOneTimeTip = false;
-        localStorage.setItem(ONE_TIME_TIP_STORAGE_KEY, "1");
-        safeRender();
-      };
-      appView.appendChild(tip);
+    const categoryTipId = getCategoryTipId();
+    if(categoryTipId){
+      const tip = createOneTimeTip(categoryTipId);
+      if(tip) appView.appendChild(tip);
     }
     if(pendingRecentUpdates.length){
       const note = document.createElement("div");
@@ -3860,6 +3983,11 @@ function renderAdmin(){
     </div>
     <br>
   `;
+
+  if(isNewAdminSetupState()){
+    const tip = createOneTimeTip("newAdminMode");
+    if(tip) container.insertBefore(tip, container.children[1] || null);
+  }
 
   if(adminTab === "categories") renderAdminCategories(container);
   if(adminTab === "resources") renderAdminResources(container);
