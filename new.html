@@ -208,6 +208,10 @@ textarea.services-editor { min-height:320px; resize:vertical; }
 .resource-info-rendered .resource-info-section + .resource-info-section,
 .resource-info-rendered .resource-info-additional-rendered { margin-top:6px; }
 #res_name { text-align:left; width:100%; box-sizing:border-box; }
+.admin-guide-active .resource-editor-guide-section { display:none; }
+.admin-guide-active .resource-editor-guide-section.admin-guide-current-section { display:block; }
+.admin-guide-active .admin-guide-defer-verified { display:none; }
+.admin-guide-tip-actions { margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
 .verified-warning { color:#aa0000; font-size:13px; margin-top:4px; min-height:1.1em; }
 .tag-controls-row { margin-top:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
 .assigned-tags-line { font-size:14px; }
@@ -266,11 +270,13 @@ textarea.services-editor { min-height:320px; resize:vertical; }
 .reference-modal-header {
   display:flex;
   justify-content:space-between;
+  align-items:center;
   gap:16px;
   padding:16px 18px;
   border-bottom:1px solid #dde6ef;
 }
 .reference-modal-title { font-size:20px; font-weight:bold; }
+.reference-modal-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
 .reference-modal-subtitle { margin-top:2px; color:#555; }
 .reference-modal-body {
   padding:16px 18px 18px;
@@ -286,7 +292,7 @@ textarea.services-editor { min-height:320px; resize:vertical; }
 .reference-match-categories { color:#555; font-size:14px; }
 .reference-match-snippet { margin-top:3px; color:#333; font-size:14px; }
 .reference-empty { margin:0; color:#555; }
-.admin-help-content .admin-help-quick-start {
+.admin-help-content .admin-help-setup {
   margin:0 0 14px;
   padding:12px 14px;
   border:1px solid #c8d6e5;
@@ -437,6 +443,14 @@ textarea.services-editor { min-height:320px; resize:vertical; }
   }
 
   .reference-modal-close {
+    display: none !important;
+  }
+
+  .reference-modal-actions {
+    display: none !important;
+  }
+
+  .admin-help-setup {
     display: none !important;
   }
 
@@ -1148,7 +1162,14 @@ const TIP_STORAGE_KEYS = {
 const TIP_TEXT = {
   user: "Click on a category to see its resources. Click a resource to see details. Click ⬜ to include it in the printed handout.",
   newAdminWelcome: "Welcome to your new TSO Resources app. Click Ctrl+Alt+A to add an Admin button to the top blue bar. Then click it.",
-  newAdminMode: "Click Ctrl+Alt+A to hide the Admin button when you're done. Now click the gray Help button"
+  newAdminMode: "Click Ctrl+Alt+A to hide the Admin button when you're done. Now click the gray Help button",
+  adminGuideResources: "Click the gray Resources button to enter the Resource editor.",
+  adminGuideNewResource: "Click the gray New button to create a resource.",
+  adminGuideResourceFields: "Fill in Name, Phone, Address and so on, then click Next",
+  adminGuideTags: "Add search tags for this resource, then click Next",
+  adminGuideCategories: "Choose the categories where this resource should appear, then click Next",
+  adminGuideInformation: "Add the public information users should see, then click Next. If this resource is a list, such as a list of food pantries, you can skip this section.",
+  adminGuideUpdate: "Describe this update, then click Done"
 };
 const TSO_NAME_STORAGE_KEY = "newTsoName";
 const RESOURCE_PACKAGE_FILENAME = "albq-resources.json";
@@ -1199,6 +1220,11 @@ let recentUpdateDetail = null;
 let showUpdateInfo = false;
 let showRecentChangeLog = true;
 let showOneTimeTip = localStorage.getItem(ONE_TIME_TIP_STORAGE_KEY) !== "1";
+let adminGuideMode = false;
+let adminGuideStep = "resources";
+let adminGuideResourceSection = "basics";
+let adminGuideDismissed = false;
+let adminHelpPrintRestoreState = null;
 let allowBlankUpdateDescriptionOnce = false;
 let newCategoryIds = new Set();
 let newResourceIds = new Set();
@@ -1782,6 +1808,197 @@ function runSelfTests(){
         isAdminVisible = previousAdminVisible;
         if(previousAdminTipSeen === null) localStorage.removeItem(TIP_STORAGE_KEYS.newAdminMode);
         else localStorage.setItem(TIP_STORAGE_KEYS.newAdminMode, previousAdminTipSeen);
+        if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+        else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoName);
+      }
+    }
+  });
+
+  tests.push({
+    name: "ADMIN HELP HAS GUIDE PRINT AND SETUP CLOSE STEP",
+    fn: () => {
+      const previousData = data;
+      const previousAdminGuideMode = adminGuideMode;
+      const previousAdminGuideStep = adminGuideStep;
+      const previousAdminGuideResourceSection = adminGuideResourceSection;
+      const previousAdminGuideDismissed = adminGuideDismissed;
+      const previousAdminModeTipSeen = localStorage.getItem(TIP_STORAGE_KEYS.newAdminMode);
+      const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
+      try{
+        data = { categories:[{ id:"food", label:"Food" }], resources:[], changes:[] };
+        adminGuideMode = false;
+        adminGuideStep = "resources";
+        localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+        showAdminHelp();
+        const modal = document.getElementById("referenceModal");
+        if(!modal || modal.classList.contains("hidden")) throw new Error("Admin Help did not open");
+        if(!document.getElementById("adminHelpGuideButton")) throw new Error("Guide button missing");
+        if(!document.getElementById("adminHelpPrintButton")) throw new Error("Print button missing");
+        if(!adminGuideMode) throw new Error("new admin help should start guide mode");
+        if(/Quick Start Guide/.test(modal.textContent || "")) throw new Error("Quick Start Guide stub should be removed");
+        if(!/Now click Close and follow the red tips/.test(modal.textContent || "")){
+          throw new Error("setup step 5 is missing");
+        }
+        document.getElementById("adminHelpGuideButton").click();
+        if(adminGuideMode) throw new Error("Guide button should turn guide mode off");
+        const setupSection = modal.querySelector(".admin-help-setup");
+        if(setupSection && !setupSection.classList.contains("hidden")){
+          throw new Error("setup section should be hidden when guide mode is off");
+        }
+        closeReferenceModal();
+        showAdminHelp();
+        const reopenedSetupSection = document.querySelector("#referenceModal .admin-help-setup");
+        if(adminGuideMode || (reopenedSetupSection && !reopenedSetupSection.classList.contains("hidden"))){
+          throw new Error("dismissed guide should stay off when Admin Help is reopened");
+        }
+      }finally{
+        data = previousData;
+        adminGuideMode = previousAdminGuideMode;
+        adminGuideStep = previousAdminGuideStep;
+        adminGuideResourceSection = previousAdminGuideResourceSection;
+        adminGuideDismissed = previousAdminGuideDismissed;
+        closeReferenceModal();
+        if(previousAdminModeTipSeen === null) localStorage.removeItem(TIP_STORAGE_KEYS.newAdminMode);
+        else localStorage.setItem(TIP_STORAGE_KEYS.newAdminMode, previousAdminModeTipSeen);
+        if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+        else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoName);
+      }
+    }
+  });
+
+  tests.push({
+    name: "ADMIN GUIDE TIPS ADVANCE THROUGH RESOURCE CREATION",
+    fn: () => {
+      const previousData = data;
+      const previousStoredData = localStorage.getItem(DATA_STORAGE_KEY);
+      const previousView = view;
+      const previousAdminTab = adminTab;
+      const previousAdminVisible = isAdminVisible;
+      const previousAdminGuideMode = adminGuideMode;
+      const previousAdminGuideStep = adminGuideStep;
+      const previousAdminGuideResourceSection = adminGuideResourceSection;
+      const previousAdminGuideDismissed = adminGuideDismissed;
+      const previousAdminResourceEditMode = adminResourceEditMode;
+      const previousSelectedResourceId = selectedResourceId;
+      try{
+        data = { categories:[{ id:"food", label:"Food" }], resources:[], changes:[], lastModified:nowISO() };
+        view = "admin";
+        adminTab = "categories";
+        isAdminVisible = true;
+        adminResourceEditMode = false;
+        selectedResourceId = "";
+        startAdminGuide("resources");
+        render();
+        let tip = document.querySelector("#adminView .admin-guide-tip");
+        if(!tip || tip.textContent !== TIP_TEXT.adminGuideResources){
+          throw new Error("guide should start with Resources tip");
+        }
+        switchAdminTab("resources");
+        tip = document.querySelector("#adminView .admin-guide-tip");
+        if(!tip || tip.textContent !== TIP_TEXT.adminGuideNewResource){
+          throw new Error("guide should advance to New resource tip");
+        }
+        newResource();
+        tip = document.querySelector("#adminView .admin-guide-tip");
+        if(!tip || !tip.textContent.includes(TIP_TEXT.adminGuideResourceFields)){
+          throw new Error("guide should advance to resource fields tip");
+        }
+        if(!document.querySelector("#adminView .admin-guide-tip button")){
+          throw new Error("resource fields guide tip should include a Next button");
+        }
+        if(document.querySelector("#adminView .admin-guide-tip button").textContent !== "Next"){
+          throw new Error("first resource guide section should only show Next");
+        }
+        if(document.querySelectorAll("#resEditor .resource-editor-guide-section:not(.admin-guide-current-section)").length < 1){
+          throw new Error("resource editor should be divided into guide sections");
+        }
+        if(!document.querySelector('#resEditor [data-guide-section="basics"].admin-guide-current-section')){
+          throw new Error("basic resource fields should be the first guide section");
+        }
+        advanceAdminGuideResourceSection();
+        tip = document.querySelector("#adminView .admin-guide-tip");
+        if(!tip || !tip.textContent.includes(TIP_TEXT.adminGuideTags)){
+          throw new Error("guide should advance to tags section");
+        }
+        if(!document.querySelector('#resEditor [data-guide-section="tags"].admin-guide-current-section')){
+          throw new Error("tags should be the second guide section");
+        }
+        const tagButtons = Array.from(document.querySelectorAll("#adminView .admin-guide-tip button")).map(button => button.textContent);
+        if(JSON.stringify(tagButtons) !== JSON.stringify(["Back", "Next"])){
+          throw new Error(`middle resource guide section should show Back and Next, got ${JSON.stringify(tagButtons)}`);
+        }
+        retreatAdminGuideResourceSection();
+        if(!document.querySelector('#resEditor [data-guide-section="basics"].admin-guide-current-section')){
+          throw new Error("Back should return to the previous guide section");
+        }
+        advanceAdminGuideResourceSection();
+        advanceAdminGuideResourceSection();
+        advanceAdminGuideResourceSection();
+        tip = document.querySelector("#adminView .admin-guide-tip");
+        if(!tip || !tip.textContent.includes("If this resource is a list")){
+          throw new Error("information guide tip should explain list resources can skip the section");
+        }
+        advanceAdminGuideResourceSection();
+        const finalButtons = Array.from(document.querySelectorAll("#adminView .admin-guide-tip button")).map(button => button.textContent);
+        if(JSON.stringify(finalButtons) !== JSON.stringify(["Back"])){
+          throw new Error(`final resource guide section should show Back only, got ${JSON.stringify(finalButtons)}`);
+        }
+      }finally{
+        data = previousData;
+        view = previousView;
+        adminTab = previousAdminTab;
+        isAdminVisible = previousAdminVisible;
+        adminGuideMode = previousAdminGuideMode;
+        adminGuideStep = previousAdminGuideStep;
+        adminGuideResourceSection = previousAdminGuideResourceSection;
+        adminGuideDismissed = previousAdminGuideDismissed;
+        adminResourceEditMode = previousAdminResourceEditMode;
+        selectedResourceId = previousSelectedResourceId;
+        if(previousStoredData === null) localStorage.removeItem(DATA_STORAGE_KEY);
+        else localStorage.setItem(DATA_STORAGE_KEY, previousStoredData);
+      }
+    }
+  });
+
+  tests.push({
+    name: "ADMIN HELP PRINT EXPANDS AND RESTORES SECTIONS",
+    fn: () => {
+      const previousData = data;
+      const previousAdminGuideMode = adminGuideMode;
+      const previousAdminGuideStep = adminGuideStep;
+      const previousAdminGuideResourceSection = adminGuideResourceSection;
+      const previousAdminGuideDismissed = adminGuideDismissed;
+      const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
+      const previousPrint = window.print;
+      const previousSetTimeout = window.setTimeout;
+      try{
+        data = { categories:[{ id:"food", label:"Food" }], resources:[{ id:"r", name:"Resource" }], changes:[] };
+        localStorage.setItem(TSO_NAME_STORAGE_KEY, "Test");
+        showAdminHelp();
+        const modal = document.getElementById("referenceModal");
+        const details = Array.from(modal.querySelectorAll(".admin-help-content details"));
+        if(details.length < 2) throw new Error("not enough printable Admin Help sections");
+        details[0].open = false;
+        details[1].open = true;
+        let printCalled = false;
+        window.print = () => { printCalled = true; };
+        window.setTimeout = callback => { callback(); return 0; };
+        printAdminHelp();
+        if(!printCalled) throw new Error("Admin Help print did not call window.print");
+        if(details.some(detail => !detail.open)) throw new Error("Admin Help print did not expand all details");
+        restoreAdminHelpPrintState();
+        if(details[0].open !== false || details[1].open !== true){
+          throw new Error("Admin Help print did not restore detail state");
+        }
+      }finally{
+        data = previousData;
+        adminGuideMode = previousAdminGuideMode;
+        adminGuideStep = previousAdminGuideStep;
+        adminGuideResourceSection = previousAdminGuideResourceSection;
+        adminGuideDismissed = previousAdminGuideDismissed;
+        window.print = previousPrint;
+        window.setTimeout = previousSetTimeout;
+        closeReferenceModal();
         if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
         else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoName);
       }
@@ -2826,6 +3043,136 @@ function getCategoryTipId(){
   return "";
 }
 
+function startAdminGuide(step = "resources"){
+  adminGuideMode = true;
+  adminGuideStep = step;
+  adminGuideDismissed = false;
+  if(step === "resourceFields") adminGuideResourceSection = "basics";
+}
+
+function stopAdminGuide(){
+  adminGuideMode = false;
+  adminGuideStep = "resources";
+  adminGuideResourceSection = "basics";
+  adminGuideDismissed = true;
+}
+
+function toggleAdminGuide(){
+  if(adminGuideMode){
+    stopAdminGuide();
+  }else{
+    startAdminGuide(adminTab === "resources" ? "newResource" : "resources");
+  }
+  if(view === "admin") safeRenderAdmin();
+}
+
+function getAdminGuideTipText(){
+  if(!adminGuideMode) return "";
+  if(adminGuideStep === "resourceFields" || adminResourceEditMode){
+    if(adminGuideResourceSection === "tags") return TIP_TEXT.adminGuideTags;
+    if(adminGuideResourceSection === "categories") return TIP_TEXT.adminGuideCategories;
+    if(adminGuideResourceSection === "information") return TIP_TEXT.adminGuideInformation;
+    if(adminGuideResourceSection === "update") return TIP_TEXT.adminGuideUpdate;
+    return TIP_TEXT.adminGuideResourceFields;
+  }
+  if(adminGuideStep === "newResource" || adminTab === "resources") return TIP_TEXT.adminGuideNewResource;
+  return TIP_TEXT.adminGuideResources;
+}
+
+function getAdminGuideResourceSections(){
+  return ["basics", "tags", "categories", "information", "update"];
+}
+
+function advanceAdminGuideResourceSection(){
+  const sections = getAdminGuideResourceSections();
+  const index = sections.indexOf(adminGuideResourceSection);
+  if(index === -1 || index >= sections.length - 1) return;
+  adminGuideResourceSection = sections[index + 1];
+  safeRenderAdmin();
+}
+
+function retreatAdminGuideResourceSection(){
+  const sections = getAdminGuideResourceSections();
+  const index = sections.indexOf(adminGuideResourceSection);
+  if(index <= 0) return;
+  adminGuideResourceSection = sections[index - 1];
+  safeRenderAdmin();
+}
+
+function isAdminGuideResourceFirstSection(){
+  const sections = getAdminGuideResourceSections();
+  return adminGuideResourceSection === sections[0];
+}
+
+function isAdminGuideResourceLastSection(){
+  const sections = getAdminGuideResourceSections();
+  return adminGuideResourceSection === sections[sections.length - 1];
+}
+
+function renderAdminGuideTip(container){
+  const tipText = getAdminGuideTipText();
+  if(!tipText) return;
+  const tip = document.createElement("div");
+  tip.className = "one-time-tip admin-guide-tip";
+  const tipMessage = document.createElement("div");
+  tipMessage.className = "admin-guide-tip-message";
+  tipMessage.textContent = tipText;
+  tip.appendChild(tipMessage);
+  if(adminResourceEditMode && (!isAdminGuideResourceFirstSection() || !isAdminGuideResourceLastSection())){
+    const actions = document.createElement("div");
+    actions.className = "admin-guide-tip-actions";
+    if(!isAdminGuideResourceFirstSection()){
+      const backBtn = document.createElement("button");
+      backBtn.className = "button";
+      backBtn.type = "button";
+      backBtn.textContent = "Back";
+      backBtn.onclick = retreatAdminGuideResourceSection;
+      actions.appendChild(backBtn);
+    }
+    if(!isAdminGuideResourceLastSection()){
+      const nextBtn = document.createElement("button");
+      nextBtn.className = "button";
+      nextBtn.type = "button";
+      nextBtn.textContent = "Next";
+      nextBtn.onclick = advanceAdminGuideResourceSection;
+      actions.appendChild(nextBtn);
+    }
+    tip.appendChild(actions);
+  }
+  const firstPanel = container.querySelector(".admin-panel");
+  if(firstPanel){
+    container.insertBefore(tip, firstPanel);
+  }else{
+    container.appendChild(tip);
+  }
+}
+
+function printAdminHelp(){
+  const modal = document.getElementById("referenceModal");
+  if(!modal || modal.classList.contains("hidden")) return;
+  const details = Array.from(modal.querySelectorAll(".admin-help-content details"));
+  adminHelpPrintRestoreState = details.map(detail => detail.open);
+  details.forEach(detail => { detail.open = true; });
+  window.setTimeout(() => window.print(), 0);
+}
+
+function restoreAdminHelpPrintState(){
+  if(!adminHelpPrintRestoreState) return;
+  const modal = document.getElementById("referenceModal");
+  const details = modal ? Array.from(modal.querySelectorAll(".admin-help-content details")) : [];
+  details.forEach((detail, index) => {
+    detail.open = !!adminHelpPrintRestoreState[index];
+  });
+  adminHelpPrintRestoreState = null;
+}
+
+function syncAdminHelpGuideVisibility(){
+  const setupSection = document.querySelector("#referenceModal .admin-help-setup");
+  if(setupSection) setupSection.classList.toggle("hidden", !adminGuideMode);
+  const guideBtn = document.getElementById("adminHelpGuideButton");
+  if(guideBtn) guideBtn.setAttribute("aria-pressed", adminGuideMode ? "true" : "false");
+}
+
 function toggleUpdateInfoView(){
   if(view === "recent-updates" && showUpdateInfo){
     showUpdateInfo = false;
@@ -2972,29 +3319,31 @@ function showUserHelp(){
 }
 
 function showAdminHelp(){
+  markTipSeen("newAdminMode");
+  if(isNewAdminSetupState() && !adminGuideDismissed) startAdminGuide("resources");
   const modal = getReferenceModal();
   modal.innerHTML = `
     <div class="reference-modal-panel" role="dialog" aria-modal="true" aria-labelledby="adminHelpTitle">
       <div class="reference-modal-header">
         <div id="adminHelpTitle" class="reference-modal-title">Admin Help</div>
-        <button class="button reference-modal-close" type="button">Close</button>
+        <div class="reference-modal-actions">
+          <button class="button" type="button" id="adminHelpGuideButton" aria-pressed="${adminGuideMode ? "true" : "false"}">Guide</button>
+          <button class="button" type="button" id="adminHelpPrintButton">Print</button>
+          <button class="button reference-modal-close" type="button">Close</button>
+        </div>
       </div>
       <div class="reference-modal-body admin-help-content">
-        <section class="admin-help-setup">
+        <section class="admin-help-setup ${adminGuideMode ? "" : "hidden"}">
           <h3>Set Up This TSO Resources App</h3>
           <ol>
             <li>Click <code>Change TSO Name</code>.</li>
             <li>Enter the name of your TSO and click <code>Save TSO Name</code>.</li>
             <li>Check the blue title bar. It should say your TSO name followed by <code>TSO Resources</code>.</li>
             <li>Rename the file <code>new.html</code> to match your TSO, such as <code>provo.html</code> or <code>albuquerque.html</code>.</li>
+            <li>Now click <code>Close</code> and follow the red tips.</li>
           </ol>
           <p>The name saved in the app changes the title shown to users. Renaming <code>new.html</code> changes the file name people open.</p>
           <p><button class="button" type="button" id="adminHelpOpenSetup">Change TSO Name</button></p>
-        </section>
-
-        <section class="admin-help-quick-start">
-          <h3>Quick Start Guide</h3>
-          <p>Stub: add your first category, add your first resource, assign the resource to the category, then click <code>Save Resources</code>.</p>
         </section>
 
         <details>
@@ -3125,9 +3474,17 @@ function showAdminHelp(){
   `;
   const closeBtn = modal.querySelector(".reference-modal-close");
   const setupBtn = document.getElementById("adminHelpOpenSetup");
+  const guideBtn = document.getElementById("adminHelpGuideButton");
+  const printBtn = document.getElementById("adminHelpPrintButton");
   if(closeBtn) closeBtn.addEventListener("click", closeReferenceModal);
   if(setupBtn) setupBtn.addEventListener("click", showAdminSetup);
+  if(guideBtn) guideBtn.addEventListener("click", () => {
+    toggleAdminGuide();
+    syncAdminHelpGuideVisibility();
+  });
+  if(printBtn) printBtn.addEventListener("click", printAdminHelp);
   modal.classList.remove("hidden");
+  syncAdminHelpGuideVisibility();
   if(closeBtn) closeBtn.focus();
 }
 
@@ -3928,6 +4285,7 @@ function doPrint(){ PrintWorkflow.doPrint(); }
 
 window.addEventListener("afterprint", () => {
   PrintWorkflow.handleAfterPrint();
+  restoreAdminHelpPrintState();
 });
 
 // ============================================================
@@ -3988,10 +4346,10 @@ function renderAdmin(){
     const tip = createOneTimeTip("newAdminMode");
     if(tip) container.insertBefore(tip, container.children[1] || null);
   }
-
   if(adminTab === "categories") renderAdminCategories(container);
   if(adminTab === "resources") renderAdminResources(container);
   if(adminTab === "tags") renderAdminTags(container);
+  renderAdminGuideTip(container);
 }
 
 function showChangeLog(){
@@ -4844,6 +5202,7 @@ function getReferenceModal(){
 function closeReferenceModal(){
   const modal = document.getElementById("referenceModal");
   if(modal) modal.classList.add("hidden");
+  if(adminGuideMode && view === "admin") safeRenderAdmin();
 }
 
 function showReferenceModal(resourceName, matches){
@@ -4914,6 +5273,8 @@ function switchAdminTab(nextTab){
   if(!commitPendingEditsIfChanged()) return;
   if(nextTab !== "resources"){
     adminResourceEditMode = false;
+  }else if(adminGuideMode){
+    adminGuideStep = "newResource";
   }
   adminTab = nextTab;
   safeRenderAdmin();
@@ -5841,7 +6202,7 @@ function renderAdminResources(container){
   }
 
   container.innerHTML += `
-    <div class="admin-panel">
+    <div class="admin-panel ${adminGuideMode ? "admin-guide-active" : ""}">
       <div class="admin-box">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
           <h3 style="margin:0;">Edit Resource</h3>
@@ -5945,6 +6306,7 @@ function newResource(){
   adminTab = "resources";
   selectedResourceId = resource.id;
   adminResourceEditMode = true;
+  if(adminGuideMode) startAdminGuide("resourceFields");
   safeRenderAdmin();
   focusAndSelectResourceName();
 }
@@ -6020,6 +6382,7 @@ function deleteResource(){
 function openResourceEditor(){
   if(!selectedResourceId) return;
   adminResourceEditMode = true;
+  if(adminGuideMode) startAdminGuide("resourceFields");
   safeRenderAdmin();
   focusAndSelectResourceName();
 }
@@ -6076,84 +6439,94 @@ function editResource(idx){
     }).join("");
 
   editor.innerHTML = `
-    <label>Name<br>
-      <input id="res_name" value="${escapeHTML(res.name || "")}">
-    </label>
-    <div id="res_name_warning" style="display:none; color:#aa0000; margin-top:4px;"></div>
-
-    <div class="resource-editor-grid" style="margin-top:10px;">
-      <label>Phone<br>
-        <input id="res_phone" value="${escapeHTML(res.phone || "")}">
+    <div class="resource-editor-guide-section ${adminGuideResourceSection === "basics" ? "admin-guide-current-section" : ""}" data-guide-section="basics">
+      <label>Name<br>
+        <input id="res_name" value="${escapeHTML(res.name || "")}">
       </label>
-      <label class="span-2">Address<br>
-        <input id="res_address" value="${escapeHTML(res.address || "")}">
-      </label>
+      <div id="res_name_warning" style="display:none; color:#aa0000; margin-top:4px;"></div>
 
-      <label>Website<br>
-        <input id="res_website" type="url" value="${escapeHTML(res.website || "")}">
-      </label>
-      <label>Hours<br>
-        <input id="res_hours" value="${escapeHTML(res.hours || "")}">
-      </label>
-      <div>
-        <strong>Verified</strong>
-        <div class="verified-row" style="margin-top:4px;">
-          <span id="res_verified_display" class="verified-value">${escapeHTML(verifiedDisplay)}</span>
-          <button class="button" type="button" id="res_verified_btn">Update</button>
-          <input id="res_verified_on" type="text" placeholder="MM/YY" value="${escapeHTML(res.verifiedOn || "")}" style="width:120px;">
-        </div>
-        <div id="res_verified_warning" class="verified-warning"></div>
-      </div>
-    </div>
+      <div class="resource-editor-grid" style="margin-top:10px;">
+        <label>Phone<br>
+          <input id="res_phone" value="${escapeHTML(res.phone || "")}">
+        </label>
+        <label class="span-2">Address<br>
+          <input id="res_address" value="${escapeHTML(res.address || "")}">
+        </label>
 
-    <label style="display:block; margin-top:8px;">Description<br>
-      <textarea id="res_description" class="big">${escapeHTML(res.description || "")}</textarea>
-    </label><br>
-
-    <label style="display:block; margin-top:8px;">Describe this update (optional)<br>
-      <textarea id="res_update_description" class="big" style="min-height:60px;"></textarea>
-    </label><br>
-
-    <label style="display:block; margin-top:8px;">Tags (comma-separated or one per line)<br>
-      <textarea id="res_tags" class="big" style="min-height:72px;">${escapeHTML(tagInputValue)}</textarea>
-    </label>
-    ${tagSuggestions.length ? `
-      <div id="res_tag_suggestions" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;">
-        ${tagSuggestions.map(tag => `<button class="button" type="button" data-tag-suggestion="${escapeHTML(tag)}">${escapeHTML(tag)}</button>`).join("")}
-      </div>
-    ` : ""}
-    <br>
-
-    <div>
-      <strong>Categories</strong><br>
-      ${catChecks}
-    </div>
-
-    <label style="display:block; font-weight:bold; margin-top:12px;">Information</label>
-    <div class="services-control-block">
-      <div class="services-control-header">
-        <div class="services-preview-toggle">
-          <button class="button primary" type="button" id="res_information_edit_btn">Edit</button>
-          <button class="button" type="button" id="res_information_preview_btn">Preview</button>
-        </div>
-        <div class="services-hint resource-info-guidance">
-          Use the section headings as a guide. Blank sections will not be shown. Text in Additional text appears after the guided sections without its own heading.<br>
-          Formatting: use * at the start of a line for bullets, **bold** for bold text, __underline__ for underline, and --- on its own line for a horizontal line.
-        </div>
-      </div>
-      <div id="res_information_editor">
-        ${INFORMATION_SECTIONS.map(section => `
-          <div class="resource-info-section">
-            <label class="resource-info-section-label" for="res_info_${escapeHTML(section.key)}">${escapeHTML(section.label)}:</label>
-            <textarea id="res_info_${escapeHTML(section.key)}" class="big resource-info-input" style="min-height:76px;">${escapeHTML(informationDraft[section.key] || "")}</textarea>
+        <label>Website<br>
+          <input id="res_website" type="url" value="${escapeHTML(res.website || "")}">
+        </label>
+        <label>Hours<br>
+          <input id="res_hours" value="${escapeHTML(res.hours || "")}">
+        </label>
+        <div class="admin-guide-defer-verified">
+          <strong>Verified</strong>
+          <div class="verified-row" style="margin-top:4px;">
+            <span id="res_verified_display" class="verified-value">${escapeHTML(verifiedDisplay)}</span>
+            <button class="button" type="button" id="res_verified_btn">Update</button>
+            <input id="res_verified_on" type="text" placeholder="MM/YY" value="${escapeHTML(res.verifiedOn || "")}" style="width:120px;">
           </div>
-        `).join("")}
-        <div class="resource-info-additional">
-          <label class="resource-info-section-label" for="res_info_additional">Additional text:</label>
-          <textarea id="res_info_additional" class="big resource-info-input" style="min-height:90px;">${escapeHTML(informationDraft.additional || "")}</textarea>
+          <div id="res_verified_warning" class="verified-warning"></div>
         </div>
       </div>
-      <div id="res_information_preview" class="services-preview-box services-rendered resource-info-rendered hidden"></div>
+
+      <label style="display:block; margin-top:8px;">Description<br>
+        <textarea id="res_description" class="big">${escapeHTML(res.description || "")}</textarea>
+      </label><br>
+    </div>
+
+    <div class="resource-editor-guide-section ${adminGuideResourceSection === "update" ? "admin-guide-current-section" : ""}" data-guide-section="update">
+      <label style="display:block; margin-top:8px;">Describe this update (optional)<br>
+        <textarea id="res_update_description" class="big" style="min-height:60px;"></textarea>
+      </label><br>
+    </div>
+
+    <div class="resource-editor-guide-section ${adminGuideResourceSection === "tags" ? "admin-guide-current-section" : ""}" data-guide-section="tags">
+      <label style="display:block; margin-top:8px;">Tags (comma-separated or one per line)<br>
+        <textarea id="res_tags" class="big" style="min-height:72px;">${escapeHTML(tagInputValue)}</textarea>
+      </label>
+      ${tagSuggestions.length ? `
+        <div id="res_tag_suggestions" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;">
+          ${tagSuggestions.map(tag => `<button class="button" type="button" data-tag-suggestion="${escapeHTML(tag)}">${escapeHTML(tag)}</button>`).join("")}
+        </div>
+      ` : ""}
+      <br>
+    </div>
+
+    <div class="resource-editor-guide-section ${adminGuideResourceSection === "categories" ? "admin-guide-current-section" : ""}" data-guide-section="categories">
+      <div>
+        <strong>Categories</strong><br>
+        ${catChecks}
+      </div>
+    </div>
+
+    <div class="resource-editor-guide-section ${adminGuideResourceSection === "information" ? "admin-guide-current-section" : ""}" data-guide-section="information">
+      <label style="display:block; font-weight:bold; margin-top:12px;">Information</label>
+      <div class="services-control-block">
+        <div class="services-control-header">
+          <div class="services-preview-toggle">
+            <button class="button primary" type="button" id="res_information_edit_btn">Edit</button>
+            <button class="button" type="button" id="res_information_preview_btn">Preview</button>
+          </div>
+          <div class="services-hint resource-info-guidance">
+            Use the section headings as a guide. Blank sections will not be shown. Text in Additional text appears after the guided sections without its own heading.<br>
+            Formatting: use * at the start of a line for bullets, **bold** for bold text, __underline__ for underline, and --- on its own line for a horizontal line.
+          </div>
+        </div>
+        <div id="res_information_editor">
+          ${INFORMATION_SECTIONS.map(section => `
+            <div class="resource-info-section">
+              <label class="resource-info-section-label" for="res_info_${escapeHTML(section.key)}">${escapeHTML(section.label)}:</label>
+              <textarea id="res_info_${escapeHTML(section.key)}" class="big resource-info-input" style="min-height:76px;">${escapeHTML(informationDraft[section.key] || "")}</textarea>
+            </div>
+          `).join("")}
+          <div class="resource-info-additional">
+            <label class="resource-info-section-label" for="res_info_additional">Additional text:</label>
+            <textarea id="res_info_additional" class="big resource-info-input" style="min-height:90px;">${escapeHTML(informationDraft.additional || "")}</textarea>
+          </div>
+        </div>
+        <div id="res_information_preview" class="services-preview-box services-rendered resource-info-rendered hidden"></div>
+      </div>
     </div><br>
   `;
 
