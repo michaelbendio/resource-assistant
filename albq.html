@@ -182,7 +182,13 @@ textarea.services-editor { min-height:320px; resize:vertical; }
 }
 .admin-toolbar-help {
   flex:0 0 auto;
-  margin-right:92px;
+}
+.admin-toolbar-reference-actions {
+  margin-left:auto;
+  display:flex;
+  gap:8px;
+  align-items:center;
+  flex:0 0 auto;
 }
 .admin-action-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
 .admin-option-row { margin:0; }
@@ -266,11 +272,13 @@ textarea.services-editor { min-height:320px; resize:vertical; }
 .reference-modal-header {
   display:flex;
   justify-content:space-between;
+  align-items:center;
   gap:16px;
   padding:16px 18px;
   border-bottom:1px solid #dde6ef;
 }
 .reference-modal-title { font-size:20px; font-weight:bold; }
+.reference-modal-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
 .reference-modal-subtitle { margin-top:2px; color:#555; }
 .reference-modal-body {
   padding:16px 18px 18px;
@@ -286,15 +294,6 @@ textarea.services-editor { min-height:320px; resize:vertical; }
 .reference-match-categories { color:#555; font-size:14px; }
 .reference-match-snippet { margin-top:3px; color:#333; font-size:14px; }
 .reference-empty { margin:0; color:#555; }
-.admin-help-content .admin-help-quick-start {
-  margin:0 0 14px;
-  padding:12px 14px;
-  border:1px solid #c8d6e5;
-  border-left:4px solid #003366;
-  border-radius:6px;
-  background:#f7fbff;
-}
-.admin-help-content h3 { margin:0 0 8px; }
 .admin-help-content details {
   border:1px solid #dde6ef;
   border-radius:6px;
@@ -411,6 +410,10 @@ textarea.services-editor { min-height:320px; resize:vertical; }
   }
 
   .reference-modal-close {
+    display: none !important;
+  }
+
+  .reference-modal-actions {
     display: none !important;
   }
 
@@ -1107,12 +1110,18 @@ function fitTextareaToText(textarea){
 const seed = JSON.parse(document.getElementById("seed-data").textContent);
 // Main persisted app data snapshot (categories/resources + metadata).
 let data = JSON.parse(localStorage.getItem("albqData") || "null");
-const APP_VERSION = "0.2.0";
+const APP_VERSION = "0.2.1";
 const DEBUG = new URLSearchParams(location.search).has("debug");
 const UPDATE_SEEN_STORAGE_KEY = "albqRecentUpdatesSeen";
 const PRINT_SELECTION_STORAGE_KEY = "albqPrintSelection";
 const LEGACY_FAVORITES_STORAGE_KEY = "albqFavorites";
 const ONE_TIME_TIP_STORAGE_KEY = "albqPrintSelectionTipSeen";
+const TIP_STORAGE_KEYS = {
+  user: ONE_TIME_TIP_STORAGE_KEY
+};
+const TIP_TEXT = {
+  user: "Click on a category to see its resources. Click a resource to see details. Click ⬜ to include it in the printed handout."
+};
 const RESOURCE_PACKAGE_FILENAME = "albq-resources.json";
 const CATEGORY_REMINDER_TEXT = "Report bugs or request enhancments to Elder Bendio (michaelbendio@gmail.com)"
 
@@ -1160,7 +1169,8 @@ let pendingRecentUpdates = [];
 let recentUpdateDetail = null;
 let showUpdateInfo = false;
 let showRecentChangeLog = true;
-let showOneTimeTip = localStorage.getItem(ONE_TIME_TIP_STORAGE_KEY) !== "1";
+let showOneTimeTip = true;
+let adminHelpPrintRestoreState = null;
 let allowBlankUpdateDescriptionOnce = false;
 let newCategoryIds = new Set();
 let newResourceIds = new Set();
@@ -1654,7 +1664,7 @@ function runSelfTests(){
         render();
         const tip = appView.querySelector(".one-time-tip");
         if(!tip) throw new Error("one-time tip was not rendered");
-        if(tip.textContent !== "Click on a category to see its resources. Click a resource to see details. Click ⬜ to include it in the printed handout."){
+        if(tip.textContent !== TIP_TEXT.user){
           throw new Error("one-time tip wording changed");
         }
         const style = getComputedStyle(tip);
@@ -1663,6 +1673,30 @@ function runSelfTests(){
         }
         if(Number(style.fontWeight) < 700){
           throw new Error(`one-time tip should be bold, got ${style.fontWeight}`);
+        }
+      }finally{
+        view = previousView;
+        showOneTimeTip = previousShowOneTimeTip;
+      }
+    }
+  });
+
+  tests.push({
+    name: "USER TIP STAYS VISIBLE AFTER CLICK",
+    fn: () => {
+      const previousView = view;
+      const previousShowOneTimeTip = showOneTimeTip;
+      try{
+        view = "categories";
+        showOneTimeTip = true;
+        render();
+        const tip = appView.querySelector(".one-time-tip");
+        if(!tip) throw new Error("one-time tip was not rendered before click");
+        tip.click();
+        const nextTip = appView.querySelector(".one-time-tip");
+        if(!nextTip) throw new Error("one-time tip disappeared after click");
+        if(nextTip.textContent !== TIP_TEXT.user){
+          throw new Error("one-time tip wording changed after click");
         }
       }finally{
         view = previousView;
@@ -2682,7 +2716,10 @@ function showUserHelp(){
     <div class="reference-modal-panel" role="dialog" aria-modal="true" aria-labelledby="userHelpTitle">
       <div class="reference-modal-header">
         <div id="userHelpTitle" class="reference-modal-title">User Help</div>
-        <button class="button reference-modal-close" type="button">Close</button>
+        <div class="reference-modal-actions">
+          <button class="button" type="button" id="userHelpPrintButton">Print</button>
+          <button class="button reference-modal-close" type="button">Close</button>
+        </div>
       </div>
       <div class="reference-modal-body">
         <h3>Finding Resources</h3>
@@ -2708,8 +2745,70 @@ function showUserHelp(){
     </div>
   `;
   const closeBtn = modal.querySelector(".reference-modal-close");
+  const printBtn = document.getElementById("userHelpPrintButton");
   if(closeBtn) closeBtn.addEventListener("click", closeReferenceModal);
+  if(printBtn) printBtn.addEventListener("click", printUserHelp);
   modal.classList.remove("hidden");
+}
+
+function printUserHelp(){
+  const modal = document.getElementById("referenceModal");
+  if(!modal || modal.classList.contains("hidden")) return;
+  window.setTimeout(() => window.print(), 0);
+}
+
+function hasSeenTip(tipId){
+  if(tipId === "user") return false;
+  const storageKey = TIP_STORAGE_KEYS[tipId];
+  return !storageKey || localStorage.getItem(storageKey) === "1";
+}
+
+function markTipSeen(tipId){
+  if(tipId === "user") return;
+  const storageKey = TIP_STORAGE_KEYS[tipId];
+  if(!storageKey) return;
+  localStorage.setItem(storageKey, "1");
+}
+
+function createOneTimeTip(tipId){
+  const tipText = TIP_TEXT[tipId];
+  if(!tipText || hasSeenTip(tipId)) return null;
+  const tip = document.createElement("div");
+  tip.className = "one-time-tip";
+  tip.textContent = tipText;
+  tip.onclick = () => {
+    markTipSeen(tipId);
+    safeRender();
+  };
+  return tip;
+}
+
+function getCategoryTipId(){
+  return "user";
+}
+
+function printAdminHelp(){
+  const modal = document.getElementById("referenceModal");
+  if(!modal || modal.classList.contains("hidden")) return;
+  const details = Array.from(modal.querySelectorAll(".admin-help-content details"));
+  adminHelpPrintRestoreState = details.map(detail => detail.open);
+  details.forEach(detail => { detail.open = true; });
+  window.setTimeout(() => window.print(), 0);
+}
+
+function restoreAdminHelpPrintState(){
+  if(!adminHelpPrintRestoreState) return;
+  const modal = document.getElementById("referenceModal");
+  const details = modal ? Array.from(modal.querySelectorAll(".admin-help-content details")) : [];
+  details.forEach((detail, index) => {
+    detail.open = !!adminHelpPrintRestoreState[index];
+  });
+  adminHelpPrintRestoreState = null;
+}
+
+function printAdminHelpFromToolbar(){
+  showAdminHelp();
+  printAdminHelp();
 }
 
 function showAdminHelp(){
@@ -2718,23 +2817,12 @@ function showAdminHelp(){
     <div class="reference-modal-panel" role="dialog" aria-modal="true" aria-labelledby="adminHelpTitle">
       <div class="reference-modal-header">
         <div id="adminHelpTitle" class="reference-modal-title">Admin Help</div>
-        <button class="button reference-modal-close" type="button">Close</button>
+        <div class="reference-modal-actions">
+          <button class="button" type="button" id="adminHelpPrintButton">Print</button>
+          <button class="button reference-modal-close" type="button">Close</button>
+        </div>
       </div>
       <div class="reference-modal-body admin-help-content">
-        <section class="admin-help-quick-start">
-          <h3>Quick Start: First Category and First Resource</h3>
-          <ol>
-            <li>Press <code>Ctrl+Alt+A</code>, then open <code>Admin</code>.</li>
-            <li>In <code>Categories</code>, click <code>New</code>.</li>
-            <li>Enter the category name, add an update note like <code>Added first category</code>, and click <code>Done</code>.</li>
-            <li>Open <code>Resources</code> and click <code>New</code>.</li>
-            <li>Enter the resource name and any phone, address, website, hours, description, tags, and information you have.</li>
-            <li>Check the category you created so the resource appears there.</li>
-            <li>Add an update note like <code>Added first resource</code>, then click <code>Done</code>.</li>
-            <li>Click <code>Save Resources</code> and save the file as <code>albq-resources.json</code>.</li>
-          </ol>
-        </section>
-
         <details>
           <summary>Before You Edit</summary>
           <div class="admin-help-section-body">
@@ -2862,7 +2950,9 @@ function showAdminHelp(){
     </div>
   `;
   const closeBtn = modal.querySelector(".reference-modal-close");
+  const printBtn = document.getElementById("adminHelpPrintButton");
   if(closeBtn) closeBtn.addEventListener("click", closeReferenceModal);
+  if(printBtn) printBtn.addEventListener("click", printAdminHelp);
   modal.classList.remove("hidden");
   if(closeBtn) closeBtn.focus();
 }
@@ -3153,16 +3243,10 @@ function render(){
   }
 
   if(view==="categories"){
-    if(showOneTimeTip){
-      const tip = document.createElement("div");
-      tip.className = "one-time-tip";
-      tip.textContent = "Click on a category to see its resources. Click a resource to see details. Click ⬜ to include it in the printed handout.";
-      tip.onclick = () => {
-        showOneTimeTip = false;
-        localStorage.setItem(ONE_TIME_TIP_STORAGE_KEY, "1");
-        safeRender();
-      };
-      appView.appendChild(tip);
+    const categoryTipId = getCategoryTipId();
+    if(categoryTipId){
+      const tip = createOneTimeTip(categoryTipId);
+      if(tip) appView.appendChild(tip);
     }
     if(pendingRecentUpdates.length){
       const note = document.createElement("div");
@@ -3652,6 +3736,7 @@ function doPrint(){ PrintWorkflow.doPrint(); }
 
 window.addEventListener("afterprint", () => {
   PrintWorkflow.handleAfterPrint();
+  restoreAdminHelpPrintState();
 });
 
 // ============================================================
@@ -3686,7 +3771,10 @@ function renderAdmin(){
           Last Modified: ${escapeHTML(formatDateTimeUTC(data.lastModified))}
         </div>
       </div>
-      <button class="button admin-toolbar-help" onclick="showAdminHelp()">Help</button>
+      <div class="admin-toolbar-reference-actions">
+        <button class="button" onclick="printAdminHelpFromToolbar()">Print</button>
+        <button class="button admin-toolbar-help" onclick="showAdminHelp()">Help</button>
+      </div>
     </div>
 
     <div>
