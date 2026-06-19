@@ -182,7 +182,13 @@ textarea.services-editor { min-height:320px; resize:vertical; }
 }
 .admin-toolbar-help {
   flex:0 0 auto;
-  margin-right:92px;
+}
+.admin-toolbar-reference-actions {
+  margin-left:auto;
+  display:flex;
+  gap:8px;
+  align-items:center;
+  flex:0 0 auto;
 }
 .admin-action-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
 .admin-option-row { margin:0; }
@@ -1223,7 +1229,7 @@ let showRecentChangeLog = true;
 let showOneTimeTip = localStorage.getItem(ONE_TIME_TIP_STORAGE_KEY) !== "1";
 let adminGuideDismissed = localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY) === "1";
 let adminGuideMode = !adminGuideDismissed;
-let adminGuideStep = "resources";
+let adminGuideStep = "adminHelp";
 let adminGuideResourceSection = "basics";
 let adminHelpPrintRestoreState = null;
 let allowBlankUpdateDescriptionOnce = false;
@@ -1887,8 +1893,8 @@ function runSelfTests(){
       const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
       try{
         data = { categories:[{ id:"food", label:"Food" }], resources:[], changes:[] };
-        adminGuideMode = false;
-        adminGuideStep = "resources";
+        adminGuideMode = true;
+        adminGuideStep = "adminHelp";
         adminGuideDismissed = false;
         localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
         localStorage.removeItem(TSO_NAME_STORAGE_KEY);
@@ -2024,6 +2030,88 @@ function runSelfTests(){
         selectedResourceId = previousSelectedResourceId;
         if(previousStoredData === null) localStorage.removeItem(DATA_STORAGE_KEY);
         else localStorage.setItem(DATA_STORAGE_KEY, previousStoredData);
+      }
+    }
+  });
+
+  tests.push({
+    name: "NEW ADMIN GUIDE WAITS FOR HELP THEN NEW",
+    fn: () => {
+      const previousData = data;
+      const previousStoredData = localStorage.getItem(DATA_STORAGE_KEY);
+      const previousView = view;
+      const previousAdminTab = adminTab;
+      const previousAdminVisible = isAdminVisible;
+      const previousAdminGuideMode = adminGuideMode;
+      const previousAdminGuideStep = adminGuideStep;
+      const previousAdminGuideResourceSection = adminGuideResourceSection;
+      const previousAdminGuideDismissed = adminGuideDismissed;
+      const previousAdminResourceEditMode = adminResourceEditMode;
+      const previousSelectedResourceId = selectedResourceId;
+      const previousAdminModeTipSeen = localStorage.getItem(TIP_STORAGE_KEYS.newAdminMode);
+      const previousGuideDisabled = localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
+      const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
+      try{
+        data = { categories:[{ id:"food", label:"Food" }], resources:[], changes:[], lastModified:nowISO() };
+        localStorage.removeItem(TIP_STORAGE_KEYS.newAdminMode);
+        localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
+        localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+        view = "admin";
+        adminTab = "categories";
+        isAdminVisible = true;
+        adminResourceEditMode = false;
+        selectedResourceId = "";
+        adminGuideMode = true;
+        adminGuideStep = "adminHelp";
+        adminGuideDismissed = false;
+        render();
+        const toolbarButtons = Array.from(document.querySelectorAll("#adminView .admin-toolbar-reference-actions button")).map(button => button.textContent.trim());
+        if(toolbarButtons.join("|") !== "Guide|Help"){
+          throw new Error(`expected Guide then Help on the right edge, got ${JSON.stringify(toolbarButtons)}`);
+        }
+        const adminModeTip = document.querySelector("#adminView > .one-time-tip");
+        if(!adminModeTip || adminModeTip.textContent !== TIP_TEXT.newAdminMode){
+          throw new Error("admin mode should first show the Help tip");
+        }
+        if(document.querySelector("#adminView .admin-guide-tip")){
+          throw new Error("resource guide tip should wait until Help is clicked");
+        }
+        showAdminHelp();
+        closeReferenceModal();
+        let tip = document.querySelector("#adminView .admin-guide-tip");
+        if(!tip || tip.textContent !== TIP_TEXT.adminGuideResources){
+          throw new Error("Help should advance guide to Resources tip");
+        }
+        switchAdminTab("resources");
+        tip = document.querySelector("#adminView .admin-guide-tip");
+        if(!tip || tip.textContent !== TIP_TEXT.adminGuideNewResource){
+          throw new Error("Resources should advance guide to New tip");
+        }
+        newResource();
+        tip = document.querySelector("#adminView .admin-guide-tip");
+        if(!tip || !tip.textContent.includes(TIP_TEXT.adminGuideResourceFields)){
+          throw new Error("New should advance guide to resource fields tip");
+        }
+      }finally{
+        data = previousData;
+        view = previousView;
+        adminTab = previousAdminTab;
+        isAdminVisible = previousAdminVisible;
+        adminGuideMode = previousAdminGuideMode;
+        adminGuideStep = previousAdminGuideStep;
+        adminGuideResourceSection = previousAdminGuideResourceSection;
+        adminGuideDismissed = previousAdminGuideDismissed;
+        adminResourceEditMode = previousAdminResourceEditMode;
+        selectedResourceId = previousSelectedResourceId;
+        closeReferenceModal();
+        if(previousStoredData === null) localStorage.removeItem(DATA_STORAGE_KEY);
+        else localStorage.setItem(DATA_STORAGE_KEY, previousStoredData);
+        if(previousAdminModeTipSeen === null) localStorage.removeItem(TIP_STORAGE_KEYS.newAdminMode);
+        else localStorage.setItem(TIP_STORAGE_KEYS.newAdminMode, previousAdminModeTipSeen);
+        if(previousGuideDisabled === null) localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
+        else localStorage.setItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY, previousGuideDisabled);
+        if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+        else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoName);
       }
     }
   });
@@ -3122,7 +3210,7 @@ function startAdminGuide(step = "resources"){
 
 function stopAdminGuide(){
   adminGuideMode = false;
-  adminGuideStep = "resources";
+  adminGuideStep = "adminHelp";
   adminGuideResourceSection = "basics";
   adminGuideDismissed = true;
   localStorage.setItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY, "1");
@@ -3132,13 +3220,14 @@ function toggleAdminGuide(){
   if(adminGuideMode){
     stopAdminGuide();
   }else{
-    startAdminGuide(adminTab === "resources" ? "newResource" : "resources");
+    startAdminGuide("adminHelp");
   }
   if(view === "admin") safeRenderAdmin();
 }
 
 function getAdminGuideTipText(){
   if(!adminGuideMode) return "";
+  if(adminGuideStep === "adminHelp") return "";
   if(adminGuideStep === "resourceFields" || adminResourceEditMode){
     if(adminGuideResourceSection === "tags") return TIP_TEXT.adminGuideTags;
     if(adminGuideResourceSection === "categories") return TIP_TEXT.adminGuideCategories;
@@ -3391,7 +3480,8 @@ function showUserHelp(){
 
 function showAdminHelp(){
   markTipSeen("newAdminMode");
-  if(isNewAdminSetupState() && !adminGuideDismissed) startAdminGuide("resources");
+  const shouldAdvanceGuide = isNewAdminSetupState() && adminGuideMode && !adminGuideDismissed;
+  if(shouldAdvanceGuide) startAdminGuide("resources");
   const modal = getReferenceModal();
   modal.innerHTML = `
     <div class="reference-modal-panel" role="dialog" aria-modal="true" aria-labelledby="adminHelpTitle">
@@ -3556,6 +3646,7 @@ function showAdminHelp(){
   if(printBtn) printBtn.addEventListener("click", printAdminHelp);
   modal.classList.remove("hidden");
   syncAdminHelpGuideVisibility();
+  if(shouldAdvanceGuide && view === "admin") safeRenderAdmin("showAdminHelp guide advance");
   if(closeBtn) closeBtn.focus();
 }
 
@@ -4391,7 +4482,10 @@ function renderAdmin(){
           Last Modified: ${escapeHTML(formatDateTimeUTC(data.lastModified))}
         </div>
       </div>
-      <button class="button admin-toolbar-help" onclick="showAdminHelp()">Help</button>
+      <div class="admin-toolbar-reference-actions">
+        <button class="button" onclick="toggleAdminGuide()" aria-pressed="${adminGuideMode ? "true" : "false"}">Guide</button>
+        <button class="button admin-toolbar-help" onclick="showAdminHelp()">Help</button>
+      </div>
     </div>
 
     <div>
