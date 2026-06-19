@@ -1172,6 +1172,7 @@ const TIP_TEXT = {
   adminGuideUpdate: "Describe this update, then click Done"
 };
 const TSO_NAME_STORAGE_KEY = "newTsoName";
+const ADMIN_GUIDE_DISABLED_STORAGE_KEY = "newAdminGuideDisabled";
 const RESOURCE_PACKAGE_FILENAME = "albq-resources.json";
 const CATEGORY_REMINDER_TEXT = "Report bugs or request enhancments to Elder Bendio (michaelbendio@gmail.com)"
 
@@ -1220,10 +1221,10 @@ let recentUpdateDetail = null;
 let showUpdateInfo = false;
 let showRecentChangeLog = true;
 let showOneTimeTip = localStorage.getItem(ONE_TIME_TIP_STORAGE_KEY) !== "1";
-let adminGuideMode = false;
+let adminGuideDismissed = localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY) === "1";
+let adminGuideMode = !adminGuideDismissed;
 let adminGuideStep = "resources";
 let adminGuideResourceSection = "basics";
-let adminGuideDismissed = false;
 let adminHelpPrintRestoreState = null;
 let allowBlankUpdateDescriptionOnce = false;
 let newCategoryIds = new Set();
@@ -1756,13 +1757,19 @@ function runSelfTests(){
       const previousData = data;
       const previousView = view;
       const previousShowOneTimeTip = showOneTimeTip;
+      const previousAdminGuideMode = adminGuideMode;
+      const previousAdminGuideDismissed = adminGuideDismissed;
       const previousWelcomeTipSeen = localStorage.getItem(TIP_STORAGE_KEYS.newAdminWelcome);
+      const previousGuideDisabled = localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
       const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
       try{
         data = { categories:[{ id:"food", label:"Food" }], resources:[], changes:[] };
         view = "categories";
         showOneTimeTip = true;
-        localStorage.removeItem(TIP_STORAGE_KEYS.newAdminWelcome);
+        adminGuideMode = true;
+        adminGuideDismissed = false;
+        localStorage.setItem(TIP_STORAGE_KEYS.newAdminWelcome, "1");
+        localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
         localStorage.removeItem(TSO_NAME_STORAGE_KEY);
         render();
         const tip = appView.querySelector(".one-time-tip");
@@ -1774,8 +1781,61 @@ function runSelfTests(){
         data = previousData;
         view = previousView;
         showOneTimeTip = previousShowOneTimeTip;
+        adminGuideMode = previousAdminGuideMode;
+        adminGuideDismissed = previousAdminGuideDismissed;
         if(previousWelcomeTipSeen === null) localStorage.removeItem(TIP_STORAGE_KEYS.newAdminWelcome);
         else localStorage.setItem(TIP_STORAGE_KEYS.newAdminWelcome, previousWelcomeTipSeen);
+        if(previousGuideDisabled === null) localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
+        else localStorage.setItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY, previousGuideDisabled);
+        if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+        else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoName);
+      }
+    }
+  });
+
+  tests.push({
+    name: "DISABLED GUIDE SUPPRESSES NEW ADMIN WELCOME TIP",
+    fn: () => {
+      const previousData = data;
+      const previousView = view;
+      const previousShowOneTimeTip = showOneTimeTip;
+      const previousAdminGuideMode = adminGuideMode;
+      const previousAdminGuideDismissed = adminGuideDismissed;
+      const previousGuideDisabled = localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
+      const previousWelcomeTipSeen = localStorage.getItem(TIP_STORAGE_KEYS.newAdminWelcome);
+      const previousUserTipSeen = localStorage.getItem(TIP_STORAGE_KEYS.user);
+      const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
+      try{
+        data = { categories:[{ id:"food", label:"Food" }], resources:[], changes:[] };
+        view = "categories";
+        showOneTimeTip = true;
+        adminGuideMode = false;
+        adminGuideDismissed = true;
+        localStorage.setItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY, "1");
+        localStorage.removeItem(TIP_STORAGE_KEYS.user);
+        localStorage.removeItem(TIP_STORAGE_KEYS.newAdminWelcome);
+        localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+        render();
+        const tip = appView.querySelector(".one-time-tip");
+        if(!tip) throw new Error("fallback user tip was not rendered");
+        if(tip.textContent === TIP_TEXT.newAdminWelcome){
+          throw new Error("disabled guide should not show the new admin welcome tip");
+        }
+        if(tip.textContent !== TIP_TEXT.user){
+          throw new Error("disabled guide should fall back to the user tip");
+        }
+      }finally{
+        data = previousData;
+        view = previousView;
+        showOneTimeTip = previousShowOneTimeTip;
+        adminGuideMode = previousAdminGuideMode;
+        adminGuideDismissed = previousAdminGuideDismissed;
+        if(previousGuideDisabled === null) localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
+        else localStorage.setItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY, previousGuideDisabled);
+        if(previousWelcomeTipSeen === null) localStorage.removeItem(TIP_STORAGE_KEYS.newAdminWelcome);
+        else localStorage.setItem(TIP_STORAGE_KEYS.newAdminWelcome, previousWelcomeTipSeen);
+        if(previousUserTipSeen === null) localStorage.removeItem(TIP_STORAGE_KEYS.user);
+        else localStorage.setItem(TIP_STORAGE_KEYS.user, previousUserTipSeen);
         if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
         else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoName);
       }
@@ -1823,11 +1883,14 @@ function runSelfTests(){
       const previousAdminGuideResourceSection = adminGuideResourceSection;
       const previousAdminGuideDismissed = adminGuideDismissed;
       const previousAdminModeTipSeen = localStorage.getItem(TIP_STORAGE_KEYS.newAdminMode);
+      const previousGuideDisabled = localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
       const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
       try{
         data = { categories:[{ id:"food", label:"Food" }], resources:[], changes:[] };
         adminGuideMode = false;
         adminGuideStep = "resources";
+        adminGuideDismissed = false;
+        localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
         localStorage.removeItem(TSO_NAME_STORAGE_KEY);
         showAdminHelp();
         const modal = document.getElementById("referenceModal");
@@ -1841,6 +1904,9 @@ function runSelfTests(){
         }
         document.getElementById("adminHelpGuideButton").click();
         if(adminGuideMode) throw new Error("Guide button should turn guide mode off");
+        if(localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY) !== "1"){
+          throw new Error("turning guide mode off should be persisted");
+        }
         const setupSection = modal.querySelector(".admin-help-setup");
         if(setupSection && !setupSection.classList.contains("hidden")){
           throw new Error("setup section should be hidden when guide mode is off");
@@ -1860,6 +1926,8 @@ function runSelfTests(){
         closeReferenceModal();
         if(previousAdminModeTipSeen === null) localStorage.removeItem(TIP_STORAGE_KEYS.newAdminMode);
         else localStorage.setItem(TIP_STORAGE_KEYS.newAdminMode, previousAdminModeTipSeen);
+        if(previousGuideDisabled === null) localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
+        else localStorage.setItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY, previousGuideDisabled);
         if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
         else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoName);
       }
@@ -3008,6 +3076,7 @@ function refreshAppTitle(){
 refreshAppTitle();
 
 function hasSeenTip(tipId){
+  if(tipId === "newAdminWelcome" && adminGuideMode) return false;
   const storageKey = TIP_STORAGE_KEYS[tipId];
   return !storageKey || localStorage.getItem(storageKey) === "1";
 }
@@ -3038,7 +3107,7 @@ function createOneTimeTip(tipId){
 }
 
 function getCategoryTipId(){
-  if(isNewAdminSetupState() && !hasSeenTip("newAdminWelcome")) return "newAdminWelcome";
+  if(isNewAdminSetupState() && adminGuideMode) return "newAdminWelcome";
   if(showOneTimeTip) return "user";
   return "";
 }
@@ -3047,6 +3116,7 @@ function startAdminGuide(step = "resources"){
   adminGuideMode = true;
   adminGuideStep = step;
   adminGuideDismissed = false;
+  localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
   if(step === "resourceFields") adminGuideResourceSection = "basics";
 }
 
@@ -3055,6 +3125,7 @@ function stopAdminGuide(){
   adminGuideStep = "resources";
   adminGuideResourceSection = "basics";
   adminGuideDismissed = true;
+  localStorage.setItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY, "1");
 }
 
 function toggleAdminGuide(){
