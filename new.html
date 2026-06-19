@@ -2048,11 +2048,20 @@ function runSelfTests(){
         }
         setAdminVisibility(true);
         setView("admin");
-        const guideButton = Array.from(document.querySelectorAll("#adminView .admin-toolbar-reference-actions button")).find(button => button.textContent === "Guide");
+        let toolbarButtons = Array.from(document.querySelectorAll("#adminView .admin-toolbar-reference-actions button"));
+        const guideButton = toolbarButtons.find(button => button.textContent === "Guide");
+        const setupButton = toolbarButtons.find(button => button.textContent === "Change TSO Name");
         if(!adminGuideMode) throw new Error("entering admin from welcome tip should keep guide mode on");
         if(adminGuideStep !== "setupName") throw new Error("admin guide should start with TSO name setup");
+        if(!setupButton) throw new Error("Change TSO Name should be visible when guide mode is on");
         if(!guideButton || !guideButton.classList.contains("primary")){
           throw new Error("toolbar Guide button should be blue when guide mode is on");
+        }
+        adminGuideMode = false;
+        safeRenderAdmin();
+        toolbarButtons = Array.from(document.querySelectorAll("#adminView .admin-toolbar-reference-actions button"));
+        if(toolbarButtons.some(button => button.textContent === "Change TSO Name")){
+          throw new Error("Change TSO Name should be hidden when guide mode is off");
         }
       }finally{
         data = previousData;
@@ -4991,7 +5000,7 @@ function renderAdmin(){
         </div>
       </div>
       <div class="admin-toolbar-reference-actions">
-        <button class="button" onclick="showAdminSetup()">Change TSO Name</button>
+        ${adminGuideMode ? `<button class="button" onclick="showAdminSetup()">Change TSO Name</button>` : ""}
         <button class="button ${adminGuideMode ? "primary" : ""}" onclick="requestToggleAdminGuide()" aria-pressed="${adminGuideMode ? "true" : "false"}">Guide</button>
         <button class="button admin-toolbar-help" onclick="showAdminHelp()">Help</button>
       </div>
