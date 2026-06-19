@@ -523,6 +523,7 @@ textarea.services-editor { min-height:320px; resize:vertical; }
     <span id="tabSearch" role="button" aria-label="Search" title="Search">&#128269;</span>
     <span id="tabCategories">Categories</span>
     <span id="tabPrintSelection" role="button" aria-label="Print Preview">🖨️ (0)</span>
+    <button id="freshStartButton" class="button secondary hidden" type="button">Fresh Start</button>
     <button id="helpButton" class="help-button" type="button">Help</button>
     <span id="tabAdmin">Admin</span>
   </div>
@@ -1151,11 +1152,43 @@ function fitTextareaToText(textarea){
 // 4) Load persisted print selections, then initialize transient UI state.
 
 const seed = JSON.parse(document.getElementById("seed-data").textContent);
+const URL_PARAMS = new URLSearchParams(location.search);
+const DEBUG = URL_PARAMS.has("debug");
+const FRESH_START_STORAGE_KEYS = [
+  "newData",
+  "newRecentUpdatesSeen",
+  "newPrintSelection",
+  "newFavorites",
+  "newPrintSelectionTipSeen",
+  "newAdminWelcomeTipSeen",
+  "newAdminModeTipSeen",
+  "newTsoName",
+  "newAdminGuideDisabled",
+  "newAdminGuidePhase",
+  "albqUndo"
+];
+
+function runFreshStart(){
+  FRESH_START_STORAGE_KEYS.forEach(key => localStorage.removeItem(key));
+  sessionStorage.clear();
+}
+
+function buildUrlWithParams(nextParams){
+  const nextSearch = nextParams.toString();
+  return `${location.pathname}${nextSearch ? `?${nextSearch}` : ""}${location.hash || ""}`;
+}
+
+if(URL_PARAMS.has("fresh")){
+  runFreshStart();
+  URL_PARAMS.delete("fresh");
+  URL_PARAMS.set("freshReload", Date.now().toString());
+  location.replace(buildUrlWithParams(URL_PARAMS));
+}
+
 // Main persisted app data snapshot (categories/resources + metadata).
 const DATA_STORAGE_KEY = "newData";
 let data = JSON.parse(localStorage.getItem(DATA_STORAGE_KEY) || "null");
 const APP_VERSION = "0.1.8";
-const DEBUG = new URLSearchParams(location.search).has("debug");
 const UPDATE_SEEN_STORAGE_KEY = "newRecentUpdatesSeen";
 const PRINT_SELECTION_STORAGE_KEY = "newPrintSelection";
 const LEGACY_FAVORITES_STORAGE_KEY = "newFavorites";
@@ -1422,6 +1455,31 @@ function runSelfTests(){
       if(normalizePackageVersionValue("") !== "Unknown") throw new Error("blank packageVersion should fallback");
       if(normalizePackageVersionValue(12) !== 12) throw new Error("numeric packageVersion should be preserved");
       if(normalizePackageVersionValue("13") !== 13) throw new Error("string numeric packageVersion should normalize to number");
+    }
+  });
+
+  tests.push({
+    name: "FRESH START CLEARS SAVED APP STATE",
+    fn: () => {
+      const previousValues = FRESH_START_STORAGE_KEYS.map(key => [key, localStorage.getItem(key)]);
+      const previousSessionValue = sessionStorage.getItem("newSelfTestSessionValue");
+      try{
+        FRESH_START_STORAGE_KEYS.forEach(key => localStorage.setItem(key, "self-test"));
+        sessionStorage.setItem("newSelfTestSessionValue", "self-test");
+        runFreshStart();
+        const unclearedKey = FRESH_START_STORAGE_KEYS.find(key => localStorage.getItem(key) !== null);
+        if(unclearedKey) throw new Error(`fresh start did not clear ${unclearedKey}`);
+        if(sessionStorage.getItem("newSelfTestSessionValue") !== null){
+          throw new Error("fresh start did not clear sessionStorage");
+        }
+      }finally{
+        previousValues.forEach(([key, value]) => {
+          if(value === null) localStorage.removeItem(key);
+          else localStorage.setItem(key, value);
+        });
+        if(previousSessionValue === null) sessionStorage.removeItem("newSelfTestSessionValue");
+        else sessionStorage.setItem("newSelfTestSessionValue", previousSessionValue);
+      }
     }
   });
 
@@ -3387,9 +3445,19 @@ function setAdminVisibility(visible){
 const tabPrintSelection = document.getElementById("tabPrintSelection");
 const helpButton = document.getElementById("helpButton");
 const tabSearch = document.getElementById("tabSearch");
+const freshStartButton = document.getElementById("freshStartButton");
 tabCategories.onclick = ()=>{ setView("categories"); };
 if(tabPrintSelection) tabPrintSelection.onclick = ()=>{ startPrintSelectionPreview(); };
 if(helpButton) helpButton.onclick = ()=>{ showUserHelp(); };
+if(freshStartButton){
+  freshStartButton.classList.toggle("hidden", !DEBUG);
+  freshStartButton.onclick = () => {
+    if(!confirm("Clear saved app data and reload from a fresh start?")) return;
+    const nextParams = new URLSearchParams(location.search);
+    nextParams.set("fresh", Date.now().toString());
+    location.replace(buildUrlWithParams(nextParams));
+  };
+}
 tabAdmin.onclick = ()=>{ setView("admin"); };
 
 function syncSearchPanel(){
