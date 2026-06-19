@@ -2015,6 +2015,44 @@ function runSelfTests(){
   });
 
   tests.push({
+    name: "GUIDE OFF CATEGORIES SHOWS USER TIP",
+    fn: () => {
+      const previousData = data;
+      const previousView = view;
+      const previousShowOneTimeTip = showOneTimeTip;
+      const previousAdminGuideMode = adminGuideMode;
+      const previousAdminGuideDismissed = adminGuideDismissed;
+      const previousUserTipSeen = localStorage.getItem(TIP_STORAGE_KEYS.user);
+      const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
+      try{
+        data = { categories:[{ id:"food", label:"Food" }], resources:[{ id:"r", name:"Resource", categories:["food"] }], changes:[] };
+        view = "categories";
+        showOneTimeTip = false;
+        adminGuideMode = false;
+        adminGuideDismissed = true;
+        localStorage.setItem(TIP_STORAGE_KEYS.user, "1");
+        localStorage.setItem(TSO_NAME_STORAGE_KEY, "Test");
+        render();
+        const tip = appView.querySelector(".one-time-tip");
+        if(!tip) throw new Error("user tip should show on Categories when guide mode is off");
+        if(tip.textContent !== TIP_TEXT.user){
+          throw new Error("guide-off Categories view should show the user tip");
+        }
+      }finally{
+        data = previousData;
+        view = previousView;
+        showOneTimeTip = previousShowOneTimeTip;
+        adminGuideMode = previousAdminGuideMode;
+        adminGuideDismissed = previousAdminGuideDismissed;
+        if(previousUserTipSeen === null) localStorage.removeItem(TIP_STORAGE_KEYS.user);
+        else localStorage.setItem(TIP_STORAGE_KEYS.user, previousUserTipSeen);
+        if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+        else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoName);
+      }
+    }
+  });
+
+  tests.push({
     name: "WELCOME TIP ENTERS ADMIN WITH GUIDE ON",
     fn: () => {
       const previousData = data;
@@ -3566,6 +3604,7 @@ function refreshAppTitle(){
 refreshAppTitle();
 
 function hasSeenTip(tipId){
+  if(tipId === "user" && !adminGuideMode && view === "categories") return false;
   if(tipId === "newAdminWelcome" && adminGuideMode) return false;
   const storageKey = TIP_STORAGE_KEYS[tipId];
   return !storageKey || localStorage.getItem(storageKey) === "1";
@@ -3631,6 +3670,7 @@ function formatGuideTipText(tipText){
 
 function getCategoryTipId(){
   if(isNewAdminSetupState() && adminGuideMode) return "newAdminWelcome";
+  if(!adminGuideMode) return "user";
   if(showOneTimeTip) return "user";
   return "";
 }
