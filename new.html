@@ -1869,13 +1869,19 @@ function runSelfTests(){
       const previousData = data;
       const previousView = view;
       const previousAdminVisible = isAdminVisible;
+      const previousAdminGuideMode = adminGuideMode;
+      const previousAdminGuideStep = adminGuideStep;
+      const previousAdminGuideDismissed = adminGuideDismissed;
       const previousAdminTipSeen = localStorage.getItem(TIP_STORAGE_KEYS.newAdminMode);
       const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
       try{
         data = { categories:[{ id:"food", label:"Food" }], resources:[], changes:[] };
         view = "admin";
         isAdminVisible = true;
-        localStorage.removeItem(TIP_STORAGE_KEYS.newAdminMode);
+        adminGuideMode = true;
+        adminGuideStep = "adminHelp";
+        adminGuideDismissed = false;
+        localStorage.setItem(TIP_STORAGE_KEYS.newAdminMode, "1");
         localStorage.removeItem(TSO_NAME_STORAGE_KEY);
         render();
         const tip = document.querySelector("#adminView .one-time-tip");
@@ -1887,6 +1893,9 @@ function runSelfTests(){
         data = previousData;
         view = previousView;
         isAdminVisible = previousAdminVisible;
+        adminGuideMode = previousAdminGuideMode;
+        adminGuideStep = previousAdminGuideStep;
+        adminGuideDismissed = previousAdminGuideDismissed;
         if(previousAdminTipSeen === null) localStorage.removeItem(TIP_STORAGE_KEYS.newAdminMode);
         else localStorage.setItem(TIP_STORAGE_KEYS.newAdminMode, previousAdminTipSeen);
         if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
@@ -2185,6 +2194,85 @@ function runSelfTests(){
         else localStorage.setItem(DATA_STORAGE_KEY, previousStoredData);
         if(previousAdminModeTipSeen === null) localStorage.removeItem(TIP_STORAGE_KEYS.newAdminMode);
         else localStorage.setItem(TIP_STORAGE_KEYS.newAdminMode, previousAdminModeTipSeen);
+        if(previousGuideDisabled === null) localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
+        else localStorage.setItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY, previousGuideDisabled);
+        if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+        else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoName);
+      }
+    }
+  });
+
+  tests.push({
+    name: "GUIDE QUIT RESTORES FULL RESOURCE EDITOR AND RESTARTS",
+    fn: () => {
+      const previousData = data;
+      const previousStoredData = localStorage.getItem(DATA_STORAGE_KEY);
+      const previousView = view;
+      const previousAdminTab = adminTab;
+      const previousAdminVisible = isAdminVisible;
+      const previousAdminGuideMode = adminGuideMode;
+      const previousAdminGuideStep = adminGuideStep;
+      const previousAdminGuideResourceSection = adminGuideResourceSection;
+      const previousAdminGuideDismissed = adminGuideDismissed;
+      const previousAdminResourceEditMode = adminResourceEditMode;
+      const previousSelectedResourceId = selectedResourceId;
+      const previousGuideDisabled = localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
+      const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
+      try{
+        data = {
+          categories:[{ id:"food", label:"Food" }],
+          resources:[{ id:"food-aid", name:"Food Aid", categories:["food"], informationText:"", tags:[], lastModified:nowISO() }],
+          changes:[],
+          lastModified:nowISO()
+        };
+        localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
+        localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+        view = "admin";
+        adminTab = "resources";
+        isAdminVisible = true;
+        adminResourceEditMode = true;
+        selectedResourceId = "food-aid";
+        adminGuideMode = true;
+        adminGuideStep = "resourceFields";
+        adminGuideResourceSection = "basics";
+        adminGuideDismissed = false;
+        render();
+        if(!document.querySelector("#adminView .admin-panel.admin-guide-active #resEditor")){
+          throw new Error("resource editor should be in guided section mode before quitting guide");
+        }
+        requestToggleAdminGuide();
+        document.getElementById("quitGuideYesButton").click();
+        if(adminGuideMode) throw new Error("guide should be off after confirming quit");
+        if(document.querySelector("#adminView .admin-panel.admin-guide-active #resEditor")){
+          throw new Error("full resource editor should be available after quitting guide");
+        }
+        if(localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY) !== "1"){
+          throw new Error("guide quit should be persisted");
+        }
+        requestToggleAdminGuide();
+        if(!adminGuideMode) throw new Error("Guide button should turn guide mode back on");
+        if(adminGuideStep !== "adminHelp") throw new Error("Guide should restart at the beginning");
+        const adminModeTip = document.querySelector("#adminView > .one-time-tip");
+        if(!adminModeTip || adminModeTip.textContent !== TIP_TEXT.newAdminMode){
+          throw new Error("restarted guide should show the first Admin-mode tip");
+        }
+        if(document.querySelector("#adminView .admin-panel.admin-guide-active #resEditor")){
+          throw new Error("restarted guide should not section the editor before the resource-fields step");
+        }
+      }finally{
+        data = previousData;
+        view = previousView;
+        adminTab = previousAdminTab;
+        isAdminVisible = previousAdminVisible;
+        adminGuideMode = previousAdminGuideMode;
+        adminGuideStep = previousAdminGuideStep;
+        adminGuideResourceSection = previousAdminGuideResourceSection;
+        adminGuideDismissed = previousAdminGuideDismissed;
+        adminResourceEditMode = previousAdminResourceEditMode;
+        selectedResourceId = previousSelectedResourceId;
+        closeReferenceModal();
+        if(previousStoredData === null) localStorage.removeItem(DATA_STORAGE_KEY);
+        else localStorage.setItem(DATA_STORAGE_KEY, previousStoredData);
         if(previousGuideDisabled === null) localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
         else localStorage.setItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY, previousGuideDisabled);
         if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
@@ -3153,9 +3241,7 @@ function setAdminVisibility(visible){
   isAdminVisible = nextVisible;
   if(isAdminVisible && isNewAdminSetupState() && !adminGuideDismissed){
     adminGuideMode = true;
-    if(adminGuideStep !== "resources" && adminGuideStep !== "newResource" && adminGuideStep !== "resourceFields"){
-      adminGuideStep = "adminHelp";
-    }
+    adminGuideStep = "adminHelp";
   }
   tabAdmin.style.display = isAdminVisible ? "" : "none";
   if(!isAdminVisible){
@@ -3274,6 +3360,14 @@ function createOneTimeTip(tipId){
     markTipSeen(tipId);
     safeRender();
   };
+  return tip;
+}
+
+function createGuideTip(tipText){
+  if(!tipText) return null;
+  const tip = document.createElement("div");
+  tip.className = "one-time-tip";
+  tip.textContent = tipText;
   return tip;
 }
 
@@ -3607,7 +3701,7 @@ function showUserHelp(){
 
 function showAdminHelp(){
   markTipSeen("newAdminMode");
-  const shouldAdvanceGuide = isNewAdminSetupState() && adminGuideMode && !adminGuideDismissed;
+  const shouldAdvanceGuide = adminGuideMode && !adminGuideDismissed && adminGuideStep === "adminHelp";
   if(shouldAdvanceGuide) startAdminGuide("resources");
   const modal = getReferenceModal();
   modal.innerHTML = `
@@ -4634,8 +4728,8 @@ function renderAdmin(){
     <br>
   `;
 
-  if(isNewAdminSetupState()){
-    const tip = createOneTimeTip("newAdminMode");
+  if(adminGuideMode && adminGuideStep === "adminHelp"){
+    const tip = createGuideTip(TIP_TEXT.newAdminMode);
     if(tip) container.insertBefore(tip, container.children[1] || null);
   }
   if(adminTab === "categories") renderAdminCategories(container);
@@ -6494,7 +6588,7 @@ function renderAdminResources(container){
   }
 
   container.innerHTML += `
-    <div class="admin-panel ${adminGuideMode ? "admin-guide-active" : ""}">
+    <div class="admin-panel ${adminGuideMode && adminGuideStep === "resourceFields" ? "admin-guide-active" : ""}">
       <div class="admin-box">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
           <h3 style="margin:0;">Edit Resource</h3>
