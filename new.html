@@ -1204,10 +1204,10 @@ const TIP_TEXT = {
   newAdminMode: "Click Ctrl+Alt+A to hide the Admin button when you're done. Now click the gray Help button",
   adminGuideResources: "Click the gray Resources button to enter the Resource editor.",
   adminGuideNewResource: "Click the gray New button to create a resource.",
-  adminGuideResourceFields: "Fill in Name, Phone, Address, Website, Hours, and a short Description. Users see the Description first; fuller information comes later. Click Next.",
+  adminGuideResourceFields: "Fill in Name, Phone, Address, Website, Hours, and a short Description. Users see the Description first; fuller information comes later. If this resource is a list, such as a list of food pantries, enter a description but you can skip the rest of this section. Click Next.",
   adminGuideTags: "Add search tags for this resource, then click Next",
   adminGuideCategories: "Choose the categories where this resource should appear, then click Next",
-  adminGuideInformation: "Add the public information users should see, then click Next. If this resource is a list, such as a list of food pantries, you can skip this section.",
+  adminGuideInformation: "Add the public information users should see, then click Next.",
   adminGuideUpdate: "Describe this update, then click Done",
   adminGuideSetupName: "Click the gray Change TSO Name button.",
   adminGuideVerifyName: "Check the blue title bar. It should say your TSO name followed by TSO Resources. If it looks right, click Next.",
@@ -2243,6 +2243,9 @@ function runSelfTests(){
         if(!tip || !tip.textContent.includes(TIP_TEXT.adminGuideResourceFields)){
           throw new Error("guide should advance to resource fields tip");
         }
+        if(!tip.textContent.includes("If this resource is a list")){
+          throw new Error("resource fields guide tip should explain list resources can skip the rest of the section");
+        }
         if(!document.querySelector("#adminView .admin-guide-tip button")){
           throw new Error("resource fields guide tip should include a Next button");
         }
@@ -2285,8 +2288,11 @@ function runSelfTests(){
         advanceAdminGuideResourceSection();
         advanceAdminGuideResourceSection();
         tip = document.querySelector("#adminView .admin-guide-tip");
-        if(!tip || !tip.textContent.includes("If this resource is a list")){
-          throw new Error("information guide tip should explain list resources can skip the section");
+        if(!tip || !tip.textContent.includes(TIP_TEXT.adminGuideInformation)){
+          throw new Error("guide should advance to information section");
+        }
+        if(tip.textContent.includes("If this resource is a list")){
+          throw new Error("information guide tip should not explain list resources");
         }
         advanceAdminGuideResourceSection();
         const finalButtons = Array.from(document.querySelectorAll("#adminView .admin-guide-tip button")).map(button => button.textContent);
@@ -3798,6 +3804,13 @@ function shouldDisableResourceEditorExit(){
     && adminGuideStep === "resourceFields"
     && adminResourceEditMode
     && adminGuideResourceSection !== "update";
+}
+
+function shouldForceEnableResourceEditorExit(){
+  return adminGuideMode
+    && adminGuideStep === "resourceFields"
+    && adminResourceEditMode
+    && adminGuideResourceSection === "update";
 }
 
 function renderAdminGuideTip(container){
@@ -7295,7 +7308,11 @@ function editResource(idx){
     const verifiedValidation = validateVerifiedOnInput(draft.verifiedOn);
     showResourceNameWarning(nameValidation.message);
     showResourceVerifiedWarning(verifiedValidation.message);
-    if(doneBtn) doneBtn.disabled = shouldDisableResourceEditorExit() || !(nameValidation.valid && verifiedValidation.valid);
+    if(doneBtn){
+      doneBtn.disabled = shouldForceEnableResourceEditorExit()
+        ? false
+        : shouldDisableResourceEditorExit() || !(nameValidation.valid && verifiedValidation.valid);
+    }
   }
 
   if(nameEl){
