@@ -1183,7 +1183,9 @@ if(URL_PARAMS.has("fresh")){
 
 // Main persisted app data snapshot (categories/resources + metadata).
 const DATA_STORAGE_KEY = "newData";
-let data = JSON.parse(localStorage.getItem(DATA_STORAGE_KEY) || "null");
+const OPENED_AS_NEW_TEMPLATE = isNewTemplateFile();
+let templateTsoName = OPENED_AS_NEW_TEMPLATE ? "" : null;
+let data = OPENED_AS_NEW_TEMPLATE ? null : JSON.parse(localStorage.getItem(DATA_STORAGE_KEY) || "null");
 const APP_VERSION = "0.1.8";
 const UPDATE_SEEN_STORAGE_KEY = "newRecentUpdatesSeen";
 const PRINT_SELECTION_STORAGE_KEY = "newPrintSelection";
@@ -1269,6 +1271,7 @@ function isNewTemplateFile(){
 }
 
 function normalizeAdminGuidePhase(phase){
+  if(isNewTemplateFile() && phase !== "renameFile") return "setupName";
   if(phase === "renameFile" && !isNewTemplateFile()) return "createResource";
   if(phase === "createResource") return "createResource";
   if(phase === "renameFile") return "renameFile";
@@ -1277,8 +1280,8 @@ function normalizeAdminGuidePhase(phase){
 
 let adminGuidePhase = normalizeAdminGuidePhase(localStorage.getItem(ADMIN_GUIDE_PHASE_STORAGE_KEY));
 localStorage.setItem(ADMIN_GUIDE_PHASE_STORAGE_KEY, adminGuidePhase);
-let adminGuideDismissed = localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY) === "1";
-let adminGuideMode = !adminGuideDismissed;
+let adminGuideDismissed = OPENED_AS_NEW_TEMPLATE ? false : localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY) === "1";
+let adminGuideMode = OPENED_AS_NEW_TEMPLATE ? true : !adminGuideDismissed;
 let adminGuideStep = adminGuidePhase === "createResource" ? "reopenAdmin" : "setupName";
 let adminGuideResourceSection = "basics";
 let adminHelpPrintRestoreState = null;
@@ -1800,6 +1803,8 @@ function runSelfTests(){
     fn: () => {
       const previousData = data;
       const previousView = view;
+      const previousAdminGuideMode = adminGuideMode;
+      const previousAdminGuideDismissed = adminGuideDismissed;
       const previousAdminGuidePhase = adminGuidePhase;
       const previousAdminGuideStep = adminGuideStep;
       const previousGuidePhase = localStorage.getItem(ADMIN_GUIDE_PHASE_STORAGE_KEY);
@@ -1811,6 +1816,8 @@ function runSelfTests(){
           changes:[]
         };
         view = "categories";
+        adminGuideMode = false;
+        adminGuideDismissed = true;
         setAdminGuidePhase("setupName");
         adminGuideStep = "setupName";
         localStorage.setItem(TSO_NAME_STORAGE_KEY, "Test");
@@ -1830,6 +1837,8 @@ function runSelfTests(){
       }finally{
         data = previousData;
         view = previousView;
+        adminGuideMode = previousAdminGuideMode;
+        adminGuideDismissed = previousAdminGuideDismissed;
         adminGuidePhase = previousAdminGuidePhase;
         adminGuideStep = previousAdminGuideStep;
         if(previousGuidePhase === null) localStorage.removeItem(ADMIN_GUIDE_PHASE_STORAGE_KEY);
@@ -1895,6 +1904,60 @@ function runSelfTests(){
         else localStorage.setItem(ADMIN_GUIDE_PHASE_STORAGE_KEY, previousGuidePhase);
         if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
         else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoName);
+      }
+    }
+  });
+
+  tests.push({
+    name: "NEW TEMPLATE IGNORES RENAMED APP STATE",
+    fn: () => {
+      if(!OPENED_AS_NEW_TEMPLATE) return;
+      const previousData = data;
+      const previousView = view;
+      const previousTemplateTsoName = templateTsoName;
+      const previousAdminGuideMode = adminGuideMode;
+      const previousAdminGuidePhase = adminGuidePhase;
+      const previousAdminGuideStep = adminGuideStep;
+      const previousAdminGuideDismissed = adminGuideDismissed;
+      const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
+      const previousGuideDisabled = localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
+      const previousGuidePhase = localStorage.getItem(ADMIN_GUIDE_PHASE_STORAGE_KEY);
+      try{
+        data = { categories:[{ id:"food", label:"Food" }], resources:[{ id:"r", name:"Resource", categories:["food"] }], changes:[] };
+        view = "categories";
+        templateTsoName = "";
+        adminGuideMode = true;
+        adminGuideDismissed = false;
+        setAdminGuidePhase("setupName");
+        adminGuideStep = "setupName";
+        localStorage.setItem(TSO_NAME_STORAGE_KEY, "Ogden");
+        localStorage.setItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY, "1");
+        localStorage.setItem(ADMIN_GUIDE_PHASE_STORAGE_KEY, "createResource");
+        refreshAppTitle();
+        render();
+        if(getTsoName() !== "") throw new Error("new.html should ignore stored renamed-app TSO name");
+        if(document.title !== "<New> TSO Resources"){
+          throw new Error(`new.html title should remain <New>, got ${document.title}`);
+        }
+        const tip = appView.querySelector(".red-tip");
+        if(!tip || tip.textContent !== TIP_TEXT.newAdminWelcome){
+          throw new Error("new.html should show the new-admin welcome tip");
+        }
+      }finally{
+        data = previousData;
+        view = previousView;
+        templateTsoName = previousTemplateTsoName;
+        adminGuideMode = previousAdminGuideMode;
+        adminGuidePhase = previousAdminGuidePhase;
+        adminGuideStep = previousAdminGuideStep;
+        adminGuideDismissed = previousAdminGuideDismissed;
+        if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+        else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoName);
+        if(previousGuideDisabled === null) localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
+        else localStorage.setItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY, previousGuideDisabled);
+        if(previousGuidePhase === null) localStorage.removeItem(ADMIN_GUIDE_PHASE_STORAGE_KEY);
+        else localStorage.setItem(ADMIN_GUIDE_PHASE_STORAGE_KEY, previousGuidePhase);
+        refreshAppTitle();
       }
     }
   });
@@ -2140,6 +2203,7 @@ function runSelfTests(){
       const previousGuideDisabled = localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
       const previousGuidePhase = localStorage.getItem(ADMIN_GUIDE_PHASE_STORAGE_KEY);
       const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
+      const previousTemplateTsoName = templateTsoName;
       try{
         data = { categories:[{ id:"food", label:"Food" }], resources:[], changes:[], lastModified:nowISO() };
         view = "admin";
@@ -2189,6 +2253,7 @@ function runSelfTests(){
         adminGuideStep = previousAdminGuideStep;
         adminGuidePhase = previousAdminGuidePhase;
         adminGuideDismissed = previousAdminGuideDismissed;
+        templateTsoName = previousTemplateTsoName;
         closeReferenceModal();
         if(previousGuideDisabled === null) localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
         else localStorage.setItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY, previousGuideDisabled);
@@ -2317,6 +2382,7 @@ function runSelfTests(){
   tests.push({
     name: "RENAMED FILE GUIDE STARTS RESOURCE QUICK START",
     fn: () => {
+      if(OPENED_AS_NEW_TEMPLATE) return;
       const previousData = data;
       const previousStoredData = localStorage.getItem(DATA_STORAGE_KEY);
       const previousView = view;
@@ -2390,6 +2456,7 @@ function runSelfTests(){
   tests.push({
     name: "GUIDE QUIT RESTORES FULL RESOURCE EDITOR AND RESTARTS",
     fn: () => {
+      if(OPENED_AS_NEW_TEMPLATE) return;
       const previousData = data;
       const previousStoredData = localStorage.getItem(DATA_STORAGE_KEY);
       const previousView = view;
@@ -3517,6 +3584,7 @@ if(searchInput){
 }
 const appTitle = document.getElementById("appTitle");
 function getTsoName(){
+  if(OPENED_AS_NEW_TEMPLATE) return String(templateTsoName || "").trim();
   return String(localStorage.getItem(TSO_NAME_STORAGE_KEY) || "").trim();
 }
 
@@ -3591,6 +3659,7 @@ function formatGuideTipText(tipText){
 }
 
 function getCategoryTipId(){
+  if(OPENED_AS_NEW_TEMPLATE && adminGuideMode) return "newAdminWelcome";
   if(isNewAdminSetupState() && adminGuideMode) return "newAdminWelcome";
   if(!adminGuideMode) return "user";
   return "";
@@ -3919,6 +3988,7 @@ function showAdminSetup(){
 
   function saveName(){
     const nextName = String(nameInput ? nameInput.value : "").trim();
+    if(OPENED_AS_NEW_TEMPLATE) templateTsoName = nextName;
     if(nextName){
       localStorage.setItem(TSO_NAME_STORAGE_KEY, nextName);
     }else{
