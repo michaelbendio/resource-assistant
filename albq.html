@@ -2741,6 +2741,7 @@ function showUserHelp(){
         <h3>Merging Resource Updates</h3>
         <p>Click Categories in the top bar. The Merge Resources button is below the categories on the right side.</p>
         <p>Use Merge Resources to import updated resource information when you are notified that updates are available.</p>
+        <p>When you click the button, a file picker will let you choose the location to retrieve the update (<code>albq-resources.json</code>).</p>
       </div>
     </div>
   `;
@@ -4251,7 +4252,36 @@ function beginMergeImportPackage(){
   input.onchange = mergeImportPackage;
   document.body.appendChild(input);
   input.value = "";
-  input.click();
+  showMergeResourcePickerPrompt(input);
+}
+
+function showMergeResourcePickerPrompt(input){
+  const modal = getReferenceModal();
+  let pickerOpened = false;
+  const removeUnusedInput = () => {
+    if(!pickerOpened && input.parentNode) input.remove();
+  };
+  modal.innerHTML = `
+    <div class="reference-modal-panel" role="dialog" aria-modal="true" aria-labelledby="mergeResourcePickerTitle">
+      <div class="reference-modal-header">
+        <div id="mergeResourcePickerTitle" class="reference-modal-title">Find and click albq-resources.json</div>
+        <div class="reference-modal-actions">
+          <button class="button primary" type="button" id="mergeResourcePickerOkButton">OK</button>
+        </div>
+      </div>
+    </div>
+  `;
+  const okBtn = document.getElementById("mergeResourcePickerOkButton");
+  if(okBtn){
+    okBtn.addEventListener("click", () => {
+      pickerOpened = true;
+      closeReferenceModal();
+      input.click();
+    });
+  }
+  modal.addEventListener("click", removeUnusedInput, { once:true });
+  modal.classList.remove("hidden");
+  if(okBtn) okBtn.focus();
 }
 
 function validateImportData(imported){
