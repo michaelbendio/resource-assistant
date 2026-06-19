@@ -1178,8 +1178,8 @@ const TIP_TEXT = {
   adminGuideUpdate: "Describe this update, then click Done",
   adminGuideSetupName: "Click the gray Change TSO Name button.",
   adminGuideVerifyName: "Check the blue title bar. It should say your TSO name followed by TSO Resources. If it looks right, click Next.",
-  adminGuideRenameFile: "Now click Quit to exit TSO Resources and rename the file new.html to match your TSO, such as provo.html or albuquerque.html, then open [new name].html",
-  renamedFileWelcome: "Press Ctrl+Alt+A, click Admin and follow the guided quick start"
+  adminGuideRenameFile: "Click Quit and rename new.html to [new TSO name].html. Then open [new TSO name].html.",
+  renamedFileWelcome: "Press Ctrl+Alt+A, click Admin and follow the red tips to continue guided quick start"
 };
 const TSO_NAME_STORAGE_KEY = "newTsoName";
 const ADMIN_GUIDE_DISABLED_STORAGE_KEY = "newAdminGuideDisabled";
@@ -2109,16 +2109,17 @@ function runSelfTests(){
         nameInput.value = "Provo";
         saveBtn.click();
         if(getTsoName() !== "Provo") throw new Error("TSO name was not saved");
-        tip = document.querySelector("#adminView .admin-guide-tip");
-        if(!tip || !tip.textContent.includes("Check the blue title bar")){
-          throw new Error("saving TSO name should advance to title check tip");
+        if(adminGuideStep !== "verifyName"){
+          throw new Error("saving TSO name should advance guide state to title check");
         }
-        const nextBtn = Array.from(tip.querySelectorAll("button")).find(button => button.textContent === "Next");
-        if(!nextBtn) throw new Error("title check tip should have a Next button");
-        nextBtn.click();
+        const modal = document.getElementById("referenceModal");
+        if(!modal || !(modal.textContent || "").includes("After the blue bar looks right, click Close.")){
+          throw new Error("setup modal should tell admin to click Close after the blue bar looks right");
+        }
+        modal.querySelector(".reference-modal-close").click();
         tip = document.querySelector("#adminView .admin-guide-tip");
-        if(!tip || tip.textContent.indexOf("Now click Quit to exit TSO Resources") === -1){
-          throw new Error("Next should advance to rename and Quit tip");
+        if(!tip || tip.textContent.indexOf("Click Quit and rename new.html to provo.html. Then open provo.html.") === -1){
+          throw new Error("Close should advance to rename and Quit tip with TSO filename");
         }
         if(localStorage.getItem(ADMIN_GUIDE_PHASE_STORAGE_KEY) !== "renameFile"){
           throw new Error("rename phase should be persisted");
@@ -2272,7 +2273,7 @@ function runSelfTests(){
         adminGuideDismissed = false;
         render();
         let tip = appView.querySelector(".one-time-tip");
-        if(!tip || tip.textContent !== TIP_TEXT.renamedFileWelcome){
+        if(!tip || tip.textContent !== formatGuideTipText(TIP_TEXT.renamedFileWelcome)){
           throw new Error("renamed file should tell admin to press Ctrl+Alt+A and click Admin");
         }
         setAdminVisibility(true);
@@ -3443,6 +3444,16 @@ function getTsoName(){
   return String(localStorage.getItem(TSO_NAME_STORAGE_KEY) || "").trim();
 }
 
+function getTsoFileName(){
+  const fallback = "new-name";
+  const name = getTsoName() || fallback;
+  const cleaned = name.toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return `${cleaned || fallback}.html`;
+}
+
 function getAppTitleText(){
   const tsoName = getTsoName();
   return `${tsoName || "<New>"} TSO Resources`;
@@ -3516,6 +3527,10 @@ function advanceAdminGuideToResourceCreation(){
   setAdminGuideStep("reopenAdmin");
 }
 
+function formatGuideTipText(tipText){
+  return String(tipText || "").replace(/\[new TSO name\]\.html/g, getTsoFileName());
+}
+
 function getCategoryTipId(){
   if(isNewAdminSetupState() && adminGuideMode) return "newAdminWelcome";
   if(showOneTimeTip) return "user";
@@ -3524,7 +3539,7 @@ function getCategoryTipId(){
 
 function getCategoryGuideTipText(){
   if(adminGuideMode && adminGuidePhase === "createResource" && view === "categories" && (!isNewTemplateFile() || adminGuideStep === "reopenAdmin")){
-    return TIP_TEXT.renamedFileWelcome;
+    return formatGuideTipText(TIP_TEXT.renamedFileWelcome);
   }
   return "";
 }
@@ -3622,7 +3637,7 @@ function quitForRename(){
           </div>
         </div>
         <div class="reference-modal-body">
-          <p>Your browser did not allow this page to close itself. Close this tab or window, rename <code>new.html</code>, then open the renamed file.</p>
+          <p>Your browser did not allow this page to close itself. Close this tab or window, rename <code>new.html</code> to <code>${escapeHTML(getTsoFileName())}</code>, then open <code>${escapeHTML(getTsoFileName())}</code>.</p>
         </div>
       </div>
     `;
@@ -3681,7 +3696,7 @@ function isAdminGuideResourceLastSection(){
 }
 
 function renderAdminGuideTip(container){
-  const tipText = getAdminGuideTipText();
+  const tipText = formatGuideTipText(getAdminGuideTipText());
   if(!tipText) return;
   const tip = document.createElement("div");
   tip.className = "one-time-tip admin-guide-tip";
@@ -3689,26 +3704,7 @@ function renderAdminGuideTip(container){
   tipMessage.className = "admin-guide-tip-message";
   tipMessage.textContent = tipText;
   tip.appendChild(tipMessage);
-  if(adminGuideStep === "verifyName"){
-    const actions = document.createElement("div");
-    actions.className = "admin-guide-tip-actions";
-    const backBtn = document.createElement("button");
-    backBtn.className = "button";
-    backBtn.type = "button";
-    backBtn.textContent = "Back";
-    backBtn.onclick = () => setAdminGuideStep("setupName");
-    actions.appendChild(backBtn);
-    const nextBtn = document.createElement("button");
-    nextBtn.className = "button";
-    nextBtn.type = "button";
-    nextBtn.textContent = "Next";
-    nextBtn.onclick = () => {
-      setAdminGuidePhase("renameFile");
-      setAdminGuideStep("renameFile");
-    };
-    actions.appendChild(nextBtn);
-    tip.appendChild(actions);
-  }else if(adminGuideStep === "renameFile"){
+  if(adminGuideStep === "renameFile"){
     const actions = document.createElement("div");
     actions.className = "admin-guide-tip-actions";
     const backBtn = document.createElement("button");
@@ -3821,30 +3817,7 @@ function showAdminSetup(){
         <div class="admin-setup-actions">
           <button class="button primary" type="button" id="adminSetupSaveName">Save TSO Name</button>
         </div>
-        <p class="admin-setup-note">After the blue bar looks right, rename <code>new.html</code> to match your TSO, such as <code>provo.html</code> or <code>albuquerque.html</code>.</p>
-        <p class="admin-setup-note">To enter or leave Admin mode later, press <code>Ctrl+Alt+A</code>. When Admin mode is enabled, click the <code>Admin</code> button in the blue bar.</p>
-
-        <h3>What this app does</h3>
-        <p>This app organizes local resource information into categories. Users click a category, open a resource, review contact details and service information, select resources for printing, and print a handout.</p>
-        <div class="setup-mockup" aria-label="Example resource layout">
-          <div class="setup-mockup-grid">
-            <div class="setup-mockup-category">Food</div>
-            <div class="setup-mockup-category">Housing</div>
-            <div class="setup-mockup-category">Employment</div>
-            <div class="setup-mockup-category">Utilities</div>
-            <div class="setup-mockup-category">Medical</div>
-            <div class="setup-mockup-category">Transportation</div>
-          </div>
-          <div class="setup-mockup-resource">
-            <strong>Example Resource</strong>
-            <div>Phone, address, hours, service details, and print selection appear here.</div>
-          </div>
-        </div>
-        <p class="admin-setup-note">Click Help for quick start instructions.</p>
-        <div class="admin-setup-actions">
-          <button class="button primary" type="button" id="adminSetupOpenAdmin">Open Admin</button>
-          <button class="button" type="button" id="adminSetupOpenHelp">Open Help</button>
-        </div>
+        <p class="admin-setup-note">After the blue bar looks right, click Close.</p>
       </div>
     </div>
   `;
@@ -3852,8 +3825,6 @@ function showAdminSetup(){
   const closeBtn = modal.querySelector(".reference-modal-close");
   const nameInput = document.getElementById("adminSetupTsoName");
   const saveBtn = document.getElementById("adminSetupSaveName");
-  const openAdminBtn = document.getElementById("adminSetupOpenAdmin");
-  const openHelpBtn = document.getElementById("adminSetupOpenHelp");
 
   function saveName(){
     const nextName = String(nameInput ? nameInput.value : "").trim();
@@ -3866,32 +3837,23 @@ function showAdminSetup(){
     safeRender();
     showToast("TSO name saved.");
     if(adminGuideMode && adminGuideStep === "setupName"){
-      closeReferenceModal();
-      setAdminGuideStep("verifyName");
+      adminGuideStep = "verifyName";
     }
   }
 
-  if(closeBtn) closeBtn.addEventListener("click", closeReferenceModal);
+  if(closeBtn) closeBtn.addEventListener("click", () => {
+    closeReferenceModal();
+    if(adminGuideMode && adminGuideStep === "verifyName"){
+      setAdminGuidePhase("renameFile");
+      setAdminGuideStep("renameFile");
+    }
+  });
   if(saveBtn) saveBtn.addEventListener("click", saveName);
   if(nameInput){
     nameInput.addEventListener("keydown", event => {
       if(event.key !== "Enter") return;
       event.preventDefault();
       saveName();
-    });
-  }
-  if(openAdminBtn){
-    openAdminBtn.addEventListener("click", () => {
-      saveName();
-      closeReferenceModal();
-      setAdminVisibility(true);
-      setView("admin");
-    });
-  }
-  if(openHelpBtn){
-    openHelpBtn.addEventListener("click", () => {
-      saveName();
-      showAdminHelp();
     });
   }
   modal.classList.remove("hidden");
