@@ -85,7 +85,7 @@ textarea {
 .button.secondary { background:#f7f7f7; color:#333; border:1px solid #bbb; }
 .button.danger { background:#aa0000; color:white; }
 .topbar .help-button { color:white; border:0; outline:0; border-radius:4px; background:transparent; padding:2px 8px; font:inherit; }
-.one-time-tip { margin:0 0 12px; padding:10px 12px; border:2px solid #aa0000; border-radius:6px; background:#fff5f5; color:#aa0000; font-size:11px; font-weight:bold; }
+.red-tip { margin:0 0 12px; padding:10px 12px; border:2px solid #aa0000; border-radius:6px; background:#fff5f5; color:#aa0000; font-size:11px; font-weight:bold; }
 .category-print-banner { margin:0 0 12px; padding:9px 12px; border:1px solid #c8d6e6; border-left:4px solid #003366; border-radius:6px; background:#f7fbff; color:#1f2d3d; font-size:16px; line-height:1.35; }
 .print-empty-instruction { color:#aa0000; }
 textarea.big { width:100%; min-height:80px; }
@@ -1158,9 +1158,6 @@ const FRESH_START_STORAGE_KEYS = [
   "newRecentUpdatesSeen",
   "newPrintSelection",
   "newFavorites",
-  "newPrintSelectionTipSeen",
-  "newAdminWelcomeTipSeen",
-  "newAdminModeTipSeen",
   "newTsoName",
   "newAdminGuideDisabled",
   "newAdminGuidePhase",
@@ -1191,12 +1188,6 @@ const APP_VERSION = "0.1.8";
 const UPDATE_SEEN_STORAGE_KEY = "newRecentUpdatesSeen";
 const PRINT_SELECTION_STORAGE_KEY = "newPrintSelection";
 const LEGACY_FAVORITES_STORAGE_KEY = "newFavorites";
-const ONE_TIME_TIP_STORAGE_KEY = "newPrintSelectionTipSeen";
-const TIP_STORAGE_KEYS = {
-  user: ONE_TIME_TIP_STORAGE_KEY,
-  newAdminWelcome: "newAdminWelcomeTipSeen",
-  newAdminMode: "newAdminModeTipSeen"
-};
 const TIP_TEXT = {
   user: "Click on a category to see its resources. Click a resource to see details. Click ⬜ to include it in the printed handout.",
   newAdminWelcome: "Welcome to your new TSO Resources app. Click Ctrl+Alt+A to add an Admin button to the top blue bar. Then click it.",
@@ -1263,7 +1254,6 @@ let pendingRecentUpdates = [];
 let recentUpdateDetail = null;
 let showUpdateInfo = false;
 let showRecentChangeLog = true;
-let showOneTimeTip = localStorage.getItem(ONE_TIME_TIP_STORAGE_KEY) !== "1";
 function getCurrentHtmlFileName(){
   const path = String(location.pathname || "");
   const fileName = path.split("/").filter(Boolean).pop() || "";
@@ -1806,15 +1796,13 @@ function runSelfTests(){
   });
 
   tests.push({
-    name: "ONE-TIME TIP IS PROMINENT",
+    name: "USER TIP IS PROMINENT",
     fn: () => {
       const previousData = data;
       const previousView = view;
-      const previousShowOneTimeTip = showOneTimeTip;
       const previousAdminGuidePhase = adminGuidePhase;
       const previousAdminGuideStep = adminGuideStep;
       const previousGuidePhase = localStorage.getItem(ADMIN_GUIDE_PHASE_STORAGE_KEY);
-      const previousUserTipSeen = localStorage.getItem(TIP_STORAGE_KEYS.user);
       const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
       try{
         data = {
@@ -1823,34 +1811,29 @@ function runSelfTests(){
           changes:[]
         };
         view = "categories";
-        showOneTimeTip = true;
         setAdminGuidePhase("setupName");
         adminGuideStep = "setupName";
-        localStorage.removeItem(TIP_STORAGE_KEYS.user);
         localStorage.setItem(TSO_NAME_STORAGE_KEY, "Test");
         render();
-        const tip = appView.querySelector(".one-time-tip");
-        if(!tip) throw new Error("one-time tip was not rendered");
+        const tip = appView.querySelector(".red-tip");
+        if(!tip) throw new Error("user tip was not rendered");
         if(tip.textContent !== TIP_TEXT.user){
-          throw new Error("one-time tip wording changed");
+          throw new Error("user tip wording changed");
         }
         const style = getComputedStyle(tip);
         if(style.color !== "rgb(170, 0, 0)"){
-          throw new Error(`one-time tip should be red, got ${style.color}`);
+          throw new Error(`user tip should be red, got ${style.color}`);
         }
         if(Number(style.fontWeight) < 700){
-          throw new Error(`one-time tip should be bold, got ${style.fontWeight}`);
+          throw new Error(`user tip should be bold, got ${style.fontWeight}`);
         }
       }finally{
         data = previousData;
         view = previousView;
-        showOneTimeTip = previousShowOneTimeTip;
         adminGuidePhase = previousAdminGuidePhase;
         adminGuideStep = previousAdminGuideStep;
         if(previousGuidePhase === null) localStorage.removeItem(ADMIN_GUIDE_PHASE_STORAGE_KEY);
         else localStorage.setItem(ADMIN_GUIDE_PHASE_STORAGE_KEY, previousGuidePhase);
-        if(previousUserTipSeen === null) localStorage.removeItem(TIP_STORAGE_KEYS.user);
-        else localStorage.setItem(TIP_STORAGE_KEYS.user, previousUserTipSeen);
         if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
         else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoName);
       }
@@ -1877,28 +1860,24 @@ function runSelfTests(){
     fn: () => {
       const previousData = data;
       const previousView = view;
-      const previousShowOneTimeTip = showOneTimeTip;
       const previousAdminGuideMode = adminGuideMode;
       const previousAdminGuidePhase = adminGuidePhase;
       const previousAdminGuideStep = adminGuideStep;
       const previousAdminGuideDismissed = adminGuideDismissed;
-      const previousWelcomeTipSeen = localStorage.getItem(TIP_STORAGE_KEYS.newAdminWelcome);
       const previousGuideDisabled = localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
       const previousGuidePhase = localStorage.getItem(ADMIN_GUIDE_PHASE_STORAGE_KEY);
       const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
       try{
         data = { categories:[{ id:"food", label:"Food" }], resources:[], changes:[] };
         view = "categories";
-        showOneTimeTip = true;
         adminGuideMode = true;
         setAdminGuidePhase("setupName");
         adminGuideStep = "setupName";
         adminGuideDismissed = false;
-        localStorage.setItem(TIP_STORAGE_KEYS.newAdminWelcome, "1");
         localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
         localStorage.removeItem(TSO_NAME_STORAGE_KEY);
         render();
-        const tip = appView.querySelector(".one-time-tip");
+        const tip = appView.querySelector(".red-tip");
         if(!tip) throw new Error("new admin welcome tip was not rendered");
         if(tip.textContent !== TIP_TEXT.newAdminWelcome){
           throw new Error("new admin welcome tip wording changed");
@@ -1906,13 +1885,10 @@ function runSelfTests(){
       }finally{
         data = previousData;
         view = previousView;
-        showOneTimeTip = previousShowOneTimeTip;
         adminGuideMode = previousAdminGuideMode;
         adminGuidePhase = previousAdminGuidePhase;
         adminGuideStep = previousAdminGuideStep;
         adminGuideDismissed = previousAdminGuideDismissed;
-        if(previousWelcomeTipSeen === null) localStorage.removeItem(TIP_STORAGE_KEYS.newAdminWelcome);
-        else localStorage.setItem(TIP_STORAGE_KEYS.newAdminWelcome, previousWelcomeTipSeen);
         if(previousGuideDisabled === null) localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
         else localStorage.setItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY, previousGuideDisabled);
         if(previousGuidePhase === null) localStorage.removeItem(ADMIN_GUIDE_PHASE_STORAGE_KEY);
@@ -1928,25 +1904,19 @@ function runSelfTests(){
     fn: () => {
       const previousData = data;
       const previousView = view;
-      const previousShowOneTimeTip = showOneTimeTip;
       const previousAdminGuideMode = adminGuideMode;
       const previousAdminGuideDismissed = adminGuideDismissed;
       const previousGuideDisabled = localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
-      const previousWelcomeTipSeen = localStorage.getItem(TIP_STORAGE_KEYS.newAdminWelcome);
-      const previousUserTipSeen = localStorage.getItem(TIP_STORAGE_KEYS.user);
       const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
       try{
         data = { categories:[{ id:"food", label:"Food" }], resources:[], changes:[] };
         view = "categories";
-        showOneTimeTip = true;
         adminGuideMode = false;
         adminGuideDismissed = true;
         localStorage.setItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY, "1");
-        localStorage.removeItem(TIP_STORAGE_KEYS.user);
-        localStorage.removeItem(TIP_STORAGE_KEYS.newAdminWelcome);
         localStorage.removeItem(TSO_NAME_STORAGE_KEY);
         render();
-        const tip = appView.querySelector(".one-time-tip");
+        const tip = appView.querySelector(".red-tip");
         if(!tip) throw new Error("fallback user tip was not rendered");
         if(tip.textContent === TIP_TEXT.newAdminWelcome){
           throw new Error("disabled guide should not show the new admin welcome tip");
@@ -1957,15 +1927,10 @@ function runSelfTests(){
       }finally{
         data = previousData;
         view = previousView;
-        showOneTimeTip = previousShowOneTimeTip;
         adminGuideMode = previousAdminGuideMode;
         adminGuideDismissed = previousAdminGuideDismissed;
         if(previousGuideDisabled === null) localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
         else localStorage.setItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY, previousGuideDisabled);
-        if(previousWelcomeTipSeen === null) localStorage.removeItem(TIP_STORAGE_KEYS.newAdminWelcome);
-        else localStorage.setItem(TIP_STORAGE_KEYS.newAdminWelcome, previousWelcomeTipSeen);
-        if(previousUserTipSeen === null) localStorage.removeItem(TIP_STORAGE_KEYS.user);
-        else localStorage.setItem(TIP_STORAGE_KEYS.user, previousUserTipSeen);
         if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
         else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoName);
       }
@@ -1982,7 +1947,6 @@ function runSelfTests(){
       const previousAdminGuideStep = adminGuideStep;
       const previousAdminGuidePhase = adminGuidePhase;
       const previousAdminGuideDismissed = adminGuideDismissed;
-      const previousAdminTipSeen = localStorage.getItem(TIP_STORAGE_KEYS.newAdminMode);
       const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
       try{
         data = { categories:[{ id:"food", label:"Food" }], resources:[], changes:[] };
@@ -1991,10 +1955,9 @@ function runSelfTests(){
         adminGuideMode = true;
         adminGuideStep = "setupName";
         adminGuideDismissed = false;
-        localStorage.setItem(TIP_STORAGE_KEYS.newAdminMode, "1");
         localStorage.removeItem(TSO_NAME_STORAGE_KEY);
         render();
-        const tip = document.querySelector("#adminView .one-time-tip");
+        const tip = document.querySelector("#adminView .red-tip");
         if(!tip) throw new Error("new admin setup tip was not rendered");
         if(tip.textContent !== TIP_TEXT.adminGuideSetupName){
           throw new Error("new admin setup tip wording changed");
@@ -2006,8 +1969,6 @@ function runSelfTests(){
         adminGuideMode = previousAdminGuideMode;
         adminGuideStep = previousAdminGuideStep;
         adminGuideDismissed = previousAdminGuideDismissed;
-        if(previousAdminTipSeen === null) localStorage.removeItem(TIP_STORAGE_KEYS.newAdminMode);
-        else localStorage.setItem(TIP_STORAGE_KEYS.newAdminMode, previousAdminTipSeen);
         if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
         else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoName);
       }
@@ -2019,21 +1980,17 @@ function runSelfTests(){
     fn: () => {
       const previousData = data;
       const previousView = view;
-      const previousShowOneTimeTip = showOneTimeTip;
       const previousAdminGuideMode = adminGuideMode;
       const previousAdminGuideDismissed = adminGuideDismissed;
-      const previousUserTipSeen = localStorage.getItem(TIP_STORAGE_KEYS.user);
       const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
       try{
         data = { categories:[{ id:"food", label:"Food" }], resources:[{ id:"r", name:"Resource", categories:["food"] }], changes:[] };
         view = "categories";
-        showOneTimeTip = false;
         adminGuideMode = false;
         adminGuideDismissed = true;
-        localStorage.setItem(TIP_STORAGE_KEYS.user, "1");
         localStorage.setItem(TSO_NAME_STORAGE_KEY, "Test");
         render();
-        const tip = appView.querySelector(".one-time-tip");
+        const tip = appView.querySelector(".red-tip");
         if(!tip) throw new Error("user tip should show on Categories when guide mode is off");
         if(tip.textContent !== TIP_TEXT.user){
           throw new Error("guide-off Categories view should show the user tip");
@@ -2041,11 +1998,8 @@ function runSelfTests(){
       }finally{
         data = previousData;
         view = previousView;
-        showOneTimeTip = previousShowOneTimeTip;
         adminGuideMode = previousAdminGuideMode;
         adminGuideDismissed = previousAdminGuideDismissed;
-        if(previousUserTipSeen === null) localStorage.removeItem(TIP_STORAGE_KEYS.user);
-        else localStorage.setItem(TIP_STORAGE_KEYS.user, previousUserTipSeen);
         if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
         else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoName);
       }
@@ -2062,8 +2016,6 @@ function runSelfTests(){
       const previousAdminGuideStep = adminGuideStep;
       const previousAdminGuidePhase = adminGuidePhase;
       const previousAdminGuideDismissed = adminGuideDismissed;
-      const previousWelcomeTipSeen = localStorage.getItem(TIP_STORAGE_KEYS.newAdminWelcome);
-      const previousAdminModeTipSeen = localStorage.getItem(TIP_STORAGE_KEYS.newAdminMode);
       const previousGuideDisabled = localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
       const previousGuidePhase = localStorage.getItem(ADMIN_GUIDE_PHASE_STORAGE_KEY);
       const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
@@ -2075,12 +2027,10 @@ function runSelfTests(){
         setAdminGuidePhase("setupName");
         adminGuideStep = "setupName";
         adminGuideDismissed = false;
-        localStorage.removeItem(TIP_STORAGE_KEYS.newAdminWelcome);
-        localStorage.removeItem(TIP_STORAGE_KEYS.newAdminMode);
         localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
         localStorage.removeItem(TSO_NAME_STORAGE_KEY);
         render();
-        const welcomeTip = appView.querySelector(".one-time-tip");
+        const welcomeTip = appView.querySelector(".red-tip");
         if(!welcomeTip || welcomeTip.textContent !== TIP_TEXT.newAdminWelcome){
           throw new Error("welcome tip should be visible before entering admin");
         }
@@ -2109,10 +2059,6 @@ function runSelfTests(){
         adminGuideStep = previousAdminGuideStep;
         adminGuidePhase = previousAdminGuidePhase;
         adminGuideDismissed = previousAdminGuideDismissed;
-        if(previousWelcomeTipSeen === null) localStorage.removeItem(TIP_STORAGE_KEYS.newAdminWelcome);
-        else localStorage.setItem(TIP_STORAGE_KEYS.newAdminWelcome, previousWelcomeTipSeen);
-        if(previousAdminModeTipSeen === null) localStorage.removeItem(TIP_STORAGE_KEYS.newAdminMode);
-        else localStorage.setItem(TIP_STORAGE_KEYS.newAdminMode, previousAdminModeTipSeen);
         if(previousGuideDisabled === null) localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
         else localStorage.setItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY, previousGuideDisabled);
         if(previousGuidePhase === null) localStorage.removeItem(ADMIN_GUIDE_PHASE_STORAGE_KEY);
@@ -2131,7 +2077,6 @@ function runSelfTests(){
       const previousAdminGuideStep = adminGuideStep;
       const previousAdminGuideResourceSection = adminGuideResourceSection;
       const previousAdminGuideDismissed = adminGuideDismissed;
-      const previousAdminModeTipSeen = localStorage.getItem(TIP_STORAGE_KEYS.newAdminMode);
       const previousGuideDisabled = localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
       const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
       try{
@@ -2173,8 +2118,6 @@ function runSelfTests(){
         adminGuideResourceSection = previousAdminGuideResourceSection;
         adminGuideDismissed = previousAdminGuideDismissed;
         closeReferenceModal();
-        if(previousAdminModeTipSeen === null) localStorage.removeItem(TIP_STORAGE_KEYS.newAdminMode);
-        else localStorage.setItem(TIP_STORAGE_KEYS.newAdminMode, previousAdminModeTipSeen);
         if(previousGuideDisabled === null) localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
         else localStorage.setItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY, previousGuideDisabled);
         if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
@@ -2401,7 +2344,7 @@ function runSelfTests(){
         adminGuideStep = "reopenAdmin";
         adminGuideDismissed = false;
         render();
-        let tip = appView.querySelector(".one-time-tip");
+        let tip = appView.querySelector(".red-tip");
         if(!tip || tip.textContent !== formatGuideTipText(TIP_TEXT.renamedFileWelcome)){
           throw new Error("renamed file should tell admin to press Ctrl+Alt+A and click Admin");
         }
@@ -2579,7 +2522,6 @@ function runSelfTests(){
     fn: () => {
       const previousData = data;
       const previousView = view;
-      const previousShowOneTimeTip = showOneTimeTip;
       try{
         data = {
           appVersion:APP_VERSION,
@@ -2589,7 +2531,6 @@ function runSelfTests(){
           changes:[]
         };
         view = "categories";
-        showOneTimeTip = false;
         render();
         const grid = appView.querySelector(".grid");
         const buttons = Array.from(appView.querySelectorAll("button"));
@@ -2602,7 +2543,6 @@ function runSelfTests(){
       }finally{
         data = previousData;
         view = previousView;
-        showOneTimeTip = previousShowOneTimeTip;
       }
     }
   });
@@ -3603,42 +3543,24 @@ function refreshAppTitle(){
 
 refreshAppTitle();
 
-function hasSeenTip(tipId){
-  if(tipId === "user" && !adminGuideMode && view === "categories") return false;
-  if(tipId === "newAdminWelcome" && adminGuideMode) return false;
-  const storageKey = TIP_STORAGE_KEYS[tipId];
-  return !storageKey || localStorage.getItem(storageKey) === "1";
-}
-
-function markTipSeen(tipId){
-  const storageKey = TIP_STORAGE_KEYS[tipId];
-  if(!storageKey) return;
-  localStorage.setItem(storageKey, "1");
-  if(tipId === "user") showOneTimeTip = false;
-}
-
 function isNewAdminSetupState(){
   return !getTsoName()
     && !(Array.isArray(data.resources) && data.resources.length);
 }
 
-function createOneTimeTip(tipId){
+function createTip(tipId){
   const tipText = TIP_TEXT[tipId];
-  if(!tipText || hasSeenTip(tipId)) return null;
+  if(!tipText) return null;
   const tip = document.createElement("div");
-  tip.className = "one-time-tip";
+  tip.className = "red-tip";
   tip.textContent = tipText;
-  tip.onclick = () => {
-    markTipSeen(tipId);
-    safeRender();
-  };
   return tip;
 }
 
 function createGuideTip(tipText){
   if(!tipText) return null;
   const tip = document.createElement("div");
-  tip.className = "one-time-tip";
+  tip.className = "red-tip";
   tip.textContent = tipText;
   return tip;
 }
@@ -3671,7 +3593,6 @@ function formatGuideTipText(tipText){
 function getCategoryTipId(){
   if(isNewAdminSetupState() && adminGuideMode) return "newAdminWelcome";
   if(!adminGuideMode) return "user";
-  if(showOneTimeTip) return "user";
   return "";
 }
 
@@ -3869,7 +3790,7 @@ function renderAdminGuideTip(container){
   const tipText = formatGuideTipText(getAdminGuideTipText());
   if(!tipText) return;
   const tip = document.createElement("div");
-  tip.className = "one-time-tip admin-guide-tip";
+  tip.className = "red-tip admin-guide-tip";
   const tipMessage = document.createElement("div");
   tipMessage.className = "admin-guide-tip-message";
   tipMessage.textContent = tipText;
@@ -4067,7 +3988,6 @@ function showUserHelp(){
 }
 
 function showAdminHelp(){
-  markTipSeen("newAdminMode");
   const modal = getReferenceModal();
   modal.innerHTML = `
     <div class="reference-modal-panel" role="dialog" aria-modal="true" aria-labelledby="adminHelpTitle">
@@ -4513,7 +4433,7 @@ function render(){
     }
     const categoryTipId = getCategoryTipId();
     if(!categoryGuideTipText && categoryTipId){
-      const tip = createOneTimeTip(categoryTipId);
+      const tip = createTip(categoryTipId);
       if(tip) appView.appendChild(tip);
     }
     if(pendingRecentUpdates.length){
