@@ -2239,9 +2239,6 @@ function runSelfTests(){
           throw new Error("guide should advance to New resource tip");
         }
         newResource();
-        const guidedResource = data.resources.find(resource => resource.id === selectedResourceId);
-        if(guidedResource) guidedResource.name = "Food Aid";
-        safeRenderAdmin();
         tip = document.querySelector("#adminView .admin-guide-tip");
         if(!tip || !tip.textContent.includes(TIP_TEXT.adminGuideResourceFields)){
           throw new Error("guide should advance to resource fields tip");
@@ -2261,7 +2258,14 @@ function runSelfTests(){
         if(!document.querySelector('#resEditor [data-guide-section="basics"].admin-guide-current-section')){
           throw new Error("basic resource fields should be the first guide section");
         }
+        const nameInput = document.getElementById("res_name");
+        nameInput.value = "Food Aid";
+        nameInput.dispatchEvent(new Event("input", { bubbles:true }));
         advanceAdminGuideResourceSection();
+        const guidedResource = data.resources.find(resource => resource.id === selectedResourceId);
+        if(!guidedResource || guidedResource.name !== "Food Aid"){
+          throw new Error("guided Next should preserve the typed resource name");
+        }
         tip = document.querySelector("#adminView .admin-guide-tip");
         if(!tip || !tip.textContent.includes(TIP_TEXT.adminGuideTags)){
           throw new Error("guide should advance to tags section");
@@ -3745,10 +3749,27 @@ function getAdminGuideResourceSections(){
   return ["basics", "tags", "categories", "information", "update"];
 }
 
+function saveGuidedResourceEditorProgress(){
+  if(!(editing && editing.kind === "resource")) return true;
+  const draft = resourceEditorDraft();
+  if(!draft) return true;
+  const validation = validateResourceName(draft, editing.idx);
+  showResourceNameWarning(validation.message);
+  if(!validation.valid){
+    const nameInput = document.getElementById("res_name");
+    if(nameInput) nameInput.focus();
+    return false;
+  }
+  applyResourceDraft(editing.idx, draft);
+  editorSnapshot = snapshotResourceEditor();
+  return true;
+}
+
 function advanceAdminGuideResourceSection(){
   const sections = getAdminGuideResourceSections();
   const index = sections.indexOf(adminGuideResourceSection);
   if(index === -1 || index >= sections.length - 1) return;
+  if(!saveGuidedResourceEditorProgress()) return;
   adminGuideResourceSection = sections[index + 1];
   safeRenderAdmin();
 }
@@ -3757,6 +3778,7 @@ function retreatAdminGuideResourceSection(){
   const sections = getAdminGuideResourceSections();
   const index = sections.indexOf(adminGuideResourceSection);
   if(index <= 0) return;
+  if(!saveGuidedResourceEditorProgress()) return;
   adminGuideResourceSection = sections[index - 1];
   safeRenderAdmin();
 }
