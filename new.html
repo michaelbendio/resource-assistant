@@ -84,7 +84,7 @@ textarea {
 .button.primary { background:#003366; color:white; }
 .button.secondary { background:#f7f7f7; color:#333; border:1px solid #bbb; }
 .button.danger { background:#aa0000; color:white; }
-.topbar .help-button { color:white; border:1px solid rgba(255,255,255,.6); border-radius:4px; background:transparent; padding:2px 8px; font:inherit; }
+.topbar .help-button { color:white; border:0; outline:0; border-radius:4px; background:transparent; padding:2px 8px; font:inherit; }
 .one-time-tip { margin:0 0 12px; padding:10px 12px; border:2px solid #aa0000; border-radius:6px; background:#fff5f5; color:#aa0000; font-size:11px; font-weight:bold; }
 .category-print-banner { margin:0 0 12px; padding:9px 12px; border:1px solid #c8d6e6; border-left:4px solid #003366; border-radius:6px; background:#f7fbff; color:#1f2d3d; font-size:16px; line-height:1.35; }
 .print-empty-instruction { color:#aa0000; }
@@ -1758,6 +1758,21 @@ function runSelfTests(){
   });
 
   tests.push({
+    name: "USER HELP BUTTON HAS NO OUTLINE BORDER",
+    fn: () => {
+      const help = document.getElementById("helpButton");
+      if(!help) throw new Error("user Help button missing");
+      const style = getComputedStyle(help);
+      if(style.borderTopStyle !== "none" && style.borderTopWidth !== "0px"){
+        throw new Error(`user Help button should not have an outline border, got ${style.borderTopStyle} ${style.borderTopWidth}`);
+      }
+      if(style.outlineStyle !== "none" && style.outlineWidth !== "0px"){
+        throw new Error(`user Help button should not have an outline, got ${style.outlineStyle} ${style.outlineWidth}`);
+      }
+    }
+  });
+
+  tests.push({
     name: "NEW ADMIN WELCOME TIP USES ADMIN ONBOARDING TEXT",
     fn: () => {
       const previousData = data;
@@ -1881,6 +1896,62 @@ function runSelfTests(){
   });
 
   tests.push({
+    name: "WELCOME TIP ENTERS ADMIN WITH GUIDE ON",
+    fn: () => {
+      const previousData = data;
+      const previousView = view;
+      const previousAdminVisible = isAdminVisible;
+      const previousAdminGuideMode = adminGuideMode;
+      const previousAdminGuideStep = adminGuideStep;
+      const previousAdminGuideDismissed = adminGuideDismissed;
+      const previousWelcomeTipSeen = localStorage.getItem(TIP_STORAGE_KEYS.newAdminWelcome);
+      const previousAdminModeTipSeen = localStorage.getItem(TIP_STORAGE_KEYS.newAdminMode);
+      const previousGuideDisabled = localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
+      const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
+      try{
+        data = { categories:[{ id:"food", label:"Food" }], resources:[], changes:[] };
+        view = "categories";
+        isAdminVisible = false;
+        adminGuideMode = true;
+        adminGuideStep = "adminHelp";
+        adminGuideDismissed = false;
+        localStorage.removeItem(TIP_STORAGE_KEYS.newAdminWelcome);
+        localStorage.removeItem(TIP_STORAGE_KEYS.newAdminMode);
+        localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
+        localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+        render();
+        const welcomeTip = appView.querySelector(".one-time-tip");
+        if(!welcomeTip || welcomeTip.textContent !== TIP_TEXT.newAdminWelcome){
+          throw new Error("welcome tip should be visible before entering admin");
+        }
+        setAdminVisibility(true);
+        setView("admin");
+        const guideButton = document.querySelector("#adminView .admin-toolbar-reference-actions button");
+        if(!adminGuideMode) throw new Error("entering admin from welcome tip should keep guide mode on");
+        if(adminGuideStep !== "adminHelp") throw new Error("admin guide should start by waiting for Help");
+        if(!guideButton || !guideButton.classList.contains("primary")){
+          throw new Error("toolbar Guide button should be blue when guide mode is on");
+        }
+      }finally{
+        data = previousData;
+        view = previousView;
+        isAdminVisible = previousAdminVisible;
+        adminGuideMode = previousAdminGuideMode;
+        adminGuideStep = previousAdminGuideStep;
+        adminGuideDismissed = previousAdminGuideDismissed;
+        if(previousWelcomeTipSeen === null) localStorage.removeItem(TIP_STORAGE_KEYS.newAdminWelcome);
+        else localStorage.setItem(TIP_STORAGE_KEYS.newAdminWelcome, previousWelcomeTipSeen);
+        if(previousAdminModeTipSeen === null) localStorage.removeItem(TIP_STORAGE_KEYS.newAdminMode);
+        else localStorage.setItem(TIP_STORAGE_KEYS.newAdminMode, previousAdminModeTipSeen);
+        if(previousGuideDisabled === null) localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
+        else localStorage.setItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY, previousGuideDisabled);
+        if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+        else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoName);
+      }
+    }
+  });
+
+  tests.push({
     name: "ADMIN HELP HAS GUIDE PRINT AND SETUP CLOSE STEP",
     fn: () => {
       const previousData = data;
@@ -1908,16 +1979,22 @@ function runSelfTests(){
         if(!/Now click Close and follow the red tips/.test(modal.textContent || "")){
           throw new Error("setup step 5 is missing");
         }
+        if(!document.getElementById("adminHelpGuideButton").classList.contains("primary")){
+          throw new Error("Guide button should be blue when guide mode is on");
+        }
         document.getElementById("adminHelpGuideButton").click();
+        const prompt = document.getElementById("referenceModal");
+        if(!prompt || !/Do you want to quit the guided quick start\?/.test(prompt.textContent || "")){
+          throw new Error("Guide button should ask before quitting guide mode");
+        }
+        document.getElementById("quitGuideNoButton").click();
+        if(!adminGuideMode) throw new Error("No should keep guide mode on");
+        document.getElementById("adminHelpGuideButton").click();
+        document.getElementById("quitGuideYesButton").click();
         if(adminGuideMode) throw new Error("Guide button should turn guide mode off");
         if(localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY) !== "1"){
           throw new Error("turning guide mode off should be persisted");
         }
-        const setupSection = modal.querySelector(".admin-help-setup");
-        if(setupSection && !setupSection.classList.contains("hidden")){
-          throw new Error("setup section should be hidden when guide mode is off");
-        }
-        closeReferenceModal();
         showAdminHelp();
         const reopenedSetupSection = document.querySelector("#referenceModal .admin-help-setup");
         if(adminGuideMode || (reopenedSetupSection && !reopenedSetupSection.classList.contains("hidden"))){
@@ -3074,6 +3151,12 @@ function setAdminVisibility(visible){
     if(view === "admin") return;
   }
   isAdminVisible = nextVisible;
+  if(isAdminVisible && isNewAdminSetupState() && !adminGuideDismissed){
+    adminGuideMode = true;
+    if(adminGuideStep !== "resources" && adminGuideStep !== "newResource" && adminGuideStep !== "resourceFields"){
+      adminGuideStep = "adminHelp";
+    }
+  }
   tabAdmin.style.display = isAdminVisible ? "" : "none";
   if(!isAdminVisible){
     const adminSection = document.getElementById("adminView");
@@ -3225,6 +3308,47 @@ function toggleAdminGuide(){
   if(view === "admin") safeRenderAdmin();
 }
 
+function requestToggleAdminGuide(source = "toolbar"){
+  if(!adminGuideMode){
+    startAdminGuide("adminHelp");
+    if(view === "admin") safeRenderAdmin();
+    return;
+  }
+  showQuitAdminGuidePrompt(source);
+}
+
+function showQuitAdminGuidePrompt(source = "toolbar"){
+  const modal = getReferenceModal();
+  modal.innerHTML = `
+    <div class="reference-modal-panel" role="dialog" aria-modal="true" aria-labelledby="quitGuideTitle">
+      <div class="reference-modal-header">
+        <div id="quitGuideTitle" class="reference-modal-title">Do you want to quit the guided quick start?</div>
+        <div class="reference-modal-actions">
+          <button class="button danger" type="button" id="quitGuideYesButton">Yes</button>
+          <button class="button" type="button" id="quitGuideNoButton">No</button>
+        </div>
+      </div>
+    </div>
+  `;
+  const yesBtn = document.getElementById("quitGuideYesButton");
+  const noBtn = document.getElementById("quitGuideNoButton");
+  if(yesBtn){
+    yesBtn.addEventListener("click", () => {
+      stopAdminGuide();
+      closeReferenceModal();
+      if(view === "admin") safeRenderAdmin("quit guide");
+    });
+  }
+  if(noBtn){
+    noBtn.addEventListener("click", () => {
+      closeReferenceModal();
+      if(source === "adminHelp") showAdminHelp();
+    });
+  }
+  modal.classList.remove("hidden");
+  if(noBtn) noBtn.focus();
+}
+
 function getAdminGuideTipText(){
   if(!adminGuideMode) return "";
   if(adminGuideStep === "adminHelp") return "";
@@ -3330,7 +3454,10 @@ function syncAdminHelpGuideVisibility(){
   const setupSection = document.querySelector("#referenceModal .admin-help-setup");
   if(setupSection) setupSection.classList.toggle("hidden", !adminGuideMode);
   const guideBtn = document.getElementById("adminHelpGuideButton");
-  if(guideBtn) guideBtn.setAttribute("aria-pressed", adminGuideMode ? "true" : "false");
+  if(guideBtn){
+    guideBtn.setAttribute("aria-pressed", adminGuideMode ? "true" : "false");
+    guideBtn.classList.toggle("primary", adminGuideMode);
+  }
 }
 
 function toggleUpdateInfoView(){
@@ -3488,7 +3615,7 @@ function showAdminHelp(){
       <div class="reference-modal-header">
         <div id="adminHelpTitle" class="reference-modal-title">Admin Help</div>
         <div class="reference-modal-actions">
-          <button class="button" type="button" id="adminHelpGuideButton" aria-pressed="${adminGuideMode ? "true" : "false"}">Guide</button>
+          <button class="button ${adminGuideMode ? "primary" : ""}" type="button" id="adminHelpGuideButton" aria-pressed="${adminGuideMode ? "true" : "false"}">Guide</button>
           <button class="button" type="button" id="adminHelpPrintButton">Print</button>
           <button class="button reference-modal-close" type="button">Close</button>
         </div>
@@ -3640,7 +3767,7 @@ function showAdminHelp(){
   if(closeBtn) closeBtn.addEventListener("click", closeReferenceModal);
   if(setupBtn) setupBtn.addEventListener("click", showAdminSetup);
   if(guideBtn) guideBtn.addEventListener("click", () => {
-    toggleAdminGuide();
+    requestToggleAdminGuide("adminHelp");
     syncAdminHelpGuideVisibility();
   });
   if(printBtn) printBtn.addEventListener("click", printAdminHelp);
@@ -4483,7 +4610,7 @@ function renderAdmin(){
         </div>
       </div>
       <div class="admin-toolbar-reference-actions">
-        <button class="button" onclick="toggleAdminGuide()" aria-pressed="${adminGuideMode ? "true" : "false"}">Guide</button>
+        <button class="button ${adminGuideMode ? "primary" : ""}" onclick="requestToggleAdminGuide()" aria-pressed="${adminGuideMode ? "true" : "false"}">Guide</button>
         <button class="button admin-toolbar-help" onclick="showAdminHelp()">Help</button>
       </div>
     </div>
