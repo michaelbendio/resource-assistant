@@ -1171,7 +1171,7 @@ const TIP_TEXT = {
   newAdminMode: "Click Ctrl+Alt+A to hide the Admin button when you're done. Now click the gray Help button",
   adminGuideResources: "Click the gray Resources button to enter the Resource editor.",
   adminGuideNewResource: "Click the gray New button to create a resource.",
-  adminGuideResourceFields: "Fill in Name, Phone, Address and so on, then click Next",
+  adminGuideResourceFields: "Fill in Name, Phone, Address, Website, Hours, and a short Description. Users see the Description first; fuller information comes later. Click Next.",
   adminGuideTags: "Add search tags for this resource, then click Next",
   adminGuideCategories: "Choose the categories where this resource should appear, then click Next",
   adminGuideInformation: "Add the public information users should see, then click Next. If this resource is a list, such as a list of food pantries, you can skip this section.",
@@ -2181,6 +2181,9 @@ function runSelfTests(){
           throw new Error("guide should advance to New resource tip");
         }
         newResource();
+        const guidedResource = data.resources.find(resource => resource.id === selectedResourceId);
+        if(guidedResource) guidedResource.name = "Food Aid";
+        safeRenderAdmin();
         tip = document.querySelector("#adminView .admin-guide-tip");
         if(!tip || !tip.textContent.includes(TIP_TEXT.adminGuideResourceFields)){
           throw new Error("guide should advance to resource fields tip");
@@ -2190,6 +2193,9 @@ function runSelfTests(){
         }
         if(document.querySelector("#adminView .admin-guide-tip button").textContent !== "Next"){
           throw new Error("first resource guide section should only show Next");
+        }
+        if(!document.getElementById("res_cancel_btn").disabled || !document.getElementById("res_done_btn").disabled){
+          throw new Error("Cancel and Done should be disabled until the final guided resource step");
         }
         if(document.querySelectorAll("#resEditor .resource-editor-guide-section:not(.admin-guide-current-section)").length < 1){
           throw new Error("resource editor should be divided into guide sections");
@@ -2224,6 +2230,9 @@ function runSelfTests(){
         const finalButtons = Array.from(document.querySelectorAll("#adminView .admin-guide-tip button")).map(button => button.textContent);
         if(JSON.stringify(finalButtons) !== JSON.stringify(["Back"])){
           throw new Error(`final resource guide section should show Back only, got ${JSON.stringify(finalButtons)}`);
+        }
+        if(document.getElementById("res_cancel_btn").disabled || document.getElementById("res_done_btn").disabled){
+          throw new Error("Cancel and Done should be enabled on the final guided resource step");
         }
       }finally{
         data = previousData;
@@ -3693,6 +3702,13 @@ function isAdminGuideResourceFirstSection(){
 function isAdminGuideResourceLastSection(){
   const sections = getAdminGuideResourceSections();
   return adminGuideResourceSection === sections[sections.length - 1];
+}
+
+function shouldDisableResourceEditorExit(){
+  return adminGuideMode
+    && adminGuideStep === "resourceFields"
+    && adminResourceEditMode
+    && adminGuideResourceSection !== "update";
 }
 
 function renderAdminGuideTip(container){
@@ -6756,8 +6772,8 @@ function renderAdminResources(container){
         <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
           <h3 style="margin:0;">Edit Resource</h3>
           <div style="display:flex; gap:8px; align-items:center;">
-            <button class="button" type="button" onclick="cancelResourceEditor()">Cancel</button>
-            <button id="res_done_btn" class="button primary" onclick="closeResourceEditor()">Done</button>
+            <button id="res_cancel_btn" class="button" type="button" onclick="cancelResourceEditor()" ${shouldDisableResourceEditorExit() ? "disabled" : ""}>Cancel</button>
+            <button id="res_done_btn" class="button primary" onclick="closeResourceEditor()" ${shouldDisableResourceEditorExit() ? "disabled" : ""}>Done</button>
           </div>
         </div>
         <div id="resEditor" style="margin-top:12px;"></div>
@@ -7190,7 +7206,7 @@ function editResource(idx){
     const verifiedValidation = validateVerifiedOnInput(draft.verifiedOn);
     showResourceNameWarning(nameValidation.message);
     showResourceVerifiedWarning(verifiedValidation.message);
-    if(doneBtn) doneBtn.disabled = !(nameValidation.valid && verifiedValidation.valid);
+    if(doneBtn) doneBtn.disabled = shouldDisableResourceEditorExit() || !(nameValidation.valid && verifiedValidation.valid);
   }
 
   if(nameEl){
