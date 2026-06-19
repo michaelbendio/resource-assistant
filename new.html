@@ -523,7 +523,6 @@ textarea.services-editor { min-height:320px; resize:vertical; }
     <span id="tabSearch" role="button" aria-label="Search" title="Search">&#128269;</span>
     <span id="tabCategories">Categories</span>
     <span id="tabPrintSelection" role="button" aria-label="Print Preview">🖨️ (0)</span>
-    <button id="freshStartButton" class="button secondary" type="button">Fresh Start</button>
     <button id="helpButton" class="help-button" type="button">Help</button>
     <span id="tabAdmin">Admin</span>
   </div>
@@ -1461,6 +1460,12 @@ function runSelfTests(){
   tests.push({
     name: "FRESH START CLEARS SAVED APP STATE",
     fn: () => {
+      if(document.getElementById("freshStartButton")){
+        throw new Error("Fresh Start should be a keyboard shortcut, not a button");
+      }
+      if(typeof requestFreshStart !== "function"){
+        throw new Error("Fresh Start shortcut handler is missing");
+      }
       const previousValues = FRESH_START_STORAGE_KEYS.map(key => [key, localStorage.getItem(key)]);
       const previousSessionValue = sessionStorage.getItem("newSelfTestSessionValue");
       try{
@@ -3455,19 +3460,17 @@ function setAdminVisibility(visible){
 const tabPrintSelection = document.getElementById("tabPrintSelection");
 const helpButton = document.getElementById("helpButton");
 const tabSearch = document.getElementById("tabSearch");
-const freshStartButton = document.getElementById("freshStartButton");
 tabCategories.onclick = ()=>{ setView("categories"); };
 if(tabPrintSelection) tabPrintSelection.onclick = ()=>{ startPrintSelectionPreview(); };
 if(helpButton) helpButton.onclick = ()=>{ showUserHelp(); };
-if(freshStartButton){
-  freshStartButton.onclick = () => {
-    if(!confirm("Clear saved app data and reload from a fresh start?")) return;
-    const nextParams = new URLSearchParams(location.search);
-    nextParams.set("fresh", Date.now().toString());
-    location.replace(buildUrlWithParams(nextParams));
-  };
-}
 tabAdmin.onclick = ()=>{ setView("admin"); };
+
+function requestFreshStart(){
+  if(!confirm("Clear saved app data and reload from a fresh start?")) return;
+  const nextParams = new URLSearchParams(location.search);
+  nextParams.set("fresh", Date.now().toString());
+  location.replace(buildUrlWithParams(nextParams));
+}
 
 function syncSearchPanel(){
   const panel = document.getElementById("searchPanel");
@@ -7531,24 +7534,15 @@ window.addEventListener("keydown", (e) => {
   safeRender();
 }, true);
 
-/* ---------- Hidden Print Selection Reset Hotkey ---------- */
-/*
-  Ctrl + Alt + Shift + F  => clear print selection and reload.
-  No confirmation; low stakes.
-*/
 window.addEventListener("keydown", (e) => {
-  const isFavResetCombo =
-    e.ctrlKey && e.altKey && e.shiftKey &&
-    (e.key === "F" || e.key === "f");
-
-  if (!isFavResetCombo) return;
+  const isFreshStartShortcut =
+    e.ctrlKey && e.altKey && !e.shiftKey &&
+    (e.code === "KeyF" || e.key === "F" || e.key === "f");
+  if(!isFreshStartShortcut) return;
 
   e.preventDefault();
   e.stopPropagation();
-
-  localStorage.removeItem(PRINT_SELECTION_STORAGE_KEY);
-  localStorage.removeItem(LEGACY_FAVORITES_STORAGE_KEY);
-  location.reload();
+  requestFreshStart();
 }, true);
 
 /* ---------- Start ---------- */
