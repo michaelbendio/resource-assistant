@@ -523,7 +523,7 @@ textarea.services-editor { min-height:320px; resize:vertical; }
     <span id="tabSearch" role="button" aria-label="Search" title="Search">&#128269;</span>
     <span id="tabCategories">Categories</span>
     <span id="tabPrintSelection" role="button" aria-label="Print Preview">🖨️ (0)</span>
-    <button id="freshStartButton" class="button secondary hidden" type="button">Fresh Start</button>
+    <button id="freshStartButton" class="button secondary" type="button">Fresh Start</button>
     <button id="helpButton" class="help-button" type="button">Help</button>
     <span id="tabAdmin">Admin</span>
   </div>
@@ -3450,7 +3450,6 @@ tabCategories.onclick = ()=>{ setView("categories"); };
 if(tabPrintSelection) tabPrintSelection.onclick = ()=>{ startPrintSelectionPreview(); };
 if(helpButton) helpButton.onclick = ()=>{ showUserHelp(); };
 if(freshStartButton){
-  freshStartButton.classList.toggle("hidden", !DEBUG);
   freshStartButton.onclick = () => {
     if(!confirm("Clear saved app data and reload from a fresh start?")) return;
     const nextParams = new URLSearchParams(location.search);
