@@ -85,6 +85,13 @@ textarea {
 .button.secondary { background:#f7f7f7; color:#333; border:1px solid #bbb; }
 .button.danger { background:#aa0000; color:white; }
 .topbar .help-button { color:white; border:0; outline:0; border-radius:4px; background:transparent; padding:2px 8px; font:inherit; }
+.topbar .tabs span.admin-flash {
+  background:#aa0000;
+  color:white;
+  border-radius:4px;
+  padding:2px 8px;
+  opacity:1;
+}
 .red-tip { margin:0 0 12px; padding:10px 12px; border:2px solid #aa0000; border-radius:6px; background:#fff5f5; color:#aa0000; font-size:11px; font-weight:bold; }
 .category-print-banner { margin:0 0 12px; padding:9px 12px; border:1px solid #c8d6e6; border-left:4px solid #003366; border-radius:6px; background:#f7fbff; color:#1f2d3d; font-size:16px; line-height:1.35; }
 .print-empty-instruction { color:#aa0000; }
@@ -1191,15 +1198,16 @@ const PRINT_SELECTION_STORAGE_KEY = "newPrintSelection";
 const LEGACY_FAVORITES_STORAGE_KEY = "newFavorites";
 const TIP_TEXT = {
   user: "Click on a category to see its resources. Click a resource to see details. Click ⬜ to include it in the printed handout.",
-  newAdminWelcome: "Welcome to your new TSO Resources app. Click Ctrl+Alt+A to add an Admin button to the top blue bar. Then click it.",
+  newAdminWelcome: "Welcome to your new TSO Resources app. Press Ctrl+Alt+A to add an Admin button to the top blue bar. Then click it.",
   newAdminMode: "Click Ctrl+Alt+A to hide the Admin button when you're done. Now click the gray Help button",
   adminGuideResources: "Click the gray Resources button to enter the Resource editor.",
   adminGuideNewResource: "Click the gray New button to create a resource.",
   adminGuideResourceFields: "Fill in Name, Phone, Address, Website, Hours, and a short Description. Users see the Description first; fuller information comes later. If this resource is a list, such as a list of food pantries, enter a description but you can skip the rest of this section. Click Next.",
-  adminGuideTags: "Add search tags for this resource, then click Next",
+  adminGuideTags: "Optionally add tags for this resource, then click Next. Think of tags as subcategories.",
   adminGuideCategories: "Choose the categories where this resource should appear, then click Next",
-  adminGuideInformation: "Add the public information users should see, then click Next.",
+  adminGuideInformation: "Add the public information users should see. Use the formatting guide to improve readability, and use Preview to check it. Then click Next.",
   adminGuideUpdate: "Describe this update, then click Done",
+  adminGuideSaveResource: "Now click Done to save the resource",
   adminGuideSetupName: "Click the gray Change TSO Name button.",
   adminGuideVerifyName: "Check the blue title bar. It should say your TSO name followed by TSO Resources. If it looks right, click Next.",
   adminGuideRenameFile: "Click Quit and rename new.html to [new TSO name].html. Then open [new TSO name].html.",
@@ -2065,6 +2073,11 @@ function runSelfTests(){
         if(!guideButton || !guideButton.classList.contains("primary")){
           throw new Error("toolbar Guide button should be blue when guide mode is on");
         }
+        flashAdminButton();
+        if(!tabAdmin.classList.contains("admin-flash")){
+          throw new Error("Admin button should flash when it is revealed");
+        }
+        tabAdmin.classList.remove("admin-flash");
         adminGuideMode = false;
         safeRenderAdmin();
         toolbarButtons = Array.from(document.querySelectorAll("#adminView .admin-toolbar-reference-actions button"));
@@ -2310,12 +2323,38 @@ function runSelfTests(){
           throw new Error("information guide tip should not explain list resources");
         }
         advanceAdminGuideResourceSection();
-        const finalButtons = Array.from(document.querySelectorAll("#adminView .admin-guide-tip button")).map(button => button.textContent);
-        if(JSON.stringify(finalButtons) !== JSON.stringify(["Back"])){
-          throw new Error(`final resource guide section should show Back only, got ${JSON.stringify(finalButtons)}`);
+        const updateButtons = Array.from(document.querySelectorAll("#adminView .admin-guide-tip button")).map(button => button.textContent);
+        if(JSON.stringify(updateButtons) !== JSON.stringify(["Back"])){
+          throw new Error(`update resource guide section should show Back only, got ${JSON.stringify(updateButtons)}`);
         }
         if(document.getElementById("res_cancel_btn").disabled || document.getElementById("res_done_btn").disabled){
-          throw new Error("Cancel and Done should be enabled on the final guided resource step");
+          throw new Error("Cancel and Done should be enabled on the update guided resource step");
+        }
+        const categoryCheckbox = document.querySelector('.resCat[value="food"]');
+        if(categoryCheckbox) categoryCheckbox.checked = true;
+        const updateDescription = document.getElementById("res_update_description");
+        updateDescription.value = "Added Food Aid";
+        updateDescription.dispatchEvent(new Event("input", { bubbles:true }));
+        closeResourceEditor();
+        tip = document.querySelector("#adminView .admin-guide-tip");
+        if(!adminGuideMode || adminGuideResourceSection !== "save"){
+          throw new Error("first Done on update step should advance to final save tip");
+        }
+        if(!tip || !tip.textContent.includes(TIP_TEXT.adminGuideSaveResource)){
+          throw new Error("guide should show final Done-to-save tip");
+        }
+        if(!adminResourceEditMode){
+          throw new Error("resource editor should remain open for final save tip");
+        }
+        if(document.getElementById("res_done_btn").disabled){
+          throw new Error("Done should be enabled on the final save tip");
+        }
+        closeResourceEditor();
+        if(adminGuideMode || adminResourceEditMode){
+          throw new Error("second Done should save resource and disable guide mode");
+        }
+        if(localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY) !== "1"){
+          throw new Error("completed guided quick start should persist guide mode off");
         }
       }finally{
         data = previousData;
@@ -3466,6 +3505,16 @@ function setAdminVisibility(visible){
   }
 }
 
+function flashAdminButton(){
+  if(!tabAdmin) return;
+  tabAdmin.classList.remove("admin-flash");
+  void tabAdmin.offsetWidth;
+  tabAdmin.classList.add("admin-flash");
+  setTimeout(() => {
+    tabAdmin.classList.remove("admin-flash");
+  }, 900);
+}
+
 const tabPrintSelection = document.getElementById("tabPrintSelection");
 const helpButton = document.getElementById("helpButton");
 const tabSearch = document.getElementById("tabSearch");
@@ -3764,6 +3813,7 @@ function getAdminGuideTipText(){
     if(adminGuideResourceSection === "tags") return TIP_TEXT.adminGuideTags;
     if(adminGuideResourceSection === "categories") return TIP_TEXT.adminGuideCategories;
     if(adminGuideResourceSection === "information") return TIP_TEXT.adminGuideInformation;
+    if(adminGuideResourceSection === "save") return TIP_TEXT.adminGuideSaveResource;
     if(adminGuideResourceSection === "update") return TIP_TEXT.adminGuideUpdate;
     return TIP_TEXT.adminGuideResourceFields;
   }
@@ -3830,7 +3880,7 @@ function shouldForceEnableResourceEditorExit(){
   return adminGuideMode
     && adminGuideStep === "resourceFields"
     && adminResourceEditMode
-    && adminGuideResourceSection === "update";
+    && (adminGuideResourceSection === "update" || adminGuideResourceSection === "save");
 }
 
 function renderAdminGuideTip(container){
@@ -3861,7 +3911,7 @@ function renderAdminGuideTip(container){
     quitBtn.onclick = quitForRename;
     actions.appendChild(quitBtn);
     tip.appendChild(actions);
-  }else if(adminResourceEditMode && (!isAdminGuideResourceFirstSection() || !isAdminGuideResourceLastSection())){
+  }else if(adminResourceEditMode && adminGuideResourceSection !== "save" && (!isAdminGuideResourceFirstSection() || !isAdminGuideResourceLastSection())){
     const actions = document.createElement("div");
     actions.className = "admin-guide-tip-actions";
     if(!isAdminGuideResourceFirstSection()){
@@ -7081,8 +7131,19 @@ function focusAndSelectResourceName(){
 }
 
 function closeResourceEditor(){
+  if(adminGuideMode && adminGuideStep === "resourceFields" && adminResourceEditMode && adminGuideResourceSection === "update"){
+    if(!saveGuidedResourceEditorProgress()) return;
+    adminGuideResourceSection = "save";
+    safeRenderAdmin();
+    return;
+  }
+  const shouldCompleteGuidedQuickStart = adminGuideMode
+    && adminGuideStep === "resourceFields"
+    && adminResourceEditMode
+    && adminGuideResourceSection === "save";
   if(!commitPendingEditsIfChanged()) return;
   adminResourceEditMode = false;
+  if(shouldCompleteGuidedQuickStart) stopAdminGuide();
   safeRenderAdmin();
 }
 
@@ -7161,7 +7222,7 @@ function editResource(idx){
       </label><br>
     </div>
 
-    <div class="resource-editor-guide-section ${adminGuideResourceSection === "update" ? "admin-guide-current-section" : ""}" data-guide-section="update">
+    <div class="resource-editor-guide-section ${(adminGuideResourceSection === "update" || adminGuideResourceSection === "save") ? "admin-guide-current-section" : ""}" data-guide-section="update">
       <label style="display:block; margin-top:8px;">Describe this update (optional)<br>
         <textarea id="res_update_description" class="big" style="min-height:60px;"></textarea>
       </label><br>
@@ -7546,8 +7607,10 @@ window.addEventListener("keydown", (e) => {
 
   e.preventDefault();
   e.stopPropagation();
-  setAdminVisibility(!isAdminVisible);
+  const shouldShowAdmin = !isAdminVisible;
+  setAdminVisibility(shouldShowAdmin);
   safeRender();
+  if(shouldShowAdmin) flashAdminButton();
 }, true);
 
 window.addEventListener("keydown", (e) => {
