@@ -197,6 +197,52 @@ textarea.services-editor { min-height:320px; resize:vertical; }
   align-items:center;
   flex:0 0 auto;
 }
+.admin-mode-bar {
+  position:sticky;
+  top:49px;
+  z-index:19;
+  background:#fff;
+  border-bottom:1px solid #ddd;
+  display:flex;
+  gap:8px;
+  align-items:center;
+  overflow-x:auto;
+  white-space:nowrap;
+  padding:4px 0;
+  margin-bottom:10px;
+}
+.admin-nav-tabs {
+  display:flex;
+  gap:8px;
+  align-items:center;
+  flex:0 0 auto;
+}
+.admin-mode-bar .button { flex:0 0 auto; }
+.admin-sticky-bar {
+  position:sticky;
+  top:0;
+  z-index:20;
+  background:#fff;
+  border-bottom:1px solid #ddd;
+  padding:8px 0;
+  margin-bottom:12px;
+  display:flex;
+  gap:12px;
+  align-items:center;
+  justify-content:space-between;
+  overflow-x:auto;
+  white-space:nowrap;
+}
+.admin-sticky-package-actions,
+.admin-sticky-reference-actions,
+.admin-sticky-editor-actions {
+  display:flex;
+  gap:8px;
+  align-items:center;
+  flex-wrap:nowrap;
+}
+.admin-sticky-reference-actions { margin-left:auto; justify-content:flex-end; }
+.admin-sticky-editor-actions { margin-left:auto; justify-content:flex-end; }
 .admin-action-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
 .admin-option-row { margin:0; }
 .admin-option-row + .admin-action-row { margin-top:12px; }
@@ -254,9 +300,18 @@ textarea.services-editor { min-height:320px; resize:vertical; }
   color:#7c2d12;
   font-weight:bold;
 }
-.category-order-input { appearance:textfield; -moz-appearance:textfield; }
-.category-order-input::-webkit-outer-spin-button,
-.category-order-input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+.category-admin-panel { display:block; }
+.category-admin-layout { display:grid; grid-template-columns:minmax(260px, 360px) minmax(0, 1fr); gap:20px; align-items:start; }
+.category-editor-layout { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:20px; align-items:start; }
+.category-filter-row { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+.category-filter-row input[type="text"] { flex:1; min-width:0; }
+.resource-category-option { margin:0 0 8px; }
+.resource-category-filter-list { margin:4px 0 8px 28px; }
+.resource-category-filter-list label { display:block; margin:2px 0; }
+.editor-sticky-bar { position:sticky; bottom:0; background:#fff; border-top:1px solid #ddd; padding:10px 0 0; margin-top:12px; display:flex; gap:8px; justify-content:flex-end; z-index:5; }
+.for-group-row { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+.for-group-row.selected { background:#eef4ff; outline:2px solid #99b8e8; outline-offset:2px; }
+.for-group-row input[type="text"] { flex:1; min-width:0; }
 
 .reference-modal {
   position:fixed;
@@ -564,28 +619,38 @@ textarea.services-editor { min-height:320px; resize:vertical; }
 <script id="seed-data" type="application/json">
 {
   "categories": [
-    { "id": "addiction", "label": "Addiction", "active": true, "displayOrder": 10 },
-    { "id": "children-pregnancy", "label": "Children/Pregnancy", "active": true, "displayOrder": 20 },
-    { "id": "clothing-household", "label": "Clothing/Household", "active": true, "displayOrder": 30 },
-    { "id": "disability", "label": "Disability", "active": true, "displayOrder": 40 },
-    { "id": "domestic-violence", "label": "Domestic Violence", "active": true, "displayOrder": 50 },
-    { "id": "education", "label": "Education", "active": true, "displayOrder": 60 },
-    { "id": "employment", "label": "Employment", "active": true, "displayOrder": 70 },
-    { "id": "financial-assistance", "label": "Financial Assistance", "active": true, "displayOrder": 80 },
-    { "id": "reentry-support", "label": "Reentry Support", "active": true, "displayOrder": 90 },
-    { "id": "food", "label": "Food", "active": true, "displayOrder": 100 },
-    { "id": "medical-dental-vision", "label": "Medical, Dental, Vision", "active": true, "displayOrder": 110 },
-    { "id": "homeless-services", "label": "Homeless Services", "active": true, "displayOrder": 120 },
-    { "id": "housing", "label": "Housing", "active": true, "displayOrder": 130 },
-    { "id": "id-recovery", "label": "ID Recovery", "active": true, "displayOrder": 140 },
-    { "id": "immigration", "label": "Immigration", "active": true, "displayOrder": 150 },
-    { "id": "legal", "label": "Legal", "active": true, "displayOrder": 160 },
-    { "id": "mental-health", "label": "Mental Health", "active": true, "displayOrder": 170 },
-    { "id": "miscellaneous", "label": "Miscellaneous", "active": true, "displayOrder": 180 },
-    { "id": "seniors", "label": "Seniors", "active": true, "displayOrder": 190 },
-    { "id": "transportation", "label": "Transportation", "active": true, "displayOrder": 200 },
-    { "id": "utilities-phone-internet", "label": "Utilities, Phone, Internet", "active": true, "displayOrder": 210 },
-    { "id": "veterans", "label": "Veterans", "active": true, "displayOrder": 220 }
+    { "id": "addiction", "label": "Addiction", "active": true, "filters": ["Treatment", "Recovery Support"] },
+    { "id": "children-pregnancy", "label": "Children/Pregnancy", "active": true, "filters": ["Child Care", "Pregnancy", "WIC"] },
+    { "id": "clothing-household", "label": "Clothing/Household", "active": true, "filters": ["Clothing", "Household Goods", "Hygiene Products", "Laundry"] },
+    { "id": "disability", "label": "Disability", "active": true },
+    { "id": "domestic-violence", "label": "Domestic Violence", "active": true },
+    { "id": "education", "label": "Education", "active": true, "filters": ["GED", "High School Diploma", "Scholarships", "Skilled Trade Education"] },
+    { "id": "employment", "label": "Employment", "active": true, "filters": ["Apprenticeship", "Career Training", "Permanent Employment", "Temporary Employment"] },
+    { "id": "financial-assistance", "label": "Financial Assistance", "active": true, "filters": ["Rent Assistance", "Utilities Assistance"] },
+    { "id": "reentry-support", "label": "Reentry Support", "active": true },
+    { "id": "food", "label": "Food", "active": true, "filters": ["Food Pantries", "Meals", "SNAP", "WIC"] },
+    { "id": "medical-dental-vision", "label": "Medical, Dental, Vision", "active": true, "filters": ["Dental", "Medical Equipment", "Medicaid", "Physical Therapy", "Vision"] },
+    { "id": "homeless-services", "label": "Homeless Services", "active": true, "filters": ["Shelters", "Showers", "Laundry", "Meals"] },
+    { "id": "housing", "label": "Housing", "active": true, "filters": ["Assistance", "Government Subsidized", "Permanent", "Repairs", "Shared Rooms", "Temporary", "Transitional"] },
+    { "id": "id-recovery", "label": "ID Recovery", "active": true },
+    { "id": "immigration", "label": "Immigration", "active": true },
+    { "id": "legal", "label": "Legal", "active": true, "filters": ["Civil Legal Help", "Immigration Legal Help"] },
+    { "id": "mental-health", "label": "Mental Health", "active": true, "filters": ["Addiction", "Counseling", "Crisis Support"] },
+    { "id": "miscellaneous", "label": "Miscellaneous", "active": true },
+    { "id": "seniors", "label": "Seniors", "active": true },
+    { "id": "transportation", "label": "Transportation", "active": true },
+    { "id": "utilities-phone-internet", "label": "Utilities, Phone, Internet", "active": true },
+    { "id": "veterans", "label": "Veterans", "active": true }
+  ],
+  "forGroups": [
+    "Veterans",
+    "Ex-offenders",
+    "Women",
+    "Children",
+    "Seniors",
+    "Immigrants",
+    "People with Disabilities",
+    "Medically Vulnerable People"
   ],
   "resources": []
 }
@@ -913,28 +978,53 @@ function toggleResourceTag(tags, tag){
 
 function normalizeDataTagsShape(nextData){
   if(!nextData || typeof nextData !== "object") return;
-  if(!Array.isArray(nextData.tags)) nextData.tags = [];
-  nextData.tags = [];
-
+  if("tags" in nextData) delete nextData.tags;
   if(!Array.isArray(nextData.resources)) return;
   nextData.resources.forEach(r => {
-    r.tags = normalizeResourceTags(r.tags);
+    if(r && typeof r === "object" && "tags" in r) delete r.tags;
+  });
+}
+
+function normalizeCategoryFilters(filters){
+  return normalizeResourceTags(filters);
+}
+
+function normalizeDataCategoryFilterShape(nextData){
+  if(!nextData || typeof nextData !== "object") return;
+  if(Array.isArray(nextData.categories)){
+    nextData.categories.forEach(category => {
+      if(!category || typeof category !== "object") return;
+      category.filters = normalizeCategoryFilters(category.filters);
+    });
+  }
+  if(!Array.isArray(nextData.resources)) return;
+  nextData.resources.forEach(resource => {
+    const source = resource && typeof resource.categoryFilters === "object" && !Array.isArray(resource.categoryFilters)
+      ? resource.categoryFilters
+      : {};
+    const normalized = {};
+    Object.keys(source).forEach(categoryId => {
+      const filters = normalizeCategoryFilters(source[categoryId]);
+      if(filters.length) normalized[categoryId] = filters;
+    });
+    resource.categoryFilters = normalized;
   });
 }
 
 function getAllTags(excludeResourceId = ""){
-  const tags = [];
-  const seen = new Set();
-  (Array.isArray(data.resources) ? data.resources : []).forEach(resource => {
-    if(excludeResourceId && String(resource && resource.id || "") === String(excludeResourceId)) return;
-    normalizeResourceTags(resource && resource.tags).forEach(tag => {
-      const key = tag.toLowerCase();
-      if(seen.has(key)) return;
-      seen.add(key);
-      tags.push(tag);
-    });
+  return normalizeResourceTags(data && data.forGroups)
+    .sort((a,b)=>a.localeCompare(b, undefined, { sensitivity:"base" }));
+}
+
+function normalizeDataForGroupsShape(nextData){
+  if(!nextData || typeof nextData !== "object") return;
+  nextData.forGroups = normalizeResourceTags(nextData.forGroups)
+    .sort((a,b)=>a.localeCompare(b, undefined, { sensitivity:"base" }));
+  if(!Array.isArray(nextData.resources)) return;
+  nextData.resources.forEach(resource => {
+    if(!resource || typeof resource !== "object") return;
+    resource.forGroups = normalizeResourceTags(resource.forGroups);
   });
-  return tags.sort((a,b)=>a.localeCompare(b, undefined, { sensitivity:"base" }));
 }
 
 const TAG_CATEGORY_HINTS = [
@@ -990,17 +1080,11 @@ function confirmCategoryAssignmentHint(draft){
   return confirm(`This resource has tags suggesting ${categoryList}, but ${categoryPhrase} not selected. Continue?`);
 }
 
-const INFORMATION_SECTIONS = [
-  { key:"offered", label:"What is offered" },
-  { key:"eligibility", label:"Eligibility" },
-  { key:"expect", label:"What to expect" },
-  { key:"connect", label:"How to connect" }
-];
 const INFORMATION_ADDITIONAL_LABEL = "Additional text:";
 
-// Resource "Information" is stored as plain text with simple markdown-like
-// section headings. The admin editor splits that text into fields, then composes
-// it back into the same storage format before saving.
+// Resource "Information" is stored as plain text. Older imported text may
+// include an "Additional text:" heading; the editor strips that heading when it
+// opens so the saved text remains plain.
 function trimOuterBlankLines(lines){
   const next = lines.slice();
   while(next.length && next[0].trim() === "") next.shift();
@@ -1009,64 +1093,17 @@ function trimOuterBlankLines(lines){
 }
 
 function emptyInformationDraft(){
-  return INFORMATION_SECTIONS.reduce((draft, section) => {
-    draft[section.key] = "";
-    return draft;
-  }, { additional:"" });
+  return { additional:"" };
 }
 
 function parseInformationText(text){
-  const normalized = String(text || "").replace(/\r\n?/g, "\n");
-  const draft = emptyInformationDraft();
-  const buckets = INFORMATION_SECTIONS.reduce((acc, section) => {
-    acc[section.key] = [];
-    return acc;
-  }, { additional:[] });
-  let currentKey = "additional";
-
-  normalized.split("\n").forEach(line => {
-    const trimmed = line.trim();
-    if(trimmed === INFORMATION_ADDITIONAL_LABEL){
-      currentKey = "additional";
-      return;
-    }
-
-    const section = INFORMATION_SECTIONS.find(item => {
-      const escapedLabel = item.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      return new RegExp(`^\\*\\*${escapedLabel}:\\*\\*(?:\\s*(.*))?$`).test(trimmed);
-    });
-
-    if(section){
-      currentKey = section.key;
-      const escapedLabel = section.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const match = trimmed.match(new RegExp(`^\\*\\*${escapedLabel}:\\*\\*(?:\\s*(.*))?$`));
-      if(match && match[1]) buckets[currentKey].push(match[1]);
-      return;
-    }
-
-    buckets[currentKey].push(line);
-  });
-
-  Object.keys(draft).forEach(key => {
-    draft[key] = trimOuterBlankLines(buckets[key] || []).join("\n");
-  });
-  return draft;
+  const lines = String(text || "").replace(/\r\n?/g, "\n").split("\n");
+  const stripped = lines.filter(line => line.trim() !== INFORMATION_ADDITIONAL_LABEL);
+  return { additional:trimOuterBlankLines(stripped).join("\n") };
 }
 
 function composeInformationText(draft){
-  const parts = [];
-  INFORMATION_SECTIONS.forEach(section => {
-    const body = String(draft && draft[section.key] || "").trim();
-    if(!body) return;
-    parts.push(`**${section.label}:**`);
-    parts.push(body);
-  });
-  const additional = String(draft && draft.additional || "").trim();
-  if(additional){
-    parts.push(INFORMATION_ADDITIONAL_LABEL);
-    parts.push(additional);
-  }
-  return parts.join("\n");
+  return String(draft && draft.additional || "").trim();
 }
 
 function applyInformationMarkup(escapedText){
@@ -1119,27 +1156,7 @@ function renderInformationMarkupHTML(text){
 }
 
 function renderInformationHTML(text){
-  const draft = parseInformationText(text);
-  const out = [];
-
-  INFORMATION_SECTIONS.forEach(section => {
-    const body = String(draft[section.key] || "").trim();
-    if(!body) return;
-    out.push(
-      `<div class="resource-info-section">` +
-      `<strong>${escapeHTML(section.label)}:</strong>` +
-      `<div class="resource-info-body">${renderInformationMarkupHTML(body)}</div>` +
-      `</div>`
-    );
-  });
-
-  const additional = String(draft.additional || "").trim();
-  if(additional){
-    out.push(`<div class="resource-info-additional-rendered">${renderInformationMarkupHTML(additional)}</div>`);
-  }
-
-  if(out.length) return out.join("");
-  return renderInformationMarkupHTML(text);
+  return renderInformationMarkupHTML(composeInformationText(parseInformationText(text)));
 }
 
 function fitTextareaToText(textarea){
@@ -1203,7 +1220,7 @@ const TIP_TEXT = {
   adminGuideResources: "Click the gray Resources button to enter the Resource editor.",
   adminGuideNewResource: "Click the gray New button to create a resource.",
   adminGuideResourceFields: "Fill in Name, Phone, Address, Website, Hours, and a short Description. Users see the Description first; fuller information comes later. If this resource is a list, such as a list of food pantries, enter a description but you can skip the rest of this section. Click Next.",
-  adminGuideTags: "Optionally add tags for this resource, then click Next. Think of tags as subcategories.",
+  adminGuideTags: "Optionally add the groups this resource is for, then click Next.",
   adminGuideCategories: "Choose the categories where this resource should appear, then click Next",
   adminGuideInformation: "Add the public information users see when they click the description. Use the formatting guide to improve readability, and use Preview to check it. Then click Next.",
   adminGuideUpdate: "Describe this update, then click Done",
@@ -1229,6 +1246,8 @@ if(!localStorage.getItem(DATA_STORAGE_KEY) || appliedCategoryPreset){
 
 normalizeDataInformationShape(data);
 normalizeDataTagsShape(data);
+normalizeDataForGroupsShape(data);
+normalizeDataCategoryFilterShape(data);
 normalizeDataVerifiedOnShape(data);
 normalizeChanges(data);
 normalizeLastLoadedPackageInfo(data);
@@ -1242,6 +1261,7 @@ if(DEBUG) assertInvariants("startup");
 // and temporary update-review screens.
 let view = "categories";
 let currentCategory = null;
+const LISTS_CATEGORY_ID = "__lists__";
 let isSearchOpen = false;
 let searchQuery = "";
 let searchResults = null;
@@ -1253,11 +1273,10 @@ let adminResourceEditMode = false;
 let selectedResourceId = "";
 let selectedCategoryIndex = "";
 let selectedAdminTag = "";
-let adminCategoryOrderEditorOpen = false;
-let adminCategoryOrderDraft = null; // array of { idx, value } in fixed editor row order
 let editing = null;
 let editorSnapshot = "";
-let categoryTagFilters = {}; // categoryId -> [tag, ...]
+let categoryTagFilters = {}; // categoryId -> transient selected category/For filters
+let selectedForGroupIndex = 0;
 const UNDO_STORAGE_KEY = "albqUndo";
 let pendingRecentUpdates = [];
 let recentUpdateDetail = null;
@@ -1340,17 +1359,17 @@ function assertInvariants(context = "invariant check"){
     if(ids.has(id)) throw new Error(`${context}: duplicate resource id '${id}'`);
     ids.add(id);
 
-    if(!Array.isArray(resource.tags)) throw new Error(`${context}: resource '${id}' tags must be an array`);
-    const resourceTagKeys = new Set();
-    resource.tags.forEach(tag => {
-      if(typeof tag !== "string" || tag !== tag.trim() || !tag){
-        throw new Error(`${context}: resource '${id}' has invalid tag '${tag}'`);
+    if(!Array.isArray(resource.forGroups)) throw new Error(`${context}: resource '${id}' forGroups must be an array`);
+    const resourceForGroupKeys = new Set();
+    resource.forGroups.forEach(group => {
+      if(typeof group !== "string" || group !== group.trim() || !group){
+        throw new Error(`${context}: resource '${id}' has invalid For group '${group}'`);
       }
-      const key = tag.toLowerCase();
-      if(resourceTagKeys.has(key)){
-        throw new Error(`${context}: resource '${id}' has duplicate tag '${tag}'`);
+      const key = group.toLowerCase();
+      if(resourceForGroupKeys.has(key)){
+        throw new Error(`${context}: resource '${id}' has duplicate For group '${group}'`);
       }
-      resourceTagKeys.add(key);
+      resourceForGroupKeys.add(key);
     });
 
     if(resource.verifiedOn != null && !isValidMMYY(resource.verifiedOn)){
@@ -1542,6 +1561,125 @@ function runSelfTests(){
   });
 
   tests.push({
+    name: "ADMIN PACKAGE ACTIONS ARE STICKY",
+    fn: () => {
+      const previousData = data;
+      const previousView = view;
+      const previousAdminTab = adminTab;
+      try{
+        data = {
+          categories:[],
+          resources:[],
+          changes:[{ id:"change-1", targetType:"resource", action:"updated", targetName:"Shelter", createdAt:nowISO() }],
+          lastModified:"2026-01-02T03:04:05.000Z"
+        };
+        view = "admin";
+        adminTab = "categories";
+        renderAdmin();
+        const sticky = document.querySelector("#adminView .admin-sticky-bar");
+        if(!sticky) throw new Error("Admin sticky bar was not rendered");
+        const style = getComputedStyle(sticky);
+        if(style.position !== "sticky") throw new Error(`Admin package bar should be sticky, got ${style.position}`);
+        const buttons = Array.from(sticky.querySelectorAll("button")).map(button => button.textContent);
+        if(!buttons.includes("Save Resource Package")) throw new Error("Save Resource Package button was missing");
+        if(!buttons.includes("Show change log")) throw new Error("Show change log button was missing");
+        if(!buttons.includes("Clear change log")) throw new Error("Clear change log button was missing");
+        if(/Last Modified:/i.test(document.getElementById("adminView").textContent || "")){
+          throw new Error("Admin page should not show Last Modified");
+        }
+      }finally{
+        data = previousData;
+        view = previousView;
+        adminTab = previousAdminTab;
+        renderAdmin();
+      }
+    }
+  });
+
+  tests.push({
+    name: "ADMIN HAS TWO STICKY CONTROL BARS",
+    fn: () => {
+      const previousData = data;
+      const previousView = view;
+      const previousAdminTab = adminTab;
+      const previousAdminGuideMode = adminGuideMode;
+      try{
+        data = { categories:[], resources:[], changes:[] };
+        view = "admin";
+        adminTab = "categories";
+        adminGuideMode = true;
+        renderAdmin();
+        const packageBar = document.querySelector("#adminView .admin-sticky-bar");
+        const modeBar = document.querySelector("#adminView .admin-mode-bar");
+        if(!packageBar || !modeBar) throw new Error("Admin sticky control bars were not rendered");
+        if(getComputedStyle(packageBar).position !== "sticky") throw new Error("package bar should be sticky");
+        if(getComputedStyle(modeBar).position !== "sticky") throw new Error("mode bar should be sticky");
+        const packageLabels = Array.from(packageBar.querySelectorAll("button")).map(button => button.textContent.trim());
+        ["Save Resource Package", "Change TSO Name", "Guide", "Help"].forEach(label => {
+          if(!packageLabels.includes(label)) throw new Error(`${label} was not in the package bar`);
+        });
+        const modeLabels = Array.from(modeBar.querySelectorAll("button")).map(button => button.textContent.trim());
+        ["Categories", "Resources", "For"].forEach(label => {
+          if(!modeLabels.includes(label)) throw new Error(`${label} was not in the mode bar`);
+        });
+      }finally{
+        data = previousData;
+        view = previousView;
+        adminTab = previousAdminTab;
+        adminGuideMode = previousAdminGuideMode;
+        renderAdmin();
+      }
+    }
+  });
+
+  tests.push({
+    name: "ADMIN ENTRY HAS NO CLEAN EDITOR ACTIONS",
+    fn: () => {
+      const previousData = data;
+      const previousView = view;
+      const previousAdminTab = adminTab;
+      const previousAdminVisible = isAdminVisible;
+      const previousAdminResourceEditMode = adminResourceEditMode;
+      const previousEditing = editing;
+      const previousEditorSnapshot = editorSnapshot;
+      try{
+        data = {
+          categories:[{ id:"food", label:"Food", filters:[] }],
+          resources:[{ id:"resource", name:"Resource", categories:[], categoryFilters:{}, forGroups:[], informationText:"" }],
+          changes:[]
+        };
+        view = "categories";
+        adminTab = "categories";
+        isAdminVisible = true;
+        adminResourceEditMode = false;
+        editing = null;
+        editorSnapshot = "";
+        setView("admin");
+        const actions = document.getElementById("admin_editor_actions");
+        if(!actions || !actions.hidden){
+          throw new Error("Admin entry should not show Cancel and Done for a clean editor");
+        }
+        actions.hidden = false;
+        actions.innerHTML = `<button>Cancel</button><button>Done</button>`;
+        renderAdmin();
+        const rerenderedActions = document.getElementById("admin_editor_actions");
+        if(!rerenderedActions || !rerenderedActions.hidden || rerenderedActions.textContent.trim()){
+          throw new Error("Admin render should clear stale editor actions");
+        }
+      }finally{
+        data = previousData;
+        view = previousView;
+        adminTab = previousAdminTab;
+        isAdminVisible = previousAdminVisible;
+        adminResourceEditMode = previousAdminResourceEditMode;
+        editing = previousEditing;
+        editorSnapshot = previousEditorSnapshot;
+        renderAdmin();
+      }
+    }
+  });
+
+  tests.push({
     name: "RECENT UPDATES PACKAGE SECTION RENDERING",
     fn: () => {
       const previousData = data;
@@ -1591,6 +1729,36 @@ function runSelfTests(){
         pendingRecentUpdates = previousPendingRecentUpdates;
         showUpdateInfo = previousShowUpdateInfo;
         showRecentChangeLog = previousShowRecentChangeLog;
+      }
+    }
+  });
+
+  tests.push({
+    name: "RENAMED FILE NAME DERIVES TSO NAME",
+    fn: () => {
+      if(getTsoNameFromHtmlFileName("provo.html") !== "Provo"){
+        throw new Error("single-word filename did not derive TSO name");
+      }
+      if(getTsoNameFromHtmlFileName("salt-lake-city.html") !== "Salt Lake City"){
+        throw new Error("hyphenated filename did not derive TSO name");
+      }
+    }
+  });
+
+  tests.push({
+    name: "CHANGE TSO NAME BUTTON IS TEMPLATE ONLY",
+    fn: () => {
+      const previousAdminGuideMode = adminGuideMode;
+      try{
+        adminGuideMode = true;
+        if(!shouldShowChangeTsoNameButton(true)){
+          throw new Error("new template should show Change TSO Name during guide mode");
+        }
+        if(shouldShowChangeTsoNameButton(false)){
+          throw new Error("renamed file should hide Change TSO Name");
+        }
+      }finally{
+        adminGuideMode = previousAdminGuideMode;
       }
     }
   });
@@ -1777,8 +1945,8 @@ function runSelfTests(){
       try{
         data = {
           categories:[
-            { id:"food", label:"Food", displayOrder:20 },
-            { id:"housing", label:"Housing", displayOrder:10 }
+            { id:"food", label:"Food" },
+            { id:"housing", label:"Apartments" }
           ],
           resources:[
             { id:"shelter", name:"Shelter Resource", categories:["housing"], tags:[], informationText:"" }
@@ -1795,11 +1963,11 @@ function runSelfTests(){
         if(!sel.classList.contains("resource-button-listbox")) throw new Error("category selector should use custom listbox styling");
         const options = Array.from(sel.querySelectorAll(".resource-listbox-option"));
         if(options.length !== 2) throw new Error("category selector options were not populated");
-        if(options[0].textContent !== "Housing") throw new Error("category selector should respect display order");
+        if(options[0].textContent !== "Apartments") throw new Error("category selector should sort alphabetically");
         if(selectedCategoryIndex !== "1") throw new Error("category selector should default to the first visible category");
         const resourceList = document.getElementById("adminCategoryResourceList");
         const editor = document.getElementById("catEditor");
-        if(!resourceList || !editor || resourceList.parentElement !== editor){
+        if(!resourceList || !editor || !editor.contains(resourceList)){
           throw new Error("category resource list should render inside the category editor");
         }
         if(!/Shelter Resource/.test(resourceList.textContent || "")){
@@ -1813,6 +1981,269 @@ function runSelfTests(){
         selectedCategoryIndex = previousSelectedCategoryIndex;
         editing = previousEditing;
         editorSnapshot = previousEditorSnapshot;
+      }
+    }
+  });
+
+  tests.push({
+    name: "CATEGORY FILTER EDITOR USES CHECKBOXES",
+    fn: () => {
+      const previousData = data;
+      const previousAdminTab = adminTab;
+      const previousSelectedCategoryIndex = selectedCategoryIndex;
+      const previousEditing = editing;
+      const previousEditorSnapshot = editorSnapshot;
+      try{
+        data = {
+          categories:[
+            { id:"food", label:"Food", filters:["Food Pantries", "Meals", "SNAP"] }
+          ],
+          resources:[],
+          changes:[]
+        };
+        adminTab = "categories";
+        selectedCategoryIndex = "0";
+        renderAdmin();
+        editCategory(0);
+        const selectors = Array.from(document.querySelectorAll(".catFilterSelect"));
+        if(selectors.length !== 3) throw new Error("category filter selectors were not rendered");
+        if(selectors.some(selector => selector.type !== "checkbox")){
+          throw new Error("category filter selectors should be checkboxes");
+        }
+        selectors[0].checked = true;
+        selectors[1].checked = true;
+        const deleteBtn = document.getElementById("cat_filter_delete_btn");
+        if(!deleteBtn) throw new Error("delete filter button was not rendered");
+        deleteBtn.click();
+        const remaining = Array.from(document.querySelectorAll(".catFilterInput")).map(input => input.value);
+        if(remaining.length !== 1 || remaining[0] !== "SNAP"){
+          throw new Error("checked category filters were not deleted");
+        }
+      }finally{
+        data = previousData;
+        adminTab = previousAdminTab;
+        selectedCategoryIndex = previousSelectedCategoryIndex;
+        editing = previousEditing;
+        editorSnapshot = previousEditorSnapshot;
+        renderAdmin();
+      }
+    }
+  });
+
+  tests.push({
+    name: "CATEGORY EDITOR ACTION BAR IS STICKY AND DIRTY",
+    fn: () => {
+      const previousData = data;
+      const previousAdminTab = adminTab;
+      const previousSelectedCategoryIndex = selectedCategoryIndex;
+      const previousEditing = editing;
+      const previousEditorSnapshot = editorSnapshot;
+      try{
+        data = {
+          categories:[{ id:"food", label:"Food", filters:[] }],
+          resources:[],
+          changes:[]
+        };
+        adminTab = "categories";
+        selectedCategoryIndex = "0";
+        renderAdmin();
+        editCategory(0);
+        const bar = document.getElementById("admin_editor_actions");
+        const label = document.getElementById("cat_label");
+        if(!bar || !label) throw new Error("category editor action bar was not rendered");
+        if(!bar.hidden) throw new Error("category action bar should start hidden for unchanged existing category");
+        if(document.getElementById("cat_done_btn")) throw new Error("category Done should not exist for unchanged existing category");
+        label.value = "Food Help";
+        label.dispatchEvent(new Event("input", { bubbles:true }));
+        const doneBtn = document.getElementById("cat_done_btn");
+        if(!doneBtn || !doneBtn.closest(".admin-sticky-editor-actions")) throw new Error("category Done should be in Admin sticky editor actions after edit");
+        if(bar.hidden) throw new Error("category action bar should show after an edit");
+      }finally{
+        data = previousData;
+        adminTab = previousAdminTab;
+        selectedCategoryIndex = previousSelectedCategoryIndex;
+        editing = previousEditing;
+        editorSnapshot = previousEditorSnapshot;
+        renderAdmin();
+      }
+    }
+  });
+
+  tests.push({
+    name: "RESOURCE CATEGORY FILTER ASSIGNMENT",
+    fn: () => {
+      const previousData = data;
+      const previousAdminTab = adminTab;
+      const previousEditing = editing;
+      const previousEditorSnapshot = editorSnapshot;
+      const previousAdminResourceEditMode = adminResourceEditMode;
+      const previousSelectedResourceId = selectedResourceId;
+      try{
+        data = {
+          categories:[
+            { id:"employment", label:"Employment", filters:["Career Training", "Temporary Employment"] }
+          ],
+          resources:[
+            { id:"jobs", name:"Jobs Resource", categories:["employment"], categoryFilters:{ employment:["Temporary Employment"] }, tags:[], informationText:"" }
+          ],
+          changes:[]
+        };
+        adminTab = "resources";
+        adminResourceEditMode = true;
+        selectedResourceId = "jobs";
+        renderAdmin();
+        editResource(0);
+        const filterList = document.querySelector('[data-category-filters-for="employment"]');
+        if(!filterList) throw new Error("resource editor did not render category filters");
+        if(filterList.hidden) throw new Error("selected category filters should be visible");
+        const filter = document.querySelector('.resCatFilter[value="Temporary Employment"]');
+        if(!filter || !filter.checked) throw new Error("saved category filter was not checked");
+        const draft = resourceEditorDraft();
+        if(!draft.categoryFilters.employment || draft.categoryFilters.employment[0] !== "Temporary Employment"){
+          throw new Error("resource draft did not capture category filter selection");
+        }
+      }finally{
+        data = previousData;
+        adminTab = previousAdminTab;
+        editing = previousEditing;
+        editorSnapshot = previousEditorSnapshot;
+        adminResourceEditMode = previousAdminResourceEditMode;
+        selectedResourceId = previousSelectedResourceId;
+        renderAdmin();
+      }
+    }
+  });
+
+  tests.push({
+    name: "RESOURCE EDITOR ACTION BAR IS STICKY AND DIRTY",
+    fn: () => {
+      const previousData = data;
+      const previousAdminTab = adminTab;
+      const previousEditing = editing;
+      const previousEditorSnapshot = editorSnapshot;
+      const previousAdminResourceEditMode = adminResourceEditMode;
+      const previousSelectedResourceId = selectedResourceId;
+      try{
+        data = {
+          categories:[],
+          resources:[
+            { id:"phone", name:"Phone Resource", phone:"", address:"", website:"", hours:"", description:"", categories:[], categoryFilters:{}, forGroups:[], informationText:"" }
+          ],
+          changes:[]
+        };
+        adminTab = "resources";
+        adminResourceEditMode = true;
+        selectedResourceId = "phone";
+        renderAdmin();
+        editResource(0);
+        const bar = document.getElementById("admin_editor_actions");
+        const phone = document.getElementById("res_phone");
+        if(!bar || !phone) throw new Error("resource editor action bar was not rendered");
+        if(!bar.hidden) throw new Error("resource action bar should start hidden for unchanged existing resource");
+        if(document.getElementById("res_done_btn")) throw new Error("resource Done should not exist for unchanged existing resource");
+        phone.value = "555-1212";
+        phone.dispatchEvent(new Event("input", { bubbles:true }));
+        const doneBtn = document.getElementById("res_done_btn");
+        if(!doneBtn || !doneBtn.closest(".admin-sticky-editor-actions")) throw new Error("resource Done should be in Admin sticky editor actions after edit");
+        if(bar.hidden) throw new Error("resource action bar should show after an edit");
+      }finally{
+        data = previousData;
+        adminTab = previousAdminTab;
+        editing = previousEditing;
+        editorSnapshot = previousEditorSnapshot;
+        adminResourceEditMode = previousAdminResourceEditMode;
+        selectedResourceId = previousSelectedResourceId;
+        renderAdmin();
+      }
+    }
+  });
+
+  tests.push({
+    name: "NEW RESOURCE CAN BE CANCELLED BEFORE VALID",
+    fn: () => {
+      const previousData = data;
+      const previousAdminTab = adminTab;
+      const previousEditing = editing;
+      const previousEditorSnapshot = editorSnapshot;
+      const previousAdminResourceEditMode = adminResourceEditMode;
+      const previousSelectedResourceId = selectedResourceId;
+      const previousNewResourceIds = newResourceIds;
+      try{
+        data = {
+          categories:[],
+          resources:[],
+          changes:[]
+        };
+        adminTab = "resources";
+        adminResourceEditMode = false;
+        selectedResourceId = "";
+        newResourceIds = new Set();
+        renderAdmin();
+        newResource();
+        const actionBar = document.getElementById("admin_editor_actions");
+        const cancelBtn = document.getElementById("res_cancel_btn");
+        const doneBtn = document.getElementById("res_done_btn");
+        if(!actionBar || actionBar.hidden) throw new Error("new resource should show editor actions");
+        if(!cancelBtn || cancelBtn.disabled) throw new Error("new resource Cancel should be enabled before valid");
+        if(!doneBtn || !doneBtn.disabled) throw new Error("new resource Done should be disabled before valid");
+        cancelBtn.click();
+        if(data.resources.length !== 0) throw new Error("Cancel did not discard blank new resource");
+      }finally{
+        data = previousData;
+        adminTab = previousAdminTab;
+        editing = previousEditing;
+        editorSnapshot = previousEditorSnapshot;
+        adminResourceEditMode = previousAdminResourceEditMode;
+        selectedResourceId = previousSelectedResourceId;
+        newResourceIds = previousNewResourceIds;
+        renderAdmin();
+      }
+    }
+  });
+
+  tests.push({
+    name: "RESOURCE INFORMATION PREVIEW IS DEFAULT",
+    fn: () => {
+      const previousData = data;
+      const previousAdminTab = adminTab;
+      const previousEditing = editing;
+      const previousEditorSnapshot = editorSnapshot;
+      const previousAdminResourceEditMode = adminResourceEditMode;
+      const previousSelectedResourceId = selectedResourceId;
+      try{
+        data = {
+          categories:[],
+          resources:[
+            { id:"info", name:"Info Resource", categories:[], informationText:"Preview text" }
+          ],
+          changes:[]
+        };
+        adminTab = "resources";
+        adminResourceEditMode = true;
+        selectedResourceId = "info";
+        renderAdmin();
+        editResource(0);
+        const editor = document.getElementById("res_information_editor");
+        const preview = document.getElementById("res_information_preview");
+        const editBtn = document.getElementById("res_information_edit_btn");
+        const previewBtn = document.getElementById("res_information_preview_btn");
+        if(!editor || !preview || !editBtn || !previewBtn) throw new Error("information editor controls were not rendered");
+        if(!editor.classList.contains("hidden")) throw new Error("information editor should be hidden on entry");
+        if(preview.classList.contains("hidden")) throw new Error("information preview should be visible on entry");
+        if(!previewBtn.classList.contains("primary") || editBtn.classList.contains("primary")){
+          throw new Error("Preview button should be active on entry");
+        }
+        if(!/Preview text/.test(preview.textContent || "")){
+          throw new Error("preview content was not rendered on entry");
+        }
+      }finally{
+        data = previousData;
+        adminTab = previousAdminTab;
+        editing = previousEditing;
+        editorSnapshot = previousEditorSnapshot;
+        adminResourceEditMode = previousAdminResourceEditMode;
+        selectedResourceId = previousSelectedResourceId;
+        renderAdmin();
       }
     }
   });
@@ -2280,8 +2711,8 @@ function runSelfTests(){
         if(document.querySelector("#adminView .admin-guide-tip button").textContent !== "Next"){
           throw new Error("first resource guide section should only show Next");
         }
-        if(!document.getElementById("res_cancel_btn").disabled || !document.getElementById("res_done_btn").disabled){
-          throw new Error("Cancel and Done should be disabled until the final guided resource step");
+        if(document.getElementById("res_cancel_btn").disabled || !document.getElementById("res_done_btn").disabled){
+          throw new Error("new guided resource should allow Cancel and keep Done disabled until valid");
         }
         if(document.querySelectorAll("#resEditor .resource-editor-guide-section:not(.admin-guide-current-section)").length < 1){
           throw new Error("resource editor should be divided into guide sections");
@@ -2685,7 +3116,7 @@ function runSelfTests(){
         if(!list.classList.contains("resource-button-listbox")) throw new Error("resource browse list should use custom listbox styling");
         const options = Array.from(list.querySelectorAll(".resource-listbox-option"));
         if(options.length !== 2) throw new Error("resource browse options were not populated");
-        if(options[0].textContent !== "Alpha Resource") throw new Error("resource browse list should respect display order");
+        if(options[0].textContent !== "Alpha Resource") throw new Error("resource browse list should sort alphabetically");
         if(selectedResourceId !== "alpha") throw new Error("resource browse selection should default to the first visible resource");
         list.dispatchEvent(new KeyboardEvent("keydown", { key:"ArrowDown", bubbles:true }));
         if(selectedResourceId !== "zeta") throw new Error("resource browse keyboard navigation did not update selection");
@@ -2960,17 +3391,20 @@ function runSelfTests(){
   });
 
   tests.push({
-    name: "TAG TRIM AND DEDUPE",
+    name: "FOR GROUP TRIM AND DEDUPE",
     fn: () => {
-      const resource = { tags:[" List ", "Women"] };
-      normalizeDataTagsShape({ resources:[resource], tags:["ignored"] });
-      const expected = ["List", "Women"];
-      if(JSON.stringify(resource.tags) !== JSON.stringify(expected)){
-        throw new Error(`expected ${JSON.stringify(expected)}, got ${JSON.stringify(resource.tags)}`);
+      const sample = { resources:[{ forGroups:[" Veterans ", "veterans", "Women"] }], forGroups:[" Children ", "children"] };
+      normalizeDataForGroupsShape(sample);
+      if(JSON.stringify(sample.resources[0].forGroups) !== JSON.stringify(["Veterans", "Women"])){
+        throw new Error(`unexpected resource forGroups ${JSON.stringify(sample.resources[0].forGroups)}`);
       }
-      const deduped = normalizeResourceTags(["List", "list"]);
-      if(JSON.stringify(deduped) !== JSON.stringify(["List"])){
-        throw new Error(`expected ["List"], got ${JSON.stringify(deduped)}`);
+      if(JSON.stringify(sample.forGroups) !== JSON.stringify(["Children"])){
+        throw new Error(`unexpected governed forGroups ${JSON.stringify(sample.forGroups)}`);
+      }
+      const legacy = { tags:["ignored"], resources:[{ tags:["ignored"] }] };
+      normalizeDataTagsShape(legacy);
+      if("tags" in legacy || "tags" in legacy.resources[0]){
+        throw new Error("legacy tags should be removed");
       }
     }
   });
@@ -2997,50 +3431,42 @@ function runSelfTests(){
   });
 
   tests.push({
-    name: "ADMIN TAG DELETE BULK UPDATE",
+    name: "ADMIN FOR GROUP DELETE BULK UPDATE",
     fn: () => {
       const previousData = data;
       const previousAdminTab = adminTab;
-      const previousSelectedAdminTag = selectedAdminTag;
-      const previousUndo = localStorage.getItem(UNDO_STORAGE_KEY);
       const previousStoredData = localStorage.getItem(DATA_STORAGE_KEY);
       try{
         data = {
           categories:[{ id:"education", label:"Education" }],
+          forGroups:["GED", "List", "Food"],
           resources:[
-            { id:"adult-ed", name:"Adult Education", categories:["education"], tags:["GED", "List"], lastModified:"2026-01-01T00:00:00.000Z" },
-            { id:"career-ed", name:"Career Education", categories:["education"], tags:["ged"], lastModified:"2026-01-01T00:00:00.000Z" },
-            { id:"food", name:"Food Pantry", categories:[], tags:["Food"], lastModified:"2026-01-01T00:00:00.000Z" }
+            { id:"adult-ed", name:"Adult Education", categories:["education"], forGroups:["GED", "List"], lastModified:"2026-01-01T00:00:00.000Z" },
+            { id:"career-ed", name:"Career Education", categories:["education"], forGroups:["ged"], lastModified:"2026-01-01T00:00:00.000Z" },
+            { id:"food", name:"Food Pantry", categories:[], forGroups:["Food"], lastModified:"2026-01-01T00:00:00.000Z" }
           ],
           changes:[]
         };
         adminTab = "tags";
-        selectedAdminTag = "GED";
-        completeTagDelete("GED");
+        applyForGroupsDraft({ forGroups:["List", "Food"] });
         const adult = data.resources.find(resource => resource.id === "adult-ed");
         const career = data.resources.find(resource => resource.id === "career-ed");
         const food = data.resources.find(resource => resource.id === "food");
-        if(adult.tags.includes("GED") || career.tags.some(tag => tag.toLowerCase() === "ged")){
-          throw new Error("deleted tag remained on a matching resource");
+        if(adult.forGroups.includes("GED") || career.forGroups.some(group => group.toLowerCase() === "ged")){
+          throw new Error("deleted For group remained on a matching resource");
         }
-        if(!adult.tags.includes("List")) throw new Error("unrelated tag was removed");
-        if(!food.tags.includes("Food")) throw new Error("non-matching resource was changed");
+        if(!adult.forGroups.includes("List")) throw new Error("unrelated For group was removed");
+        if(!food.forGroups.includes("Food")) throw new Error("non-matching resource was changed");
         if(adult.lastModified === "2026-01-01T00:00:00.000Z" || career.lastModified === "2026-01-01T00:00:00.000Z"){
           throw new Error("matching resources were not timestamped");
         }
         if(food.lastModified !== "2026-01-01T00:00:00.000Z"){
           throw new Error("non-matching resource timestamp changed");
         }
-        if(data.changes.length !== 2) throw new Error("tag delete should create one change entry per changed resource");
-        if(!getUndoSnapshot() || !/deleted tag "GED"/.test(getUndoSnapshot().message)){
-          throw new Error("tag delete undo snapshot was not set");
-        }
+        if(data.changes.length !== 2) throw new Error("For group delete should create one change entry per changed resource");
       }finally{
         data = previousData;
         adminTab = previousAdminTab;
-        selectedAdminTag = previousSelectedAdminTag;
-        if(previousUndo === null) localStorage.removeItem(UNDO_STORAGE_KEY);
-        else localStorage.setItem(UNDO_STORAGE_KEY, previousUndo);
         if(previousStoredData === null) localStorage.removeItem(DATA_STORAGE_KEY);
         else localStorage.setItem(DATA_STORAGE_KEY, previousStoredData);
       }
@@ -3048,45 +3474,119 @@ function runSelfTests(){
   });
 
   tests.push({
-    name: "DEFENSIVE TAG NORMALIZATION",
+    name: "DEFENSIVE FOR GROUP NORMALIZATION",
     fn: () => {
-      const fromString = normalizeResourceTags("Shelter, List, shelter, ");
-      if(JSON.stringify(fromString) !== JSON.stringify(["Shelter", "List"])){
-        throw new Error(`unexpected string tags ${JSON.stringify(fromString)}`);
-      }
-
       const sample = {
         unknownField: true,
         categories:[{ id:"housing", label:"Housing" }],
+        forGroups:"Veterans, Women, veterans",
         resources:[
           { id:"old", name:"Old", categories:["housing"] },
-          { id:"string", name:"String Tags", categories:["housing"], tags:"Rental, Eviction Help" },
-          { id:"bad", name:"Bad Tags", categories:["housing"], tags:null }
+          { id:"string", name:"String Groups", categories:["housing"], forGroups:"Veterans, Women" },
+          { id:"bad", name:"Bad Groups", categories:["housing"], forGroups:null }
         ]
       };
       normalizePackageData(sample);
       if(sample.unknownField !== true) throw new Error("unknown package field was not preserved");
       if(!Array.isArray(sample.changes) || sample.changes.length !== 0) throw new Error("missing changes should normalize to []");
-      if(JSON.stringify(sample.resources[0].tags) !== JSON.stringify([])) throw new Error("missing tags should normalize to []");
-      if(JSON.stringify(sample.resources[1].tags) !== JSON.stringify(["Rental", "Eviction Help"])) throw new Error("string tags were not split");
-      if(JSON.stringify(sample.resources[2].tags) !== JSON.stringify([])) throw new Error("null tags should normalize to []");
+      if(JSON.stringify(sample.forGroups) !== JSON.stringify(["Veterans", "Women"])) throw new Error("string governed groups were not split");
+      if(JSON.stringify(sample.resources[0].forGroups) !== JSON.stringify([])) throw new Error("missing forGroups should normalize to []");
+      if(JSON.stringify(sample.resources[1].forGroups) !== JSON.stringify(["Veterans", "Women"])) throw new Error("string resource groups were not split");
+      if(JSON.stringify(sample.resources[2].forGroups) !== JSON.stringify([])) throw new Error("null resource groups should normalize to []");
+      if("tags" in sample) throw new Error("top-level tags should not be preserved");
     }
   });
 
   tests.push({
-    name: "CATEGORY TAG FILTER OR LOGIC",
+    name: "ADMIN FOR GROUP EDITOR CONTROLS",
+    fn: () => {
+      const previousData = data;
+      const previousAdminTab = adminTab;
+      const previousEditing = editing;
+      const previousEditorSnapshot = editorSnapshot;
+      const previousStoredData = localStorage.getItem(DATA_STORAGE_KEY);
+      try{
+        data = {
+          categories:[],
+          forGroups:["Veterans"],
+          resources:[{ id:"vet", name:"Veterans Resource", categories:[], forGroups:["Veterans"], informationText:"" }],
+          changes:[]
+        };
+        adminTab = "tags";
+        renderAdmin();
+        let newBtn = document.getElementById("forGroupNewBtn");
+        let deleteBtn = document.getElementById("forGroupDeleteBtn");
+        let actionBar = document.getElementById("admin_editor_actions");
+        if(!newBtn || !deleteBtn || !actionBar) throw new Error("For editor controls were not rendered");
+        if(!actionBar.hidden) throw new Error("For editor action bar should start hidden until dirty");
+        const firstRow = document.querySelector(".for-group-row");
+        if(!firstRow || firstRow.getAttribute("role") !== "option"){
+          throw new Error("For editor rows should be selectable options");
+        }
+
+        newBtn.click();
+        let cancelBtn = document.getElementById("forGroupCancelBtn");
+        let doneBtn = document.getElementById("forGroupDoneBtn");
+        if(actionBar.hidden || !cancelBtn || !doneBtn) throw new Error("For editor action bar should show after New");
+        if(!doneBtn.closest(".admin-sticky-editor-actions")) throw new Error("Done should be in Admin sticky editor actions");
+        let inputs = Array.from(document.querySelectorAll(".forGroupInput"));
+        inputs[inputs.length - 1].value = "Women";
+        inputs[inputs.length - 1].dispatchEvent(new Event("input", { bubbles:true }));
+        doneBtn.click();
+        if(!data.forGroups.includes("Women")) throw new Error("Done did not save new For group");
+
+        renderAdmin();
+        newBtn = document.getElementById("forGroupNewBtn");
+        actionBar = document.getElementById("admin_editor_actions");
+        if(!actionBar.hidden) throw new Error("For editor action bar should hide again after saving");
+        newBtn.click();
+        cancelBtn = document.getElementById("forGroupCancelBtn");
+        inputs = Array.from(document.querySelectorAll(".forGroupInput"));
+        inputs[inputs.length - 1].value = "Seniors";
+        inputs[inputs.length - 1].dispatchEvent(new Event("input", { bubbles:true }));
+        cancelBtn.click();
+        if(data.forGroups.includes("Seniors")) throw new Error("Cancel saved a draft For group");
+
+        renderAdmin();
+        deleteBtn = document.getElementById("forGroupDeleteBtn");
+        const womenInput = Array.from(document.querySelectorAll(".forGroupInput")).find(input => input.value === "Women");
+        if(!womenInput) throw new Error("saved For group was not rendered for deletion");
+        const row = womenInput.closest(".for-group-row");
+        row.click();
+        if(!row.classList.contains("selected")) throw new Error("clicking a For group row should select it");
+        deleteBtn.click();
+        doneBtn = document.getElementById("forGroupDoneBtn");
+        if(!doneBtn) throw new Error("For editor Done should show after Delete");
+        doneBtn.click();
+        if(data.forGroups.includes("Women")) throw new Error("Delete plus Done did not remove For group");
+      }finally{
+        data = previousData;
+        adminTab = previousAdminTab;
+        editing = previousEditing;
+        editorSnapshot = previousEditorSnapshot;
+        if(previousStoredData === null) localStorage.removeItem(DATA_STORAGE_KEY);
+        else localStorage.setItem(DATA_STORAGE_KEY, previousStoredData);
+      }
+    }
+  });
+
+  tests.push({
+    name: "CATEGORY FILTER OR LOGIC",
     fn: () => {
       const resources = [
-        { name:"Women Only", tags:["Women"] },
-        { name:"Shelter Only", tags:["Shelter"] },
-        { name:"Both", tags:["Women", "Shelter"] },
-        { name:"Neither", tags:["Food"] }
+        { name:"Women Only", forGroups:["Women"] },
+        { name:"Shelter Only", categoryFilters:{ housing:["Shelter"] } },
+        { name:"Both", forGroups:["Women"], categoryFilters:{ housing:["Shelter"] } },
+        { name:"Neither", forGroups:["Food"] }
       ];
-      const matching = filterResourcesBySelectedTags(resources, ["Women", "Shelter"]).map(r => r.name);
+      const matching = filterResourcesBySelectedCategoryFilters(resources, "housing", [
+        makeForGroupFilterKey("Women"),
+        makeCategorySpecificFilterKey("Shelter")
+      ]).map(r => r.name);
       ["Women Only", "Shelter Only", "Both"].forEach(name => {
         if(!matching.includes(name)) throw new Error(`${name} was excluded`);
       });
-      if(matching.includes("Neither")) throw new Error("resource without selected tags was included");
+      if(matching.includes("Neither")) throw new Error("resource without selected filters was included");
     }
   });
 
@@ -3098,9 +3598,9 @@ function runSelfTests(){
         const longText = `${"Long resource guide. ".repeat(30)} GED preparation and earn a GED. Captain Your Story - My Story Matters.`;
         data = {
           categories:[
-            { id:"housing", label:"Housing", displayOrder:1 },
-            { id:"food", label:"Food", displayOrder:2 },
-            { id:"education", label:"Education", displayOrder:3 }
+            { id:"housing", label:"Housing" },
+            { id:"food", label:"Food" },
+            { id:"education", label:"Education" }
           ],
           resources:[
             { id:"target", name:"Community Action", categories:["food"], tags:["Food","List"], informationText:"Community Action" },
@@ -3127,7 +3627,7 @@ function runSelfTests(){
         if(names.includes("Community Action")) throw new Error("clicked resource was included as a self-match");
         if(names.includes("Caseworker Note")) throw new Error("non-list resource was included");
         if(names.filter(name => name === "Food Pantries").length !== 1) throw new Error("duplicate mention produced duplicate match");
-        if(names[0] !== "Housing Lists") throw new Error("category order was not preserved");
+        if(names[0] !== "Food Pantries") throw new Error("list references should sort alphabetically by category");
 
         const gedMatches = findReferencingLists({ id:"ged", name:"GED" }).map(match => match.listName);
         if(!gedMatches.includes("Education Lists")) throw new Error("GED list reference was not found");
@@ -3165,8 +3665,8 @@ function runSelfTests(){
       try{
         data = {
           categories:[
-            { id:"employment", label:"Employment", displayOrder:1 },
-            { id:"health", label:"Health Care", displayOrder:2 }
+            { id:"employment", label:"Employment" },
+            { id:"health", label:"Health Care" }
           ],
           resources:[
             { id:"bio", name:"BioLife Plasma", categories:["employment","employment","health"], tags:[], informationText:"" },
@@ -3192,7 +3692,7 @@ function runSelfTests(){
       const previousData = data;
       try{
         data = {
-          categories:[{ id:"housing", label:"Housing", displayOrder:1 }],
+          categories:[{ id:"housing", label:"Housing" }],
           resources:[
             { id:"parent", name:"Parent Support", categories:["housing"], tags:[], informationText:"paid utility help" },
             { id:"uca", name:"Utah Community Action", categories:["housing"], tags:[], informationText:"Emergency rental assistance and deposit help" }
@@ -3216,6 +3716,50 @@ function runSelfTests(){
   });
 
   tests.push({
+    name: "SEARCH TAXONOMY STAGE",
+    fn: () => {
+      const previousData = data;
+      try{
+        data = {
+          categories:[
+            { id:"employment", label:"Employment", filters:["Career Training"] },
+            { id:"housing", label:"Housing", filters:["Shared Rooms"] }
+          ],
+          forGroups:["Veterans", "Seniors"],
+          resources:[
+            { id:"training", name:"Training Resource", categories:["employment"], categoryFilters:{ employment:["Career Training"] }, forGroups:[], informationText:"" },
+            { id:"vets", name:"Veterans Resource", categories:["employment","housing"], categoryFilters:{}, forGroups:["Veterans"], informationText:"" },
+            { id:"senior", name:"Community Help", categories:["housing"], categoryFilters:{}, forGroups:["Seniors"], informationText:"" },
+            { id:"room", name:"Room Resource", categories:["housing"], categoryFilters:{ housing:["Shared Rooms"] }, forGroups:[], informationText:"" }
+          ]
+        };
+        const categoryResults = buildSearchResults("housing");
+        if(categoryResults.mode !== "taxonomy") throw new Error(`expected category taxonomy mode, got ${categoryResults.mode}`);
+        const housing = categoryResults.groups.find(group => group.categoryId === "housing");
+        if(!housing || housing.items.length !== 3) throw new Error("category search did not include housing resources");
+
+        const filterResults = buildSearchResults("career training");
+        if(filterResults.mode !== "taxonomy") throw new Error("category filter search should use taxonomy mode");
+        if(filterResults.groups[0].items[0].resourceId !== "training") throw new Error("category filter search returned wrong resource");
+        if(!/Specifically: Career Training/.test(filterResults.groups[0].items[0].snippet)){
+          throw new Error("category filter search snippet was missing");
+        }
+
+        const forResults = buildSearchResults("seniors");
+        if(forResults.mode !== "taxonomy") throw new Error("For group search should use taxonomy mode");
+        if(forResults.groups[0].items[0].resourceId !== "senior") throw new Error("For group search returned wrong resource");
+        if(!/For: Seniors/.test(forResults.groups[0].items[0].snippet)){
+          throw new Error("For group search snippet was missing");
+        }
+        const forOnlyResults = buildSearchResults("shared rooms");
+        if(forOnlyResults.mode !== "taxonomy") throw new Error("second category filter search should use taxonomy mode");
+      }finally{
+        data = previousData;
+      }
+    }
+  });
+
+  tests.push({
     name: "SEARCH RESULT NAVIGATION",
     fn: () => {
       const previousData = data;
@@ -3226,7 +3770,7 @@ function runSelfTests(){
       const previousSearchOpen = isSearchOpen;
       try{
         data = {
-          categories:[{ id:"housing", label:"Housing", displayOrder:1 }],
+          categories:[{ id:"housing", label:"Housing" }],
           resources:[{ id:"uca", name:"Utah Community Action", categories:["housing"], tags:[], informationText:"" }]
         };
         categoryTagFilters = { housing:["Shelter"] };
@@ -3247,28 +3791,129 @@ function runSelfTests(){
   });
 
   tests.push({
-    name: "CATEGORY TAGS ARE RESOURCE OWNED",
+    name: "CATEGORY FILTER BUTTON GROUPS RENDER",
+    fn: () => {
+      const previousData = data;
+      const previousView = view;
+      const previousCategory = currentCategory;
+      const previousFilters = categoryTagFilters;
+      try{
+        data = {
+          categories:[{ id:"employment", label:"Employment", filters:["Career Training", "Unused Filter"] }],
+          forGroups:["Veterans", "Unused Group"],
+          resources:[
+            { id:"training", name:"Training Resource", categories:["employment"], categoryFilters:{ employment:["Career Training"] }, forGroups:[], informationText:"" },
+            { id:"vets", name:"Veterans Resource", categories:["employment"], categoryFilters:{}, forGroups:["Veterans"], informationText:"" }
+          ],
+          changes:[]
+        };
+        view = "category";
+        currentCategory = "employment";
+        categoryTagFilters = {};
+        render();
+        const text = appView.textContent || "";
+        if(!text.includes("Specifically")) throw new Error("Specifically heading was not rendered");
+        if(!text.includes("For")) throw new Error("For heading was not rendered");
+        const buttons = Array.from(appView.querySelectorAll("button")).map(button => button.textContent);
+        if(!buttons.includes("Career Training")) throw new Error("category filter button was missing");
+        if(!buttons.includes("Veterans")) throw new Error("For group button was missing");
+        if(buttons.includes("Unused Filter")) throw new Error("unused category filter button should not render");
+        if(buttons.includes("Unused Group")) throw new Error("unused For group button should not render");
+        if(buttons.some(label => label === "For: Veterans")) throw new Error("For button label should not include prefix");
+        if(/\bresult(s)?\b/.test(text)) throw new Error("category filter area should not show result counts");
+      }finally{
+        data = previousData;
+        view = previousView;
+        currentCategory = previousCategory;
+        categoryTagFilters = previousFilters;
+      }
+    }
+  });
+
+  tests.push({
+    name: "DERIVED LISTS CATEGORY",
+    fn: () => {
+      const previousData = data;
+      const previousView = view;
+      const previousCategory = currentCategory;
+      const previousFilters = categoryTagFilters;
+      try{
+        data = {
+          categories:[{ id:"food", label:"Food" }],
+          forGroups:[],
+          resources:[
+            { id:"list", name:"Food Pantry List", categories:["food"], phone:"", website:"", hours:"", address:"123 Main", informationText:"" },
+            { id:"phone", name:"Food Pantry Phone", categories:["food"], phone:"555-1212", website:"", hours:"", informationText:"" },
+            { id:"site", name:"Food Pantry Site", categories:["food"], phone:"", website:"https://example.org", hours:"", informationText:"" },
+            { id:"hours", name:"Food Pantry Hours", categories:["food"], phone:"", website:"", hours:"9-5", informationText:"" }
+          ],
+          changes:[]
+        };
+        if(!resourceMatchesListsHeuristic(data.resources[0])) throw new Error("address should not disqualify list resource");
+        if(getListsResources().map(resource => resource.id).join(",") !== "list"){
+          throw new Error("Lists heuristic returned wrong resources");
+        }
+
+        view = "categories";
+        currentCategory = null;
+        render();
+        const categoryButtons = Array.from(appView.querySelectorAll(".category-card strong")).map(node => node.textContent);
+        if(!categoryButtons.includes("Lists")) throw new Error("Lists card was not rendered");
+
+        view = "category";
+        currentCategory = LISTS_CATEGORY_ID;
+        categoryTagFilters = {};
+        render();
+        const text = appView.textContent || "";
+        if(!text.includes("Lists")) throw new Error("Lists category title was not rendered");
+        if(!text.includes("Food Pantry List")) throw new Error("Lists category did not show list resource");
+        if(text.includes("Food Pantry Phone") || text.includes("Food Pantry Site") || text.includes("Food Pantry Hours")){
+          throw new Error("Lists category included non-list resource");
+        }
+
+        const results = buildSearchResults("lists");
+        if(results.mode !== "taxonomy") throw new Error("Lists search should use taxonomy mode");
+        const listsGroup = results.groups.find(group => group.categoryId === LISTS_CATEGORY_ID);
+        if(!listsGroup || listsGroup.items[0].resourceId !== "list") throw new Error("Lists search returned wrong resources");
+      }finally{
+        data = previousData;
+        view = previousView;
+        currentCategory = previousCategory;
+        categoryTagFilters = previousFilters;
+      }
+    }
+  });
+
+  tests.push({
+    name: "CATEGORY FILTERS AND FOR GROUPS ARE RESOURCE OWNED",
     fn: () => {
       const previousData = data;
       try{
         data = {
           categories:[
-            { id:"employment", label:"Employment" },
-            { id:"education", label:"Education" }
+            { id:"employment", label:"Employment", filters:["Career Training"] },
+            { id:"education", label:"Education", filters:["GED"] }
           ],
+          forGroups:["Veterans"],
           resources:[
-            { id:"shared", name:"Shared Training", categories:["employment","education"], tags:["Career/Vocational Training", "Apprenticeship"] },
-            { id:"ged", name:"GED", categories:["education"], tags:["GED"] }
+            { id:"shared", name:"Shared Training", categories:["employment","education"], categoryFilters:{ employment:["Career Training"] }, forGroups:["Veterans"] },
+            { id:"ged", name:"GED", categories:["education"], categoryFilters:{ education:["GED"] }, forGroups:[] }
           ]
         };
-        const employmentTags = getTagsForCategory("employment");
-        const educationTags = getTagsForCategory("education");
-        if(!employmentTags.includes("Apprenticeship") || !educationTags.includes("Apprenticeship")){
-          throw new Error("shared resource tags did not appear in both categories");
+        const employmentOptions = getCategoryTagOptions("employment").map(option => option.label);
+        const educationOptions = getCategoryTagOptions("education").map(option => option.label);
+        if(!employmentOptions.includes("Career Training") || !employmentOptions.includes("Veterans")){
+          throw new Error("employment category did not include category and For filters");
         }
-        const matching = filterResourcesBySelectedTags(getCategoryResources("education"), ["Apprenticeship", "GED"]).map(r => r.id);
+        if(!educationOptions.includes("GED") || !educationOptions.includes("Veterans")){
+          throw new Error("education category did not include category and For filters");
+        }
+        const matching = filterResourcesBySelectedCategoryFilters(getCategoryResources("education"), "education", [
+          makeForGroupFilterKey("Veterans"),
+          makeCategorySpecificFilterKey("GED")
+        ]).map(r => r.id);
         if(!matching.includes("shared") || !matching.includes("ged")){
-          throw new Error("OR tag filtering missed expected education resources");
+          throw new Error("OR category filtering missed expected education resources");
         }
       }finally{
         data = previousData;
@@ -3611,8 +4256,20 @@ if(searchInput){
   });
 }
 const appTitle = document.getElementById("appTitle");
+function getTsoNameFromHtmlFileName(fileName){
+  return String(fileName || "")
+    .replace(/\.html?$/i, "")
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
 function getTsoName(){
-  return String(localStorage.getItem(TSO_NAME_STORAGE_KEY) || "").trim();
+  const storedName = String(localStorage.getItem(TSO_NAME_STORAGE_KEY) || "").trim();
+  if(storedName) return storedName;
+  if(isNewTemplateFile()) return "";
+  return getTsoNameFromHtmlFileName(getCurrentHtmlFileName());
 }
 
 function getTsoFileName(){
@@ -3639,6 +4296,7 @@ function refreshAppTitle(){
 refreshAppTitle();
 
 function isNewAdminSetupState(){
+  if(!isNewTemplateFile()) return false;
   return !getTsoName()
     && !(Array.isArray(data.resources) && data.resources.length);
 }
@@ -3697,6 +4355,10 @@ function getCategoryGuideTipText(){
     return formatGuideTipText(TIP_TEXT.renamedFileWelcome);
   }
   return "";
+}
+
+function shouldShowChangeTsoNameButton(isTemplateFile = isNewTemplateFile()){
+  return adminGuideMode && !!isTemplateFile;
 }
 
 function startAdminGuide(step = "resources"){
@@ -4107,7 +4769,7 @@ function showAdminHelp(){
               <li>Choose the latest <code>albq-resources.json</code> file.</li>
               <li>Wait for the merge to finish before making edits.</li>
             </ol>
-            <p>This matters because resource packages are merged by <code>lastModified</code> timestamps. If you edit from an older package, a later merge can bring back old details, old tags, or old category assignments.</p>
+            <p>This matters because resource packages are merged by <code>lastModified</code> timestamps. If you edit from an older package, a later merge can bring back old details, old groups, or old category assignments.</p>
           </div>
         </details>
 
@@ -4118,11 +4780,11 @@ function showAdminHelp(){
             <p>After a batch of edits:</p>
             <ol>
               <li>Click <code>Show change log</code> and review the listed changes.</li>
-              <li>Click <code>Save Resources</code>.</li>
+              <li>Click <code>Save Resource Package</code>.</li>
               <li>Save the file as <code>albq-resources.json</code>.</li>
               <li>Share that JSON file through the normal distribution process.</li>
             </ol>
-            <p><code>Save Resources</code> commits any open editor changes, increases the package version, and exports the current data.</p>
+            <p><code>Save Resource Package</code> commits any open editor changes, increases the package version, and exports the current data.</p>
           </div>
         </details>
 
@@ -4130,9 +4792,9 @@ function showAdminHelp(){
           <summary>Categories</summary>
           <div class="admin-help-section-body">
             <p>Use <code>Categories</code> to manage the sections users see on the main screen.</p>
-            <p><code>New</code> creates a blank category. Enter the category label, optionally enter a display order, describe the update, and click <code>Done</code>.</p>
+            <p><code>New</code> creates a blank category. Enter the category label, add any specific subcategories for that category, describe the update, and click <code>Done</code>.</p>
             <p><code>Delete</code> removes the selected category. It does not delete the resources in that category, but those resources will no longer appear there. The app asks for confirmation and gives you a chance to describe the deletion.</p>
-            <p><code>Edit display order...</code> lets you reorder categories. Lower numbers appear first. When you click <code>OK</code>, the app rewrites the display order as 10, 20, 30, and so on.</p>
+            <p>Categories are shown alphabetically.</p>
             <p>The category editor also shows <code>Resources in this category</code>. Click a resource name there to open it in the resource editor.</p>
             <p>Category labels must be unique.</p>
           </div>
@@ -4157,7 +4819,7 @@ function showAdminHelp(){
               <li><code>Verified</code> stores a <code>MM/YY</code> date. Click <code>Update</code> to fill in the current month and year.</li>
               <li><code>Description</code> is the short public summary.</li>
               <li><code>Describe this update</code> is used in the change log and package update summary.</li>
-              <li><code>Tags</code> can be comma-separated or entered one per line.</li>
+              <li><code>For</code> can be comma-separated or entered one per line.</li>
               <li><code>Categories</code> controls where the resource appears.</li>
               <li><code>Information</code> is the detailed public service text.</li>
             </ul>
@@ -4168,32 +4830,23 @@ function showAdminHelp(){
         <details>
           <summary>Information Text</summary>
           <div class="admin-help-section-body">
-            <p>The resource <code>Information</code> editor has guided sections:</p>
-            <ul>
-              <li><code>What is offered</code></li>
-              <li><code>Eligibility</code></li>
-              <li><code>What to expect</code></li>
-              <li><code>How to connect</code></li>
-              <li><code>Additional text</code></li>
-            </ul>
-            <p>Blank sections are hidden from the public resource view. Use <code>Preview</code> to check how the text will look.</p>
+            <p>The resource <code>Information</code> editor contains the detailed public service text. Use <code>Preview</code> to check how the text will look.</p>
             <p>Supported formatting:</p>
             <ul>
-              <li>Start a line with <code>* </code> for a bullet.</li>
+              <li>Start a line with <code>*[space]</code> for a bullet.</li>
               <li>Use <code>**bold**</code> for bold text.</li>
               <li>Use <code>__underline__</code> for underlined text.</li>
               <li>Put <code>---</code> on its own line for a divider.</li>
             </ul>
-            <p>Use <code>Additional text</code> for details that do not fit the guided sections.</p>
           </div>
         </details>
 
         <details>
-          <summary>Tags</summary>
+          <summary>For</summary>
           <div class="admin-help-section-body">
-            <p>Tags are stored on resources. The <code>Tags</code> tab shows tags currently used by one or more resources.</p>
-            <p>Select a tag to see which resources use it. <code>Delete Tag</code> removes that tag from every listed resource, updates each changed resource, and creates change-log entries.</p>
-            <p>Before deleting tags, make sure you have loaded the latest package. If another admin later saves an older version of a resource, a merge can bring the deleted tag back.</p>
+            <p><code>For</code> shows the groups currently used by one or more resources.</p>
+            <p>Select a group to see which resources use it. <code>Delete Group</code> removes that group from every listed resource, updates each changed resource, and creates change-log entries.</p>
+            <p>Before deleting groups, make sure you have loaded the latest package. If another admin later saves an older version of a resource, a merge can bring the deleted group back.</p>
           </div>
         </details>
 
@@ -4325,61 +4978,108 @@ function clearAllCategoryFilters(shouldRender = true){
   if(shouldRender && view === "category") safeRender();
 }
 
-function getResourceTagKeys(resource){
-  return new Set(normalizeResourceTags(resource && resource.tags).map(tag => tag.toLowerCase()));
+function makeCategorySpecificFilterKey(filter){
+  return `filter:${canonicalizeResourceTag(filter).toLowerCase()}`;
 }
 
-function countSelectedTagMatches(resource, activeTagKeys){
-  if(!activeTagKeys.size) return 0;
-  const resourceKeys = getResourceTagKeys(resource);
+function makeForGroupFilterKey(group){
+  return `for:${canonicalizeResourceTag(group).toLowerCase()}`;
+}
+
+function getCategoryFilterOptions(categoryId){
+  const cat = (Array.isArray(data.categories) ? data.categories : []).find(category => category && category.id === categoryId);
+  const options = [];
+  const resources = getCategoryResources(categoryId);
+  const usedCategoryFilterKeys = new Set();
+  const usedForGroupKeys = new Set();
+
+  resources.forEach(resource => {
+    getResourceCategoryFilterKeys(resource, categoryId).forEach(key => usedCategoryFilterKeys.add(key));
+    getResourceForGroupFilterKeys(resource).forEach(key => usedForGroupKeys.add(key));
+  });
+
+  normalizeCategoryFilters(cat && cat.filters).forEach(filter => {
+    const key = makeCategorySpecificFilterKey(filter);
+    if(usedCategoryFilterKeys.has(key)){
+      options.push({ key, label:filter, kind:"filter" });
+    }
+  });
+  normalizeResourceTags(data.forGroups).forEach(group => {
+    const key = makeForGroupFilterKey(group);
+    if(usedForGroupKeys.has(key)){
+      options.push({ key, label:group, kind:"for" });
+    }
+  });
+  return options;
+}
+
+function getResourceCategoryFilterKeys(resource, categoryId){
+  return new Set(normalizeCategoryFilters(resource && resource.categoryFilters && resource.categoryFilters[categoryId])
+    .map(makeCategorySpecificFilterKey));
+}
+
+function getResourceForGroupFilterKeys(resource){
+  return new Set(normalizeResourceTags(resource && resource.forGroups).map(makeForGroupFilterKey));
+}
+
+function countSelectedCategoryFilterMatches(resource, categoryId, activeFilterKeys){
+  if(!activeFilterKeys.size) return 0;
+  const resourceKeys = new Set([
+    ...getResourceCategoryFilterKeys(resource, categoryId),
+    ...getResourceForGroupFilterKeys(resource)
+  ]);
   let count = 0;
-  activeTagKeys.forEach(key => {
+  activeFilterKeys.forEach(key => {
     if(resourceKeys.has(key)) count += 1;
   });
   return count;
 }
 
-function resourceMatchesSelectedTags(resource, selectedTags){
-  const activeTags = normalizeResourceTags(selectedTags);
-  const activeTagKeys = new Set(activeTags.map(tag => tag.toLowerCase()));
-  return !activeTagKeys.size || countSelectedTagMatches(resource, activeTagKeys) > 0;
+function resourceMatchesSelectedCategoryFilters(resource, categoryId, selectedFilterKeys){
+  const activeFilterKeys = new Set(normalizeResourceTags(selectedFilterKeys));
+  return !activeFilterKeys.size || countSelectedCategoryFilterMatches(resource, categoryId, activeFilterKeys) > 0;
 }
 
-function filterResourcesBySelectedTags(resources, selectedTags){
-  const activeTags = normalizeResourceTags(selectedTags);
-  const activeTagKeys = new Set(activeTags.map(tag => tag.toLowerCase()));
+function filterResourcesBySelectedCategoryFilters(resources, categoryId, selectedFilterKeys){
+  const activeFilterKeys = new Set(normalizeResourceTags(selectedFilterKeys));
   return (Array.isArray(resources) ? resources : [])
-    .filter(resource => resourceMatchesSelectedTags(resource, activeTags))
+    .filter(resource => resourceMatchesSelectedCategoryFilters(resource, categoryId, selectedFilterKeys))
     .sort((a, b) => {
-      if(activeTagKeys.size){
-        const matchDiff = countSelectedTagMatches(b, activeTagKeys) - countSelectedTagMatches(a, activeTagKeys);
+      if(activeFilterKeys.size){
+        const matchDiff = countSelectedCategoryFilterMatches(b, categoryId, activeFilterKeys) - countSelectedCategoryFilterMatches(a, categoryId, activeFilterKeys);
         if(matchDiff) return matchDiff;
       }
       return compareResourcesByName(a, b);
     });
 }
 
+function resourceMatchesListsHeuristic(resource){
+  return !String(resource && resource.phone || "").trim()
+    && !String(resource && resource.website || "").trim()
+    && !String(resource && resource.hours || "").trim();
+}
+
+function getListsResources(){
+  return (Array.isArray(data.resources) ? data.resources : [])
+    .filter(resourceMatchesListsHeuristic);
+}
+
+function isListsCategory(categoryId){
+  return String(categoryId || "") === LISTS_CATEGORY_ID;
+}
+
 function getCategoryResources(categoryId){
+  if(isListsCategory(categoryId)) return getListsResources();
   return (Array.isArray(data.resources) ? data.resources : [])
     .filter(r => Array.isArray(r.categories) && r.categories.includes(categoryId));
 }
 
 function getTagsForCategory(categoryId){
-  const tags = [];
-  const seen = new Set();
-  getCategoryResources(categoryId).forEach(resource => {
-    normalizeResourceTags(resource.tags).forEach(tag => {
-      const key = tag.toLowerCase();
-      if(seen.has(key)) return;
-      seen.add(key);
-      tags.push(tag);
-    });
-  });
-  return tags.sort((a,b)=>a.localeCompare(b, undefined, { sensitivity:"base" }));
+  return getCategoryFilterOptions(categoryId).map(option => option.label);
 }
 
 function getCategoryTagOptions(categoryId){
-  return getTagsForCategory(categoryId);
+  return getCategoryFilterOptions(categoryId);
 }
 
 function renderSearchResultsView(){
@@ -4544,10 +5244,15 @@ function render(){
     grid.className="grid";
     const updatesByCategory = getCategoryUpdateMap();
 
-    data.categories.slice().sort((a,b)=>(a.displayOrder??999)-(b.displayOrder??999)).forEach(cat=>{
+    const categoryCards = data.categories
+      .map(cat => ({ id:cat.id, label:cat.label, source:cat }))
+      .concat(getListsResources().length ? [{ id:LISTS_CATEGORY_ID, label:"Lists", source:null }] : [])
+      .sort((a,b)=>String(a.label || "").localeCompare(String(b.label || ""), undefined, { sensitivity:"base" }));
+
+    categoryCards.forEach(cat=>{
       const card=document.createElement("div");
       card.className="category-card";
-      const updates = updatesByCategory.get(cat.id) || [];
+      const updates = cat.id === LISTS_CATEGORY_ID ? [] : (updatesByCategory.get(cat.id) || []);
       card.innerHTML=`<strong>${cat.label}</strong>${updates.length ? `<div><button type="button" class="button secondary category-update-badge">Updates: ${updates.length}</button></div>` : ""}`;
       const updateBadge = card.querySelector(".category-update-badge");
       if(updateBadge){
@@ -4583,7 +5288,9 @@ function render(){
     controls.appendChild(back);
     appView.appendChild(controls);
 
-    const cat = data.categories.find(c => c.id === currentCategory);
+    const cat = isListsCategory(currentCategory)
+      ? { id:LISTS_CATEGORY_ID, label:"Lists" }
+      : data.categories.find(c => c.id === currentCategory);
     if(cat){
       const title = document.createElement("div");
       title.textContent = cat.label;
@@ -4592,44 +5299,63 @@ function render(){
       title.style.marginBottom = "6px";
       appView.appendChild(title);
     }
-    const categoryTags = getCategoryTagOptions(currentCategory);
-    let activeTags = getCategoryFilterTags(currentCategory).filter(tag =>
-      categoryTags.some(option => option.toLowerCase() === tag.toLowerCase())
+    const categoryFilterOptions = getCategoryTagOptions(currentCategory);
+    let activeFilters = getCategoryFilterTags(currentCategory).filter(filterKey =>
+      categoryFilterOptions.some(option => option.key === filterKey)
     );
-    if(activeTags.length !== getCategoryFilterTags(currentCategory).length){
-      setCategoryFilterTags(currentCategory, activeTags);
+    if(activeFilters.length !== getCategoryFilterTags(currentCategory).length){
+      setCategoryFilterTags(currentCategory, activeFilters);
     }
     const categoryResources = getCategoryResources(currentCategory);
-    const filtered = filterResourcesBySelectedTags(categoryResources, activeTags);
+    const filtered = filterResourcesBySelectedCategoryFilters(categoryResources, currentCategory, activeFilters);
 
-    if(categoryTags.length){
+    if(categoryFilterOptions.length){
       const filterArea = document.createElement("div");
-      filterArea.style.display = "flex";
-      filterArea.style.flexWrap = "wrap";
-      filterArea.style.gap = "8px";
-      filterArea.style.alignItems = "center";
       filterArea.style.marginBottom = "12px";
 
-      categoryTags.forEach(tag => {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = activeTags.some(active => active.toLowerCase() === tag.toLowerCase())
-          ? "button primary"
-          : "button";
-        btn.textContent = tag;
-        btn.onclick = () => {
-          const key = tag.toLowerCase();
-          const selected = activeTags.some(active => active.toLowerCase() === key);
-          const nextTags = selected
-            ? activeTags.filter(active => active.toLowerCase() !== key)
-            : [...activeTags, tag];
-          setCategoryFilterTags(currentCategory, nextTags);
-          safeRender();
-        };
-        filterArea.appendChild(btn);
-      });
+      function appendFilterGroup(title, options){
+        if(!options.length) return;
+        const group = document.createElement("div");
+        group.style.margin = "0 0 8px";
 
-      if(activeTags.length){
+        const heading = document.createElement("div");
+        heading.textContent = title;
+        heading.style.fontWeight = "bold";
+        heading.style.fontSize = "14px";
+        heading.style.marginBottom = "4px";
+        group.appendChild(heading);
+
+        const buttons = document.createElement("div");
+        buttons.style.display = "flex";
+        buttons.style.flexWrap = "wrap";
+        buttons.style.gap = "8px";
+        buttons.style.alignItems = "center";
+
+        options.forEach(option => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = activeFilters.includes(option.key)
+            ? "button primary"
+            : "button";
+          btn.textContent = option.label;
+          btn.onclick = () => {
+            const selected = activeFilters.includes(option.key);
+            const nextFilters = selected
+              ? activeFilters.filter(active => active !== option.key)
+              : [...activeFilters, option.key];
+            setCategoryFilterTags(currentCategory, nextFilters);
+            safeRender();
+          };
+          buttons.appendChild(btn);
+        });
+        group.appendChild(buttons);
+        filterArea.appendChild(group);
+      }
+
+      appendFilterGroup("Specifically", categoryFilterOptions.filter(option => option.kind === "filter"));
+      appendFilterGroup("For", categoryFilterOptions.filter(option => option.kind === "for"));
+
+      if(activeFilters.length){
         const clearFilterBtn = document.createElement("button");
         clearFilterBtn.className = "button";
         clearFilterBtn.textContent = "Clear";
@@ -4640,13 +5366,6 @@ function render(){
         filterArea.appendChild(clearFilterBtn);
       }
 
-      const count = document.createElement("span");
-      count.style.fontSize = "13px";
-      count.style.whiteSpace = "nowrap";
-      count.textContent = filtered.length
-        ? `${filtered.length} ${filtered.length === 1 ? "result" : "results"}`
-        : "No matching resources";
-      filterArea.appendChild(count);
       appView.appendChild(filterArea);
     }
 
@@ -4657,7 +5376,7 @@ function render(){
 
     if(!filtered.length){
       const empty = document.createElement("p");
-      empty.textContent = activeTags.length ? "No matching resources" : "No resources in this category.";
+      empty.textContent = activeFilters.length ? "No matching resources" : "No resources in this category.";
       appView.appendChild(empty);
     }
 
@@ -5039,49 +5758,48 @@ function renderAdmin(){
   const hasChangeLog = getRecentChanges().length > 0;
 
   container.innerHTML = `
-    <div class="admin-toolbar">
-      <div>
-        <div class="admin-toolbar-actions">
-          <button class="button primary" onclick="exportPackage()">Save Resources</button>
-          ${hasChangeLog ? `
-            <button class="button" onclick="showChangeLog()">Show change log</button>
-            <button class="button" onclick="clearChangeLog()">Clear change log</button>
-          ` : ""}
-          ${undo ? `
-            <button class="button" onclick="undoLastDeletion()">${escapeHTML(undoButtonLabel)}</button>
-            <button class="button" onclick="clearUndoSnapshot(); safeRenderAdmin();">Clear undo</button>
-          ` : ""}
-        </div>
-        <div style="margin-top:10px;">
-          Last Modified: ${escapeHTML(formatDateTimeUTC(data.lastModified))}
-        </div>
+    <div class="admin-sticky-bar">
+      <div class="admin-sticky-package-actions">
+        <button class="button primary" onclick="exportPackage()">Save Resource Package</button>
+        ${hasChangeLog ? `
+          <button class="button" onclick="showChangeLog()">Show change log</button>
+          <button class="button" onclick="clearChangeLog()">Clear change log</button>
+        ` : ""}
+        ${undo ? `
+          <button class="button" onclick="undoLastDeletion()">${escapeHTML(undoButtonLabel)}</button>
+          <button class="button" onclick="clearUndoSnapshot(); safeRenderAdmin();">Clear undo</button>
+        ` : ""}
       </div>
-      <div class="admin-toolbar-reference-actions">
-        ${adminGuideMode ? `<button class="button" onclick="showAdminSetup()">Change TSO Name</button>` : ""}
+      <div class="admin-toolbar-reference-actions admin-sticky-reference-actions">
+        ${shouldShowChangeTsoNameButton() ? `<button class="button" onclick="showAdminSetup()">Change TSO Name</button>` : ""}
         <button class="button ${adminGuideMode ? "primary" : ""}" onclick="requestToggleAdminGuide()" aria-pressed="${adminGuideMode ? "true" : "false"}">Guide</button>
         <button class="button admin-toolbar-help" onclick="showAdminHelp()">Help</button>
       </div>
     </div>
 
-    <div>
-      <button class="button ${adminTab==='categories'?'primary':''}"
-        onclick="switchAdminTab('categories')">
-        Categories
-      </button>
+    <div class="admin-mode-bar">
+      <div class="admin-nav-tabs">
+        <button class="button ${adminTab==='categories'?'primary':''}"
+          onclick="switchAdminTab('categories')">
+          Categories
+        </button>
 
-      <button class="button ${adminTab==='resources'?'primary':''}"
-        onclick="switchAdminTab('resources')">
-        Resources
-      </button>
+        <button class="button ${adminTab==='resources'?'primary':''}"
+          onclick="switchAdminTab('resources')">
+          Resources
+        </button>
 
-      <button class="button ${adminTab==='tags'?'primary':''}"
-        onclick="switchAdminTab('tags')">
-        Tags
-      </button>
+        <button class="button ${adminTab==='tags'?'primary':''}"
+          onclick="switchAdminTab('tags')">
+          For
+        </button>
+      </div>
+      <div class="admin-sticky-editor-actions" id="admin_editor_actions" hidden></div>
     </div>
-    <br>
   `;
 
+  clearAdminEditorActions();
+  resetAdminEditorStateForTab(adminTab);
   if(adminTab === "categories") renderAdminCategories(container);
   if(adminTab === "resources") renderAdminResources(container);
   if(adminTab === "tags") renderAdminTags(container);
@@ -5116,7 +5834,7 @@ function clearChangeLog(){
 // - localStorage keeps the primary JSON snapshot.
 // - localStorage also keeps small UI state such as print selection, undo, and
 //   seen update ids under separate keys.
-// - Save Resources exports the same canonical JSON shape used internally.
+// - Save Resource Package exports the same canonical JSON shape used internally.
 // - Merge Resources imports another canonical JSON file and resolves conflicts
 //   by lastModified timestamps where possible.
 
@@ -5402,6 +6120,8 @@ function normalizePackageData(nextData){
   if(!Array.isArray(nextData.resources)) nextData.resources = [];
   normalizeDataInformationShape(nextData);
   normalizeDataTagsShape(nextData);
+  normalizeDataForGroupsShape(nextData);
+  normalizeDataCategoryFilterShape(nextData);
   normalizeDataVerifiedOnShape(nextData);
   normalizeChanges(nextData);
   nextData.packageVersion = normalizePackageVersionValue(nextData.packageVersion);
@@ -5422,7 +6142,7 @@ function mergeResourcePackages(localData, incomingData){
     categories: categoryMerge.merged,
     resources: resourceMerge.merged,
     changes: mergeChanges(local.changes, incoming.changes),
-    tags: []
+    forGroups: normalizeResourceTags([...(local.forGroups || []), ...(incoming.forGroups || [])])
   };
   normalizePackageData(mergedData);
   return {
@@ -5677,7 +6397,7 @@ function getReferenceCategoryEntries(resource){
 
   (Array.isArray(data.categories) ? data.categories : [])
     .slice()
-    .sort((a,b)=>(a.displayOrder??999)-(b.displayOrder??999))
+    .sort(compareCategoriesByLabel)
     .forEach((cat, index) => {
       const id = String(cat && cat.id || "");
       if(!categoryIdSet.has(id)) return;
@@ -5775,7 +6495,7 @@ function getResourceCategoryEntriesForSearch(resource){
 
   (Array.isArray(data.categories) ? data.categories : [])
     .slice()
-    .sort((a,b)=>(a.displayOrder??999)-(b.displayOrder??999))
+    .sort(compareCategoriesByLabel)
     .forEach((cat, index) => {
       const id = String(cat && cat.id || "");
       if(!categoryIdSet.has(id) || seen.has(id)) return;
@@ -5792,6 +6512,11 @@ function getResourceCategoryEntriesForSearch(resource){
     seen.add(id);
     entries.push({ id, label:id, order:9999 });
   });
+
+  if(resourceMatchesListsHeuristic(resource) && !seen.has(LISTS_CATEGORY_ID)){
+    seen.add(LISTS_CATEGORY_ID);
+    entries.push({ id:LISTS_CATEGORY_ID, label:"Lists", order:9998 });
+  }
 
   return entries;
 }
@@ -5815,6 +6540,57 @@ function addSearchResult(groupMap, groups, category, resource, options = {}){
   });
 }
 
+function addTaxonomySearchResults(groupMap, groups, cleanQuery, resources){
+  const queryHasTokens = !!getReferenceTokens(cleanQuery).length;
+  if(!queryHasTokens) return;
+
+  const resourceList = Array.isArray(resources) ? resources : [];
+  const categoryEntries = (Array.isArray(data.categories) ? data.categories : [])
+    .slice()
+    .sort(compareCategoriesByLabel)
+    .map((category, order) => ({ category, order }));
+  if(getListsResources().length){
+    categoryEntries.push({ category:{ id:LISTS_CATEGORY_ID, label:"Lists", filters:[] }, order:9998 });
+  }
+
+  categoryEntries.forEach(({ category:sourceCategory, order }) => {
+    const categoryId = String(sourceCategory && sourceCategory.id || "");
+    if(!categoryId) return;
+    const categoryLabel = String(sourceCategory && sourceCategory.label || categoryId);
+    const searchCategory = { id:categoryId, label:categoryLabel, order };
+    const categoryResources = isListsCategory(categoryId)
+      ? resourceList.filter(resourceMatchesListsHeuristic)
+      : resourceList.filter(resource => Array.isArray(resource && resource.categories) && resource.categories.includes(categoryId));
+
+    if(textContainsTokenPhrase(categoryLabel, cleanQuery)){
+      categoryResources.forEach(resource => {
+        addSearchResult(groupMap, groups, searchCategory, resource, { snippet:`Category: ${categoryLabel}` });
+      });
+    }
+
+    normalizeCategoryFilters(sourceCategory && sourceCategory.filters).forEach(filter => {
+      if(!textContainsTokenPhrase(filter, cleanQuery)) return;
+      categoryResources
+        .filter(resource => getResourceCategoryFilterKeys(resource, categoryId).has(makeCategorySpecificFilterKey(filter)))
+        .forEach(resource => {
+          addSearchResult(groupMap, groups, searchCategory, resource, { snippet:`Specifically: ${filter}` });
+        });
+    });
+  });
+
+  normalizeResourceTags(data.forGroups).forEach(group => {
+    if(!textContainsTokenPhrase(group, cleanQuery)) return;
+    const groupKey = makeForGroupFilterKey(group);
+    resourceList
+      .filter(resource => getResourceForGroupFilterKeys(resource).has(groupKey))
+      .forEach(resource => {
+        getResourceCategoryEntriesForSearch(resource).forEach(category => {
+          addSearchResult(groupMap, groups, category, resource, { snippet:`For: ${group}` });
+        });
+      });
+  });
+}
+
 function buildSearchResults(query){
   const cleanQuery = String(query || "").trim();
   const empty = { query:cleanQuery, mode:"none", groups:[] };
@@ -5833,6 +6609,13 @@ function buildSearchResults(query){
 
   if(groups.length){
     return { query:cleanQuery, mode:"name", groups:sortSearchResultGroups(groups) };
+  }
+
+  groups = [];
+  groupMap = new Map();
+  addTaxonomySearchResults(groupMap, groups, cleanQuery, resources);
+  if(groups.length){
+    return { query:cleanQuery, mode:"taxonomy", groups:sortSearchResultGroups(groups) };
   }
 
   groups = [];
@@ -6019,15 +6802,16 @@ function switchAdminTab(nextTab){
 function categoryEditorDraft(){
   // Capture category editor form state as a plain draft object.
   const labelEl = document.getElementById("cat_label");
-  const orderEl = document.getElementById("cat_order");
   const updateEl = document.getElementById("cat_update_description");
-  if(!labelEl || !orderEl || !editing || editing.kind !== "category") return null;
+  if(!labelEl || !editing || editing.kind !== "category") return null;
   const cat = data.categories[editing.idx];
   if(!cat) return null;
   return {
     id: cat.id || generateResourceId(),
     label: labelEl.value.trim(),
-    displayOrder: orderEl.value,
+    filters: Array.from(document.querySelectorAll(".catFilterInput"))
+      .map(input => input.value)
+      .filter(value => String(value || "").trim()),
     updateDescription: updateEl ? updateEl.value.trim() : ""
   };
 }
@@ -6040,19 +6824,29 @@ function resourceEditorDraft(){
   const websiteEl = document.getElementById("res_website");
   const hoursEl = document.getElementById("res_hours");
   const descEl = document.getElementById("res_description");
-  const tagsEl = document.getElementById("res_tags");
   const updateEl = document.getElementById("res_update_description");
-  if(!nameEl || !phoneEl || !addressEl || !websiteEl || !hoursEl || !descEl || !tagsEl) return null;
+  if(!nameEl || !phoneEl || !addressEl || !websiteEl || !hoursEl || !descEl) return null;
   const verifiedEl = document.getElementById("res_verified_on");
   const verifiedOn = verifiedEl ? verifiedEl.value.trim() : "";
-  const tags = parseResourceTagsInput(tagsEl.value);
-  const informationDraft = emptyInformationDraft();
-  INFORMATION_SECTIONS.forEach(section => {
-    const field = document.getElementById(`res_info_${section.key}`);
-    informationDraft[section.key] = field ? field.value : "";
+  const forGroups = Array.from(document.querySelectorAll(".resForGroup"))
+    .filter(cb=>cb.checked)
+    .map(cb=>cb.value)
+    .sort();
+  const categories = Array.from(document.querySelectorAll(".resCat"))
+    .filter(cb=>cb.checked)
+    .map(cb=>cb.value)
+    .sort();
+  const categoryFilters = {};
+  categories.forEach(categoryId => {
+    const filters = Array.from(document.querySelectorAll(".resCatFilter"))
+      .filter(cb => cb.dataset.categoryId === categoryId)
+      .filter(cb => cb.checked)
+      .map(cb => cb.value);
+    const cleaned = normalizeCategoryFilters(filters);
+    if(cleaned.length) categoryFilters[categoryId] = cleaned;
   });
   const additionalEl = document.getElementById("res_info_additional");
-  informationDraft.additional = additionalEl ? additionalEl.value : "";
+  const informationDraft = { additional:additionalEl ? additionalEl.value : "" };
 
   return {
     name: nameEl.value.trim(),
@@ -6063,11 +6857,9 @@ function resourceEditorDraft(){
     description: descEl.value,
     informationText: composeInformationText(informationDraft),
     verifiedOn,
-    categories: Array.from(document.querySelectorAll(".resCat"))
-      .filter(cb=>cb.checked)
-      .map(cb=>cb.value)
-      .sort(),
-    tags,
+    categories,
+    categoryFilters,
+    forGroups,
     updateDescription: updateEl ? updateEl.value.trim() : ""
   };
 }
@@ -6095,6 +6887,21 @@ function normalizeCategoryName(name){
   return String(name || "").trim().toLowerCase();
 }
 
+function compareCategoriesByLabel(a, b){
+  const labelA = String(a && a.label || "");
+  const labelB = String(b && b.label || "");
+  return labelA.localeCompare(labelB, undefined, { sensitivity:"base" });
+}
+
+function getAlphabeticalCategoryPairs(){
+  return (Array.isArray(data.categories) ? data.categories : [])
+    .map((c,i)=>({c,i}))
+    .sort((a,b)=>{
+      const labelCompare = compareCategoriesByLabel(a.c, b.c);
+      return labelCompare || a.i - b.i;
+    });
+}
+
 function categoryNameExists(name, excludeId){
   const normalizedName = normalizeCategoryName(name);
   if(!normalizedName) return false;
@@ -6105,11 +6912,6 @@ function categoryNameExists(name, excludeId){
 }
 
 function validateCategoryDraft(draft){
-  // Delegate numeric display-order checks to browser input validity.
-  const orderInput = document.getElementById("cat_order");
-  if(orderInput && !orderInput.checkValidity()){
-    return { valid:false, message:orderInput.validationMessage || "Display order must be a number." };
-  }
   if(categoryNameExists(draft && draft.label, draft && draft.id)){
     return { valid:false, message:"Category already exists." };
   }
@@ -6148,13 +6950,105 @@ function snapshotResourceEditor(){
   return draft ? JSON.stringify(draft) : "";
 }
 
+function setAdminEditorActions(kind, visible, doneDisabled = false, cancelDisabled = false){
+  const bar = document.getElementById("admin_editor_actions");
+  if(!bar) return;
+  if(!visible){
+    bar.innerHTML = "";
+    bar.hidden = true;
+    return;
+  }
+  const buttonSets = {
+    category: `
+      <button class="button" type="button" id="cat_cancel_btn" onclick="cancelCategoryEdit()" ${cancelDisabled ? "disabled" : ""}>Cancel</button>
+      <button class="button primary" type="button" id="cat_done_btn" onclick="closeCategoryEditor()" ${doneDisabled ? "disabled" : ""}>Done</button>
+    `,
+    resource: `
+      <button id="res_cancel_btn" class="button" type="button" onclick="cancelResourceEditor()" ${cancelDisabled ? "disabled" : ""}>Cancel</button>
+      <button id="res_done_btn" class="button primary" onclick="closeResourceEditor()" ${doneDisabled ? "disabled" : ""}>Done</button>
+    `,
+    forGroups: `
+      <button class="button" type="button" id="forGroupCancelBtn" onclick="cancelForGroupsEditor()">Cancel</button>
+      <button class="button primary" type="button" id="forGroupDoneBtn" onclick="closeForGroupsEditor()">Done</button>
+    `
+  };
+  bar.innerHTML = buttonSets[kind] || "";
+  bar.hidden = false;
+}
+
+function clearAdminEditorActions(){
+  const bar = document.getElementById("admin_editor_actions");
+  if(!bar) return;
+  bar.innerHTML = "";
+  bar.hidden = true;
+}
+
+function resetAdminEditorStateForTab(tab){
+  if(tab === "categories" && (!editing || editing.kind !== "category")){
+    editing = null;
+    editorSnapshot = "";
+  }
+  if(tab === "resources" && !adminResourceEditMode){
+    editing = null;
+    editorSnapshot = "";
+  }
+}
+
+function isCurrentCategoryNewDraft(){
+  if(!editing || editing.kind !== "category") return false;
+  const cat = data.categories[editing.idx];
+  return !!(cat && newCategoryIds.has(cat.id));
+}
+
+function isCurrentResourceNewDraft(){
+  if(!editing || editing.kind !== "resource") return false;
+  const resource = data.resources[editing.idx];
+  return !!(resource && newResourceIds.has(resource.id));
+}
+
+function updateCategoryEditorActionBar(){
+  const currentSnapshot = snapshotCategoryEditor();
+  const validation = currentSnapshot ? validateCategoryDraft(JSON.parse(currentSnapshot)) : { valid:true };
+  setAdminEditorActions(
+    "category",
+    isCurrentCategoryNewDraft() || (!!currentSnapshot && currentSnapshot !== editorSnapshot),
+    !validation.valid
+  );
+}
+
+function updateResourceEditorActionBar(validationDisabled = false){
+  const currentSnapshot = snapshotResourceEditor();
+  const isNewDraft = isCurrentResourceNewDraft();
+  const guideExitDisabled = shouldDisableResourceEditorExit();
+  setAdminEditorActions(
+    "resource",
+    shouldForceEnableResourceEditorExit() || isNewDraft || (!!currentSnapshot && currentSnapshot !== editorSnapshot)
+      || (guideExitDisabled && isNewDraft),
+    shouldForceEnableResourceEditorExit()
+      ? false
+      : guideExitDisabled || validationDisabled,
+    guideExitDisabled && !isNewDraft
+  );
+}
+
+function updateForGroupsEditorActionBar(){
+  const currentSnapshot = snapshotForGroupsEditor();
+  const baselineRows = editorSnapshot
+    ? (JSON.parse(editorSnapshot).forGroups || [])
+    : [];
+  const currentRows = Array.from(document.querySelectorAll(".forGroupInput"))
+    .map(input => input.value);
+  const rowsChanged = JSON.stringify(currentRows) !== JSON.stringify(baselineRows);
+  setAdminEditorActions("forGroups", rowsChanged || (!!currentSnapshot && currentSnapshot !== editorSnapshot));
+}
+
 function applyCategoryDraft(idx, draft){
   // Apply validated category draft into canonical data model.
   const cat = data.categories[idx];
   if(!cat) return;
   cat.id = cat.id || draft.id || generateResourceId();
   cat.label = draft.label || cat.label;
-  cat.displayOrder = draft.displayOrder === "" ? null : Number(draft.displayOrder);
+  cat.filters = normalizeCategoryFilters(draft.filters);
   cat.lastModified = nowISO();
 }
 
@@ -6223,93 +7117,6 @@ function openAdminCategoryResourceById(resourceId){
   openResourceEditor();
 }
 
-function openCategoryOrderEditor(){
-  // The order editor sorts a stable draft row list for display, then writes back
-  // normalized 10,20,30... displayOrder values on OK.
-  if(!commitPendingEditsIfChanged()) return;
-  const rows = data.categories.map((cat, idx) => {
-    const rawOrder = cat.displayOrder;
-    const numericOrder = rawOrder == null || rawOrder === "" ? null : Number(rawOrder);
-    return {
-      idx,
-      label: cat.label || "",
-      order: Number.isFinite(numericOrder) ? numericOrder : null,
-      value: rawOrder == null ? "" : String(rawOrder)
-    };
-  });
-  rows.sort((a, b) => {
-    const aMissing = a.order == null;
-    const bMissing = b.order == null;
-    if(aMissing !== bMissing) return aMissing ? 1 : -1;
-    if(!aMissing && a.order !== b.order) return a.order - b.order;
-    const labelCmp = a.label.localeCompare(b.label);
-    if(labelCmp !== 0) return labelCmp;
-    return a.idx - b.idx;
-  });
-  adminCategoryOrderEditorOpen = true;
-  adminCategoryOrderDraft = rows.map(row => ({ idx: row.idx, value: row.value }));
-  safeRenderAdmin();
-}
-
-function closeCategoryOrderEditor(shouldRender = true){
-  adminCategoryOrderEditorOpen = false;
-  adminCategoryOrderDraft = null;
-  if(shouldRender) safeRenderAdmin();
-}
-
-function applyCategoryOrderEditor(){
-  const draft = Array.isArray(adminCategoryOrderDraft)
-    ? adminCategoryOrderDraft.map((row, pos) => ({
-      idx: Number(row && row.idx),
-      value: row && typeof row.value === "string" ? row.value : "",
-      pos
-    }))
-    : [];
-  // Close first to avoid visible panel flicker during render/update.
-  adminCategoryOrderEditorOpen = false;
-  adminCategoryOrderDraft = null;
-
-  const sortedRows = draft
-    .filter(row => Number.isInteger(row.idx) && row.idx >= 0 && row.idx < data.categories.length)
-    .map(row => {
-      const raw = row.value.trim();
-      const numeric = raw === "" ? null : Number(raw);
-      return {
-        idx: row.idx,
-        pos: row.pos,
-        label: (data.categories[row.idx] && data.categories[row.idx].label) || "",
-        order: raw === "" || !Number.isFinite(numeric) ? null : numeric
-      };
-    });
-
-  sortedRows.sort((a, b) => {
-    const aMissing = a.order == null;
-    const bMissing = b.order == null;
-    if(aMissing !== bMissing) return aMissing ? 1 : -1;
-    if(!aMissing && a.order !== b.order) return a.order - b.order;
-    const labelCmp = a.label.localeCompare(b.label);
-    if(labelCmp !== 0) return labelCmp;
-    return a.pos - b.pos;
-  });
-
-  let changed = false;
-  sortedRows.forEach((row, orderIdx) => {
-    const cat = data.categories[row.idx];
-    if(!cat) return;
-    const nextDisplayOrder = (orderIdx + 1) * 10;
-    const prevRaw = cat.displayOrder;
-    const prevDisplayOrder = prevRaw == null || prevRaw === "" ? null : Number(prevRaw);
-    if(prevDisplayOrder !== nextDisplayOrder){
-      cat.displayOrder = nextDisplayOrder;
-      cat.lastModified = nowISO();
-      changed = true;
-    }
-  });
-
-  if(changed) persist();
-  safeRenderAdmin();
-}
-
 function applyResourceDraft(idx, draft){
   // Apply validated resource draft into canonical data model.
   const res = data.resources[idx];
@@ -6326,7 +7133,8 @@ function applyResourceDraft(idx, draft){
   if("reviewedOn" in res) delete res.reviewedOn;
   if("verifiedDate" in res) delete res.verifiedDate;
   res.categories = draft.categories;
-  res.tags = normalizeResourceTags(draft.tags);
+  res.categoryFilters = draft.categoryFilters || {};
+  res.forGroups = normalizeResourceTags(draft.forGroups);
   res.lastModified = nowISO();
   refreshAdminCategoryResourceList();
 }
@@ -6415,8 +7223,8 @@ function commitPendingEditsIfChanged(){
     const validation = validateCategoryDraft(draft);
     showCategoryEditorWarning(validation.message);
     if(!validation.valid){
-      const orderInput = document.getElementById("cat_order");
-      if(orderInput) orderInput.focus();
+      const labelInput = document.getElementById("cat_label");
+      if(labelInput) labelInput.focus();
       return false;
     }
     if(nextSnapshot !== editorSnapshot){
@@ -6465,46 +7273,50 @@ function commitPendingEditsIfChanged(){
     }
     return true;
   }
+
+  if(editing.kind === "forGroups"){
+    nextSnapshot = snapshotForGroupsEditor();
+    if(!nextSnapshot) return true;
+    const draft = JSON.parse(nextSnapshot);
+    const validation = validateForGroupsDraft(draft);
+    if(!validation.valid) return false;
+    if(nextSnapshot !== editorSnapshot){
+      applyForGroupsDraft(draft);
+      persist();
+      editorSnapshot = nextSnapshot;
+    }
+    return true;
+  }
   return true;
 }
 
 /* ---------- Admin: Categories ---------- */
-// Category admin owns category labels, display order, deletion, and the helper
-// list of resources assigned to the selected category.
+// Category admin owns category labels, category filters, deletion, and the
+// helper list of resources assigned to the selected category.
 
 function renderAdminCategories(container){
-  // Category management view (list, editor, order controls, and related actions).
+  // Category management view (alphabetical list, full-width editor, and filters).
 
   container.innerHTML += `
-    <div class="admin-panel">
-      <div class="admin-box">
-        <h3 class="admin-panel-title">Categories</h3>
-        <div class="admin-action-row" style="margin-bottom:8px;">
-          <button class="button" onclick="newCategory()">New</button>
-          <button class="button danger" onclick="deleteCategory()">Delete</button>
-          <button class="button" onclick="openCategoryOrderEditor()">Edit display order...</button>
-        </div>
-        <div id="catSelect" class="resource-button-listbox" role="listbox" tabindex="0" aria-label="Categories"></div>
-        <div id="categoryOrderOverlay" style="${adminCategoryOrderEditorOpen ? "position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:40; display:flex; align-items:center; justify-content:center;" : "display:none;"}">
-          <div id="categoryOrderPanel" style="background:#fff; border-radius:8px; border:1px solid #ccc; width:min(640px,90vw); max-height:80vh; overflow:auto; padding:12px;">
-            <h4 style="margin:0 0 10px 0;">Edit display order</h4>
-            <div id="categoryOrderRows"></div>
-            <div style="margin-top:12px; display:flex; gap:8px;">
-              <button class="button primary" type="button" id="categoryOrderOkBtn">OK</button>
-              <button class="button" type="button" id="categoryOrderCancelBtn">Cancel</button>
-            </div>
+    <div class="admin-panel category-admin-panel">
+      <div class="category-admin-layout">
+        <div class="admin-box">
+          <h3 class="admin-panel-title">Categories</h3>
+          <div class="admin-action-row" style="margin-bottom:8px;">
+            <button class="button" onclick="newCategory()">New</button>
+            <button class="button danger" onclick="deleteCategory()">Delete</button>
           </div>
+          <div id="catSelect" class="resource-button-listbox" role="listbox" tabindex="0" aria-label="Categories"></div>
         </div>
+        <div class="admin-box" id="catEditor"></div>
       </div>
-      <div class="admin-box" id="catEditor"></div>
     </div>
   `;
 
   const sel = document.getElementById("catSelect");
 
-  // sort for display, but keep option value = real index
-  const pairs = data.categories.map((c,i)=>({c,i}));
-  pairs.sort((a,b)=>(a.c.displayOrder ?? 999)-(b.c.displayOrder ?? 999));
+  // Sort for display, but keep option value = real index.
+  const pairs = getAlphabeticalCategoryPairs();
 
   populateCategoryBrowseOptions(sel, pairs);
 
@@ -6559,62 +7371,6 @@ function renderAdminCategories(container){
     renderAdminCategoryResourceList("");
   }
 
-  if(adminCategoryOrderEditorOpen){
-    const panel = document.getElementById("categoryOrderPanel");
-    const overlay = document.getElementById("categoryOrderOverlay");
-    const rows = document.getElementById("categoryOrderRows");
-    const okBtn = document.getElementById("categoryOrderOkBtn");
-    const cancelBtn = document.getElementById("categoryOrderCancelBtn");
-    const draft = Array.isArray(adminCategoryOrderDraft) ? adminCategoryOrderDraft : [];
-    adminCategoryOrderDraft = draft;
-
-    if(rows){
-      rows.innerHTML = "";
-      draft.forEach((rowDraft) => {
-        const cat = data.categories[rowDraft.idx];
-        if(!cat) return;
-        const row = document.createElement("div");
-        row.style.display = "flex";
-        row.style.alignItems = "center";
-        row.style.gap = "10px";
-        row.style.marginBottom = "8px";
-
-        const label = document.createElement("div");
-        label.style.flex = "1";
-        label.textContent = cat.label || "(no label)";
-
-        const input = document.createElement("input");
-        input.type = "number";
-        input.className = "category-order-input";
-        input.value = rowDraft.value ?? "";
-        input.style.width = "130px";
-        input.oninput = () => { rowDraft.value = input.value; };
-
-        row.appendChild(label);
-        row.appendChild(input);
-        rows.appendChild(row);
-      });
-    }
-
-    if(okBtn){
-      okBtn.onclick = (e) => {
-        e.stopPropagation();
-        applyCategoryOrderEditor();
-      };
-    }
-    if(cancelBtn){
-      cancelBtn.onclick = (e) => {
-        e.stopPropagation();
-        closeCategoryOrderEditor(true);
-      };
-    }
-    if(panel) panel.addEventListener("click", (e) => e.stopPropagation());
-    if(overlay){
-      overlay.addEventListener("click", () => {
-        closeCategoryOrderEditor(true);
-      });
-    }
-  }
 }
 
 function populateCategoryBrowseOptions(sel, pairs){
@@ -6672,7 +7428,7 @@ function newCategory(){
     label: "",
     active: true,
     lastModified: nowISO(),
-    displayOrder: null
+    filters: []
   });
 
   persist();
@@ -6772,6 +7528,9 @@ function completeCategoryDelete(categoryId, updateDescription){
     if(Array.isArray(r.categories)){
       r.categories = r.categories.filter(id => id !== cat.id);
     }
+    if(r.categoryFilters && typeof r.categoryFilters === "object"){
+      delete r.categoryFilters[cat.id];
+    }
   });
 
   data.categories.splice(idx,1);
@@ -6812,6 +7571,7 @@ function editCategory(idx){
   const editor = document.getElementById("catEditor");
   if(!cat || !editor) return;
   selectedCategoryIndex = String(idx);
+  cat.filters = normalizeCategoryFilters(cat.filters);
 
   editor.innerHTML = `
     <h3>Edit Category</h3>
@@ -6821,43 +7581,98 @@ function editCategory(idx){
     </label>
     <div id="cat_editor_warning" style="display:none; color:#aa0000; margin-top:4px;"></div><br>
 
-    <label>Display order (optional)<br>
-      <input id="cat_order" type="number" value="${cat.displayOrder ?? ""}">
-    </label><br><br>
     <label>Describe this update (optional)<br>
       <textarea id="cat_update_description" class="big" style="min-height:60px;"></textarea>
     </label><br><br>
-    <div style="display:flex; gap:8px; align-items:center;">
-      <button class="button" type="button" onclick="cancelCategoryEdit()">Cancel</button>
-      <button class="button primary" type="button" id="cat_done_btn" onclick="closeCategoryEditor()">Done</button>
-    </div>
     <hr style="margin:18px 0 12px; border:0; border-top:1px solid #ddd;">
-    <div id="adminCategoryResourceList" style="display:none;"></div>
+    <div class="category-editor-layout">
+      <div>
+        <h4 style="margin:0 0 8px;">Filters</h4>
+        <p class="admin-note">Add specific subcategories for this category.</p>
+        <div class="admin-action-row" style="margin-bottom:8px;">
+          <button class="button" type="button" id="cat_filter_new_btn">New</button>
+          <button class="button danger" type="button" id="cat_filter_delete_btn">Delete</button>
+        </div>
+        <div id="catFilterRows"></div>
+      </div>
+      <div id="adminCategoryResourceList" style="display:none;"></div>
+    </div>
   `;
   renderAdminCategoryResourceList(cat && cat.id ? cat.id : "");
+  renderCategoryFilterRows(cat.filters);
 
   editing = { kind: "category", idx };
   editorSnapshot = snapshotCategoryEditor();
 
   const labelInput = document.getElementById("cat_label");
-  const orderInput = document.getElementById("cat_order");
   const updateInput = document.getElementById("cat_update_description");
-  const doneBtn = document.getElementById("cat_done_btn");
+  const newFilterBtn = document.getElementById("cat_filter_new_btn");
+  const deleteFilterBtn = document.getElementById("cat_filter_delete_btn");
   function validateCategoryEditorState(){
     const draft = categoryEditorDraft();
     if(!draft){
       showCategoryEditorWarning("");
+      updateCategoryEditorActionBar();
+      const doneBtn = document.getElementById("cat_done_btn");
       if(doneBtn) doneBtn.disabled = false;
       return;
     }
     const validation = validateCategoryDraft(draft);
     showCategoryEditorWarning(validation.message);
+    updateCategoryEditorActionBar();
+    const doneBtn = document.getElementById("cat_done_btn");
     if(doneBtn) doneBtn.disabled = !validation.valid;
   }
   if(labelInput) labelInput.addEventListener("input", validateCategoryEditorState);
-  if(orderInput) orderInput.addEventListener("input", validateCategoryEditorState);
   if(updateInput) updateInput.addEventListener("input", validateCategoryEditorState);
+  if(newFilterBtn){
+    newFilterBtn.addEventListener("click", () => {
+      addCategoryFilterRow("");
+      validateCategoryEditorState();
+      const rows = Array.from(document.querySelectorAll(".catFilterInput"));
+      const last = rows[rows.length - 1];
+      if(last) last.focus();
+    });
+  }
+  if(deleteFilterBtn){
+    deleteFilterBtn.addEventListener("click", () => {
+      const selected = Array.from(document.querySelectorAll(".catFilterSelect:checked"));
+      selected.forEach(checkbox => {
+        const row = checkbox.closest(".category-filter-row");
+        if(row) row.remove();
+      });
+      if(selected.length) validateCategoryEditorState();
+    });
+  }
   validateCategoryEditorState();
+}
+
+function addCategoryFilterRow(value){
+  const list = document.getElementById("catFilterRows");
+  if(!list) return;
+  const row = document.createElement("div");
+  row.className = "category-filter-row";
+  row.innerHTML = `
+    <input type="checkbox" class="catFilterSelect" aria-label="Select filter">
+    <input type="text" class="catFilterInput" value="${escapeHTML(value || "")}" aria-label="Category filter">
+  `;
+  const input = row.querySelector(".catFilterInput");
+  if(input){
+    input.addEventListener("input", () => {
+      const doneBtn = document.getElementById("cat_done_btn");
+      const draft = categoryEditorDraft();
+      if(doneBtn && draft) doneBtn.disabled = !validateCategoryDraft(draft).valid;
+      updateCategoryEditorActionBar();
+    });
+  }
+  list.appendChild(row);
+}
+
+function renderCategoryFilterRows(filters){
+  const list = document.getElementById("catFilterRows");
+  if(!list) return;
+  list.innerHTML = "";
+  normalizeCategoryFilters(filters).forEach(filter => addCategoryFilterRow(filter));
 }
 
 /* ---------- Admin: Resources ---------- */
@@ -6940,13 +7755,7 @@ function renderAdminResources(container){
   container.innerHTML += `
     <div class="admin-panel ${adminGuideMode && adminGuideStep === "resourceFields" ? "admin-guide-active" : ""}">
       <div class="admin-box">
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-          <h3 style="margin:0;">Edit Resource</h3>
-          <div style="display:flex; gap:8px; align-items:center;">
-            <button id="res_cancel_btn" class="button" type="button" onclick="cancelResourceEditor()" ${shouldDisableResourceEditorExit() ? "disabled" : ""}>Cancel</button>
-            <button id="res_done_btn" class="button primary" onclick="closeResourceEditor()" ${shouldDisableResourceEditorExit() ? "disabled" : ""}>Done</button>
-          </div>
-        </div>
+        <h3 style="margin:0;">Edit Resource</h3>
         <div id="resEditor" style="margin-top:12px;"></div>
       </div>
     </div>
@@ -7032,7 +7841,9 @@ function newResource(){
     name: "",
     description: "",
     informationText: "",
-    tags: [],
+    categories: [],
+    categoryFilters: {},
+    forGroups: [],
     verifiedOn: null
   };
   data.resources.push(resource);
@@ -7077,9 +7888,12 @@ function isBlankResourceDraft(resource){
   if(!resource) return false;
   const hasText = ["name", "description", "phone", "address", "website", "hours", "informationText"]
     .some(key => String(resource[key] || "").trim());
-  const hasLists = ["categories", "tags"]
+  const hasLists = ["categories", "forGroups"]
     .some(key => Array.isArray(resource[key]) && resource[key].length);
-  return !hasText && !hasLists;
+  const hasCategoryFilters = resource.categoryFilters
+    && typeof resource.categoryFilters === "object"
+    && Object.keys(resource.categoryFilters).some(key => normalizeCategoryFilters(resource.categoryFilters[key]).length);
+  return !hasText && !hasLists && !hasCategoryFilters;
 }
 
 function deleteResource(){
@@ -7167,22 +7981,47 @@ function editResource(idx){
 
   normalizeResourceInformation(res);
   normalizeResourceVerifiedOn(res);
-  res.tags = normalizeResourceTags(res.tags);
+  normalizeDataForGroupsShape(data);
+  normalizeDataCategoryFilterShape(data);
+  res.forGroups = normalizeResourceTags(res.forGroups);
   const verifiedDisplay = formatVerifiedOnForDisplay(res.verifiedOn);
-  const tagInputValue = formatResourceTagsInput(res.tags);
   const informationDraft = parseInformationText(res.informationText || "");
-  const tagSuggestions = normalizeResourceTags([...res.tags, ...getAllTags(res.id)])
-    .sort((a,b)=>a.localeCompare(b, undefined, { sensitivity:"base" }));
+  const selectedForKeys = new Set(normalizeResourceTags(res.forGroups).map(group => group.toLowerCase()));
+  const forGroupChecks = normalizeResourceTags(data.forGroups)
+    .map(group => `
+      <label style="display:block; margin:2px 0;">
+        <input type="checkbox" class="resForGroup" value="${escapeHTML(group)}" ${selectedForKeys.has(group.toLowerCase()) ? "checked" : ""}>
+        ${escapeHTML(group)}
+      </label>
+    `).join("");
 
   const catChecks = data.categories
     .slice()
-    .sort((a,b)=>(a.displayOrder ?? 999)-(b.displayOrder ?? 999))
+    .sort(compareCategoriesByLabel)
     .map(c=>{
       const checked = (res.categories||[]).includes(c.id) ? "checked" : "";
-      return `<label style="display:block;">
-        <input type="checkbox" class="resCat" value="${escapeHTML(c.id)}" ${checked}>
-        ${escapeHTML(c.label)}
-      </label>`;
+      const categoryFilters = normalizeCategoryFilters(c.filters);
+      const selectedFilters = normalizeCategoryFilters(res.categoryFilters && res.categoryFilters[c.id]);
+      const selectedKeys = new Set(selectedFilters.map(filter => filter.toLowerCase()));
+      const filterRows = categoryFilters.map(filter => `
+        <label>
+          <input type="checkbox" class="resCatFilter" data-category-id="${escapeHTML(c.id)}" value="${escapeHTML(filter)}" ${selectedKeys.has(filter.toLowerCase()) ? "checked" : ""}>
+          ${escapeHTML(filter)}
+        </label>
+      `).join("");
+      return `
+        <div class="resource-category-option">
+          <label>
+            <input type="checkbox" class="resCat" value="${escapeHTML(c.id)}" ${checked}>
+            ${escapeHTML(c.label)}
+          </label>
+          ${categoryFilters.length ? `
+            <div class="resource-category-filter-list" data-category-filters-for="${escapeHTML(c.id)}" style="${checked ? "" : "display:none;"}">
+              ${filterRows}
+            </div>
+          ` : ""}
+        </div>
+      `;
     }).join("");
 
   editor.innerHTML = `
@@ -7229,14 +8068,12 @@ function editResource(idx){
     </div>
 
     <div class="resource-editor-guide-section ${adminGuideResourceSection === "tags" ? "admin-guide-current-section" : ""}" data-guide-section="tags">
-      <label style="display:block; margin-top:8px;">Tags (comma-separated or one per line)<br>
-        <textarea id="res_tags" class="big" style="min-height:72px;">${escapeHTML(tagInputValue)}</textarea>
-      </label>
-      ${tagSuggestions.length ? `
-        <div id="res_tag_suggestions" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;">
-          ${tagSuggestions.map(tag => `<button class="button" type="button" data-tag-suggestion="${escapeHTML(tag)}">${escapeHTML(tag)}</button>`).join("")}
+      <div style="margin-top:8px;">
+        <strong>For</strong>
+        <div style="margin-top:4px;">
+          ${forGroupChecks || `<p class="admin-note">No For groups have been created yet.</p>`}
         </div>
-      ` : ""}
+      </div>
       <br>
     </div>
 
@@ -7256,19 +8093,11 @@ function editResource(idx){
             <button class="button" type="button" id="res_information_preview_btn">Preview</button>
           </div>
           <div class="services-hint resource-info-guidance">
-            Use the section headings as a guide. Blank sections will not be shown. Text in Additional text appears after the guided sections without its own heading.<br>
-            Formatting: use * at the start of a line for bullets, **bold** for bold text, __underline__ for underline, and --- on its own line for a horizontal line.
+            Formatting: use *[space] at the start of a line for bullets, **bold** for bold text, __underline__ for underline, and --- on its own line for a horizontal line.
           </div>
         </div>
         <div id="res_information_editor">
-          ${INFORMATION_SECTIONS.map(section => `
-            <div class="resource-info-section">
-              <label class="resource-info-section-label" for="res_info_${escapeHTML(section.key)}">${escapeHTML(section.label)}:</label>
-              <textarea id="res_info_${escapeHTML(section.key)}" class="big resource-info-input" style="min-height:76px;">${escapeHTML(informationDraft[section.key] || "")}</textarea>
-            </div>
-          `).join("")}
           <div class="resource-info-additional">
-            <label class="resource-info-section-label" for="res_info_additional">Additional text:</label>
             <textarea id="res_info_additional" class="big resource-info-input" style="min-height:90px;">${escapeHTML(informationDraft.additional || "")}</textarea>
           </div>
         </div>
@@ -7283,21 +8112,13 @@ function editResource(idx){
   const verifiedWarning = document.getElementById("res_verified_warning");
   const nameEl = document.getElementById("res_name");
   const updateEl = document.getElementById("res_update_description");
-  const tagsEl = document.getElementById("res_tags");
   const informationEditor = document.getElementById("res_information_editor");
   const informationEditBtn = document.getElementById("res_information_edit_btn");
   const informationPreviewBtn = document.getElementById("res_information_preview_btn");
   const informationPreviewBox = document.getElementById("res_information_preview");
-  const doneBtn = document.getElementById("res_done_btn");
   function getInformationDraftFromEditor(){
-    const draft = emptyInformationDraft();
-    INFORMATION_SECTIONS.forEach(section => {
-      const field = document.getElementById(`res_info_${section.key}`);
-      draft[section.key] = field ? field.value : "";
-    });
     const additionalEl = document.getElementById("res_info_additional");
-    draft.additional = additionalEl ? additionalEl.value : "";
-    return draft;
+    return { additional:additionalEl ? additionalEl.value : "" };
   }
   function refreshInformationPreview(){
     if(!informationPreviewBox) return;
@@ -7317,6 +8138,7 @@ function editResource(idx){
   if(informationEditBtn && informationPreviewBtn){
     informationEditBtn.onclick = () => setInformationEditorMode("edit");
     informationPreviewBtn.onclick = () => setInformationEditorMode("preview");
+    setInformationEditorMode("preview");
   }
   const informationInputs = Array.from(document.querySelectorAll(".resource-info-input"));
   informationInputs.forEach(field => {
@@ -7324,36 +8146,28 @@ function editResource(idx){
     field.addEventListener("input", () => {
       fitTextareaToText(field);
       refreshInformationPreview();
+      validateEditorState();
     });
   });
-  setInformationEditorMode("edit");
 
-  function getCurrentTagKeys(){
-    return new Set(parseResourceTagsInput(tagsEl ? tagsEl.value : "").map(tag => tag.toLowerCase()));
-  }
-
-  function refreshTagSuggestionButtons(){
-    const selectedKeys = getCurrentTagKeys();
-    editor.querySelectorAll("[data-tag-suggestion]").forEach(btn => {
-      const tag = btn.getAttribute("data-tag-suggestion") || "";
-      const normalized = normalizeResourceTags([tag])[0] || "";
-      btn.classList.toggle("primary", !!normalized && selectedKeys.has(normalized.toLowerCase()));
+  function syncCategoryFilterVisibility(){
+    editor.querySelectorAll(".resCat").forEach(cb => {
+      const filterList = Array.from(editor.querySelectorAll("[data-category-filters-for]"))
+        .find(list => list.dataset.categoryFiltersFor === cb.value);
+      if(filterList) filterList.style.display = cb.checked ? "" : "none";
     });
   }
 
-  function toggleTagSuggestion(tag){
-    if(!tagsEl) return;
-    const nextTags = toggleResourceTag(parseResourceTagsInput(tagsEl.value), tag);
-    tagsEl.value = formatResourceTagsInput(nextTags);
-    tagsEl.dispatchEvent(new Event("input", { bubbles:true }));
-    tagsEl.focus();
-  }
-
-  editor.querySelectorAll("[data-tag-suggestion]").forEach(btn => {
-    btn.onclick = () => toggleTagSuggestion(btn.getAttribute("data-tag-suggestion") || "");
+  editor.querySelectorAll(".resCat").forEach(cb => {
+    cb.addEventListener("change", () => {
+      syncCategoryFilterVisibility();
+      validateEditorState();
+    });
   });
-  if(tagsEl) tagsEl.addEventListener("input", refreshTagSuggestionButtons);
-  refreshTagSuggestionButtons();
+  editor.querySelectorAll(".resCatFilter").forEach(cb => {
+    cb.addEventListener("change", validateEditorState);
+  });
+  syncCategoryFilterVisibility();
 
   function updateVerifiedDisplayAndWarning(){
     if(!verifiedInput || !verifiedDisplayEl) return true;
@@ -7370,6 +8184,7 @@ function editResource(idx){
     verifiedBtn.onclick = () => {
       verifiedInput.value = formatMMYYFromDate(new Date());
       updateVerifiedDisplayAndWarning();
+      validateEditorState();
       verifiedInput.focus();
       verifiedInput.select();
     };
@@ -7381,6 +8196,8 @@ function editResource(idx){
     if(!draft){
       showResourceNameWarning("");
       showResourceVerifiedWarning("");
+      updateResourceEditorActionBar();
+      const doneBtn = document.getElementById("res_done_btn");
       if(doneBtn) doneBtn.disabled = false;
       return;
     }
@@ -7388,185 +8205,222 @@ function editResource(idx){
     const verifiedValidation = validateVerifiedOnInput(draft.verifiedOn);
     showResourceNameWarning(nameValidation.message);
     showResourceVerifiedWarning(verifiedValidation.message);
+    const shouldDisableDone = shouldForceEnableResourceEditorExit()
+      ? false
+      : shouldDisableResourceEditorExit() || !(nameValidation.valid && verifiedValidation.valid);
+    updateResourceEditorActionBar(shouldDisableDone);
+    const doneBtn = document.getElementById("res_done_btn");
     if(doneBtn){
-      doneBtn.disabled = shouldForceEnableResourceEditorExit()
-        ? false
-        : shouldDisableResourceEditorExit() || !(nameValidation.valid && verifiedValidation.valid);
+      doneBtn.disabled = shouldDisableDone;
     }
   }
 
-  if(nameEl){
-    nameEl.addEventListener("input", validateEditorState);
-  }
-  if(tagsEl) tagsEl.addEventListener("input", validateEditorState);
+  ["res_name", "res_phone", "res_address", "res_website", "res_hours", "res_description"].forEach(id => {
+    const field = document.getElementById(id);
+    if(field) field.addEventListener("input", validateEditorState);
+  });
+  editor.querySelectorAll(".resForGroup").forEach(cb => {
+    cb.addEventListener("change", validateEditorState);
+  });
   if(updateEl) updateEl.addEventListener("input", validateEditorState);
   if(verifiedInput) verifiedInput.addEventListener("input", validateEditorState);
 
+  editorSnapshot = snapshotResourceEditor();
   updateVerifiedDisplayAndWarning();
   validateEditorState();
   focusAndSelectResourceName();
-
-  editorSnapshot = snapshotResourceEditor();
 }
 
-/* ---------- Admin: Tags ---------- */
-// Tags are not separate persisted records. This panel derives the tag list from
-// resources and bulk-removes a selected tag from every resource that uses it.
+/* ---------- Admin: For ---------- */
+// The For editor owns the governed cross-category people-served list. Resources
+// reference these values through resource.forGroups.
 
-function getResourcesUsingTag(tag){
-  const normalizedTag = normalizeResourceTags([tag])[0] || "";
-  const tagKey = normalizedTag.toLowerCase();
-  if(!tagKey) return [];
+function getResourcesUsingForGroup(group){
+  const normalizedGroup = normalizeResourceTags([group])[0] || "";
+  const groupKey = normalizedGroup.toLowerCase();
+  if(!groupKey) return [];
   return (Array.isArray(data.resources) ? data.resources : [])
-    .filter(resource => normalizeResourceTags(resource && resource.tags).some(resourceTag => resourceTag.toLowerCase() === tagKey))
+    .filter(resource => normalizeResourceTags(resource && resource.forGroups).some(resourceGroup => resourceGroup.toLowerCase() === groupKey))
     .sort((a,b)=>String(a && a.name || "").localeCompare(String(b && b.name || ""), undefined, { sensitivity:"base" }));
-}
-
-function getAdminTagRows(){
-  return getAllTags().map(tag => ({
-    tag,
-    resources: getResourcesUsingTag(tag)
-  })).filter(row => row.resources.length > 0);
 }
 
 function formatResourceCount(count){
   return `${count} ${count === 1 ? "resource" : "resources"}`;
 }
 
-function closeTagDeletePrompt(){
-  const modal = document.getElementById("tagDeletePrompt");
-  if(modal) modal.remove();
+function forGroupsEditorDraft(){
+  const groups = Array.from(document.querySelectorAll(".forGroupInput"))
+    .map(input => input.value)
+    .filter(value => String(value || "").trim());
+  return { forGroups: normalizeResourceTags(groups) };
 }
 
-function promptTagDeleteConfirmation(tag){
-  const resources = getResourcesUsingTag(tag);
-  if(!resources.length){
-    selectedAdminTag = "";
-    safeRenderAdmin();
-    return;
-  }
-  closeTagDeletePrompt();
-  const modal = document.createElement("div");
-  modal.id = "tagDeletePrompt";
-  modal.className = "reference-modal";
-  modal.innerHTML = `
-    <div class="reference-modal-panel" role="dialog" aria-modal="true" aria-labelledby="tagDeletePromptTitle" aria-describedby="tagDeletePromptSubtitle">
-      <div class="reference-modal-header">
-        <div>
-          <div id="tagDeletePromptTitle" class="reference-modal-title">Delete tag "${escapeHTML(tag)}"?</div>
-          <div id="tagDeletePromptSubtitle" class="reference-modal-subtitle">This tag will be removed from these ${formatResourceCount(resources.length)}:</div>
-        </div>
-      </div>
-      <div class="reference-modal-body">
-        <ul class="admin-detail-list">
-          ${resources.map(resource => `<li>${escapeHTML(resource.name || "(Unnamed resource)")}</li>`).join("")}
-        </ul>
-        <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px;">
-          <button class="button" type="button" id="tagDeleteCancelBtn">Cancel</button>
-          <button class="button danger" type="button" id="tagDeleteConfirmBtn">Delete Tag</button>
-        </div>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(modal);
-  const cancelBtn = document.getElementById("tagDeleteCancelBtn");
-  const confirmBtn = document.getElementById("tagDeleteConfirmBtn");
-  if(cancelBtn) cancelBtn.onclick = closeTagDeletePrompt;
-  if(confirmBtn) confirmBtn.onclick = () => {
-    closeTagDeletePrompt();
-    completeTagDelete(tag);
-  };
-  modal.addEventListener("click", event => {
-    if(event.target === modal) closeTagDeletePrompt();
-  });
-  modal.addEventListener("keydown", event => {
-    if(event.key === "Escape"){
-      event.preventDefault();
-      closeTagDeletePrompt();
-    }
-  });
-  if(cancelBtn) cancelBtn.focus();
+function snapshotForGroupsEditor(){
+  const draft = forGroupsEditorDraft();
+  return draft ? JSON.stringify(draft) : "";
 }
 
-function completeTagDelete(tag){
-  const normalizedTag = normalizeResourceTags([tag])[0] || "";
-  const tagKey = normalizedTag.toLowerCase();
-  if(!tagKey) return;
-  const resources = getResourcesUsingTag(normalizedTag);
-  if(!resources.length){
-    selectedAdminTag = "";
-    safeRenderAdmin();
-    return;
+function applyForGroupsDraft(draft){
+  const previousGroups = normalizeResourceTags(data.forGroups);
+  const nextGroups = normalizeResourceTags(draft && draft.forGroups);
+  const nextKeys = new Set(nextGroups.map(group => group.toLowerCase()));
+  const removedGroups = previousGroups.filter(group => !nextKeys.has(group.toLowerCase()));
+  const removedKeys = new Set(removedGroups.map(group => group.toLowerCase()));
+
+  data.forGroups = nextGroups;
+  if(removedKeys.size){
+    const modifiedAt = nowISO();
+    (Array.isArray(data.resources) ? data.resources : []).forEach(resource => {
+      const current = normalizeResourceTags(resource && resource.forGroups);
+      const next = current.filter(group => !removedKeys.has(group.toLowerCase()));
+      if(next.length === current.length) return;
+      resource.forGroups = next;
+      resource.lastModified = modifiedAt;
+      addChangeEntry(createChangeEntry(
+        "resource",
+        "updated",
+        resource.id,
+        resource.name || "(Unnamed resource)",
+        `Removed For group${removedGroups.length === 1 ? "" : "s"}: ${removedGroups.join(", ")}.`,
+        { categoryIds:resource.categories }
+      ));
+    });
   }
-  const modifiedAt = nowISO();
-  setUndoSnapshot(`deleted tag "${normalizedTag}"`);
-  resources.forEach(resource => {
-    resource.tags = normalizeResourceTags(resource.tags).filter(resourceTag => resourceTag.toLowerCase() !== tagKey);
-    resource.lastModified = modifiedAt;
-    addChangeEntry(createChangeEntry(
-      "resource",
-      "updated",
-      resource.id,
-      resource.name || "(Unnamed resource)",
-      `Removed tag "${normalizedTag}".`,
-      { categoryIds:resource.categories }
-    ));
-  });
-  selectedAdminTag = "";
-  persist();
+}
+
+function validateForGroupsDraft(draft){
+  return { valid:!!draft, message:"" };
+}
+
+function cancelForGroupsEditor(){
+  editing = null;
+  editorSnapshot = "";
   safeRenderAdmin();
 }
 
-function renderAdminTags(container){
-  const rows = getAdminTagRows();
-  if(selectedAdminTag && !rows.some(row => row.tag.toLowerCase() === selectedAdminTag.toLowerCase())){
-    selectedAdminTag = "";
+function closeForGroupsEditor(){
+  if(!commitPendingEditsIfChanged()) return;
+  editing = null;
+  editorSnapshot = "";
+  safeRenderAdmin();
+}
+
+function selectForGroupRow(index){
+  const rows = Array.from(document.querySelectorAll(".for-group-row"));
+  if(!rows.length){
+    selectedForGroupIndex = 0;
+    refreshForGroupDetails();
+    return;
   }
-  const selectedRow = rows.find(row => row.tag.toLowerCase() === String(selectedAdminTag || "").toLowerCase());
+  selectedForGroupIndex = Math.max(0, Math.min(Number(index) || 0, rows.length - 1));
+  rows.forEach((row, rowIndex) => {
+    const selected = rowIndex === selectedForGroupIndex;
+    row.classList.toggle("selected", selected);
+    row.setAttribute("aria-selected", selected ? "true" : "false");
+  });
+  refreshForGroupDetails();
+}
+
+function addForGroupRow(value){
+  const list = document.getElementById("forGroupRows");
+  if(!list) return;
+  const index = list.querySelectorAll(".for-group-row").length;
+  const row = document.createElement("div");
+  row.className = "for-group-row";
+  row.setAttribute("role", "option");
+  row.tabIndex = 0;
+  row.innerHTML = `
+    <input type="text" class="forGroupInput" value="${escapeHTML(value || "")}" aria-label="For group">
+  `;
+  const input = row.querySelector(".forGroupInput");
+  if(input){
+    input.addEventListener("input", () => {
+      refreshForGroupDetails();
+      updateForGroupsEditorActionBar();
+    });
+    input.addEventListener("focus", () => selectForGroupRow(index));
+  }
+  list.appendChild(row);
+  row.addEventListener("click", () => selectForGroupRow(index));
+  row.addEventListener("keydown", event => {
+    if(event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    selectForGroupRow(index);
+    if(input) input.focus();
+  });
+  if(index === selectedForGroupIndex) selectForGroupRow(index);
+}
+
+function refreshForGroupDetails(){
+  const detail = document.getElementById("forGroupDetail");
+  if(!detail) return;
+  const rows = Array.from(document.querySelectorAll(".for-group-row"));
+  const row = rows[selectedForGroupIndex] || null;
+  const group = normalizeResourceTags([row && row.querySelector(".forGroupInput") ? row.querySelector(".forGroupInput").value : ""])[0] || "";
+  const resources = group ? getResourcesUsingForGroup(group) : [];
+  detail.innerHTML = group ? `
+    <h3 style="margin-top:0;">${escapeHTML(group)}</h3>
+    <p>This group is used by these ${formatResourceCount(resources.length)}:</p>
+    ${resources.length ? `
+      <ul class="admin-detail-list">
+        ${resources.map(resource => `<li>${escapeHTML(resource.name || "(Unnamed resource)")}</li>`).join("")}
+      </ul>
+    ` : `<p class="admin-note">No resources currently use this group.</p>`}
+  ` : `
+    <h3 style="margin-top:0;">For Details</h3>
+    <p>Select a group to see the resources that use it.</p>
+  `;
+}
+
+function renderAdminTags(container){
+  normalizeDataForGroupsShape(data);
 
   container.innerHTML += `
     <div class="admin-panel">
       <div class="admin-box">
-        <h3 class="admin-panel-title">Tags</h3>
-        <p class="admin-note">When you delete a tag, the app removes that tag from each listed resource and updates each changed resource's lastModified timestamp. That is not just bookkeeping. Package merging uses lastModified to decide which version of a resource wins when a user loads a package.</p>
-        <p class="admin-note">Example: if you delete the GED tag from Adult Education, then another admin later edits Adult Education from an older package and saves it, their newer saved version may bring the GED tag back when packages are merged. To avoid that, admins should load the latest resource package before making edits.</p>
-        <p class="admin-note">These tags are currently being used by one or more resources.</p>
-        <select id="tagSelect" class="resource-listbox" size="18" style="margin-top:8px;">
-          ${rows.map(row => `<option value="${escapeHTML(row.tag)}" ${selectedRow && row.tag === selectedRow.tag ? "selected" : ""}>${escapeHTML(row.tag)} (${formatResourceCount(row.resources.length)})</option>`).join("")}
-        </select>
+        <h3 class="admin-panel-title">For</h3>
+        <p class="admin-note">"For" allows the user to specify what group of people a resource is for, across categories.</p>
+        <div class="admin-action-row" style="margin-bottom:8px;">
+          <button class="button" type="button" id="forGroupNewBtn">New</button>
+          <button class="button danger" type="button" id="forGroupDeleteBtn">Delete</button>
+        </div>
+        <div id="forGroupRows"></div>
       </div>
-      <div class="admin-box" id="tagDetail">
-        ${selectedRow ? `
-          <h3 style="margin-top:0;">${escapeHTML(selectedRow.tag)}</h3>
-          <p>This tag is used by these ${formatResourceCount(selectedRow.resources.length)}:</p>
-          <ul class="admin-detail-list">
-            ${selectedRow.resources.map(resource => `<li>${escapeHTML(resource.name || "(Unnamed resource)")}</li>`).join("")}
-          </ul>
-          <div style="margin-top:12px;">
-            <button class="button danger" type="button" id="tagDeleteBtn">Delete Tag</button>
-          </div>
-        ` : `
-          <h3 style="margin-top:0;">Tag Details</h3>
-          <p>Select a tag to see the resources that use it.</p>
-        `}
+      <div class="admin-box" id="forGroupDetail">
       </div>
     </div>
   `;
 
-  const sel = document.getElementById("tagSelect");
-  const deleteBtn = document.getElementById("tagDeleteBtn");
-  if(sel){
-    sel.onchange = () => {
-      selectedAdminTag = sel.value || "";
-      safeRenderAdmin();
-    };
-    sel.ondblclick = () => {
-      if(sel.value) promptTagDeleteConfirmation(sel.value);
+  normalizeResourceTags(data.forGroups).forEach(group => addForGroupRow(group));
+  editing = { kind:"forGroups" };
+  editorSnapshot = snapshotForGroupsEditor();
+  updateForGroupsEditorActionBar();
+  selectForGroupRow(selectedForGroupIndex);
+
+  const newBtn = document.getElementById("forGroupNewBtn");
+  const deleteBtn = document.getElementById("forGroupDeleteBtn");
+  if(newBtn){
+    newBtn.onclick = () => {
+      addForGroupRow("");
+      const rows = Array.from(document.querySelectorAll(".forGroupInput"));
+      selectedForGroupIndex = rows.length - 1;
+      selectForGroupRow(selectedForGroupIndex);
+      updateForGroupsEditorActionBar();
+      const last = rows[rows.length - 1];
+      if(last) last.focus();
     };
   }
-  if(deleteBtn && selectedRow){
-    deleteBtn.onclick = () => promptTagDeleteConfirmation(selectedRow.tag);
+  if(deleteBtn){
+    deleteBtn.onclick = () => {
+      const rows = Array.from(document.querySelectorAll(".for-group-row"));
+      const row = rows[selectedForGroupIndex];
+      if(row) row.remove();
+      selectedForGroupIndex = Math.max(0, Math.min(selectedForGroupIndex, rows.length - 2));
+      selectForGroupRow(selectedForGroupIndex);
+      updateForGroupsEditorActionBar();
+    };
   }
+  refreshForGroupDetails();
 }
 
 /* ---------- Resource Editor Done Shortcut ---------- */
