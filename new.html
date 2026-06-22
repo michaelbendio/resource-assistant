@@ -272,8 +272,6 @@ textarea.services-editor { min-height:320px; resize:vertical; }
 .admin-guide-active .admin-guide-defer-verified { display:none; }
 .admin-guide-tip-actions { margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
 .verified-warning { color:#aa0000; font-size:13px; margin-top:4px; min-height:1.1em; }
-.tag-controls-row { margin-top:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-.assigned-tags-line { font-size:14px; }
 .reload-resources-wrap { margin-top:16px; text-align:right; }
 .reload-resources-wrap .button { font-size:14px; padding:7px 10px; }
 .app-toast {
@@ -934,30 +932,30 @@ function buildAdminDeleteConfirmation(kind, name){
   return "Are you sure?";
 }
 
-function canonicalizeResourceTag(tag){
-  return String(tag || "").trim();
+function canonicalizeTaxonomyLabel(label){
+  return String(label || "").trim();
 }
 
-function normalizeResourceTags(tags){
+function normalizeTaxonomyLabels(labels){
   const normalized = [];
   const seen = new Set();
-  const source = Array.isArray(tags)
-    ? tags
-    : (typeof tags === "string" ? tags.split(/[,\n]/) : []);
+  const source = Array.isArray(labels)
+    ? labels
+    : (typeof labels === "string" ? labels.split(/[,\n]/) : []);
 
-  source.forEach(rawTag => {
-    if(typeof rawTag !== "string" && typeof rawTag !== "number") return;
-    const tag = canonicalizeResourceTag(rawTag);
-    if(!tag) return;
-    const key = tag.toLowerCase();
+  source.forEach(rawLabel => {
+    if(typeof rawLabel !== "string" && typeof rawLabel !== "number") return;
+    const label = canonicalizeTaxonomyLabel(rawLabel);
+    if(!label) return;
+    const key = label.toLowerCase();
     if(seen.has(key)) return;
     seen.add(key);
-    normalized.push(tag);
+    normalized.push(label);
   });
   return normalized;
 }
 
-function normalizeDataTagsShape(nextData){
+function normalizeLegacyTagsShape(nextData){
   if(!nextData || typeof nextData !== "object") return;
   if("tags" in nextData) delete nextData.tags;
   if(!Array.isArray(nextData.resources)) return;
@@ -967,7 +965,7 @@ function normalizeDataTagsShape(nextData){
 }
 
 function normalizeCategoryFilters(filters){
-  return normalizeResourceTags(filters);
+  return normalizeTaxonomyLabels(filters);
 }
 
 function normalizeDataCategoryFilterShape(nextData){
@@ -992,19 +990,14 @@ function normalizeDataCategoryFilterShape(nextData){
   });
 }
 
-function getAllTags(excludeResourceId = ""){
-  return normalizeResourceTags(data && data.forGroups)
-    .sort((a,b)=>a.localeCompare(b, undefined, { sensitivity:"base" }));
-}
-
 function normalizeDataForGroupsShape(nextData){
   if(!nextData || typeof nextData !== "object") return;
-  nextData.forGroups = normalizeResourceTags(nextData.forGroups)
+  nextData.forGroups = normalizeTaxonomyLabels(nextData.forGroups)
     .sort((a,b)=>a.localeCompare(b, undefined, { sensitivity:"base" }));
   if(!Array.isArray(nextData.resources)) return;
   nextData.resources.forEach(resource => {
     if(!resource || typeof resource !== "object") return;
-    resource.forGroups = normalizeResourceTags(resource.forGroups);
+    resource.forGroups = normalizeTaxonomyLabels(resource.forGroups);
   });
 }
 
@@ -1155,7 +1148,7 @@ const TIP_TEXT = {
   adminGuideResources: "Click Resources to enter the Resource editor.",
   adminGuideNewResource: "Click New to create a resource.",
   adminGuideResourceFields: "Fill in Name, Phone, Address, Website, Hours, and a short Description. Users see the Description first; fuller information comes later. If this resource is a list, such as a list of food pantries, enter a description but you can skip the rest of this section. Click Next.",
-  adminGuideTags: "Optionally choose who this resource is for, then click Next.",
+  adminGuideForGroups: "Optionally choose who this resource is for, then click Next.",
   adminGuideCategories: "Choose the categories where this resource should appear, then click Next",
   adminGuideInformation: "Add the public information users see when they click the description. Use the formatting guide to improve readability, and use Preview to check it. Then click Next.",
   adminGuideUpdate: "Describe this update, then click Done",
@@ -1180,7 +1173,7 @@ if(!localStorage.getItem(DATA_STORAGE_KEY) || appliedCategoryPreset){
 }
 
 normalizeDataInformationShape(data);
-normalizeDataTagsShape(data);
+normalizeLegacyTagsShape(data);
 normalizeDataForGroupsShape(data);
 normalizeDataCategoryFilterShape(data);
 normalizeDataVerifiedOnShape(data);
@@ -1208,10 +1201,9 @@ let adminShowVerifiedDates = false;
 let adminResourceEditMode = false;
 let selectedResourceId = "";
 let selectedCategoryIndex = "";
-let selectedAdminTag = "";
 let editing = null;
 let editorSnapshot = "";
-let categoryTagFilters = {}; // categoryId -> transient selected category/For filters
+let selectedCategoryFilters = {}; // categoryId -> transient selected category/For filters
 let selectedForGroupIndex = 0;
 const UNDO_STORAGE_KEY = "albqUndo";
 let pendingRecentUpdates = [];
@@ -1964,7 +1956,7 @@ function runSelfTests(){
             { id:"housing", label:"Apartments" }
           ],
           resources:[
-            { id:"shelter", name:"Shelter Resource", categories:["housing"], tags:[], informationText:"" }
+            { id:"shelter", name:"Shelter Resource", categories:["housing"], informationText:"" }
           ],
           changes:[]
         };
@@ -2099,7 +2091,7 @@ function runSelfTests(){
             { id:"employment", label:"Employment", filters:["Career Training", "Temporary Employment"] }
           ],
           resources:[
-            { id:"jobs", name:"Jobs Resource", categories:["employment"], categoryFilters:{ employment:["Temporary Employment"] }, tags:[], informationText:"" }
+            { id:"jobs", name:"Jobs Resource", categories:["employment"], categoryFilters:{ employment:["Temporary Employment"] }, informationText:"" }
           ],
           changes:[]
         };
@@ -2744,15 +2736,15 @@ function runSelfTests(){
           throw new Error("guided Next should preserve the typed resource name");
         }
         tip = document.querySelector("#adminView .admin-guide-tip");
-        if(!tip || !tip.textContent.includes(TIP_TEXT.adminGuideTags)){
-          throw new Error("guide should advance to tags section");
+        if(!tip || !tip.textContent.includes(TIP_TEXT.adminGuideForGroups)){
+          throw new Error("guide should advance to For groups section");
         }
-        if(!document.querySelector('#resEditor [data-guide-section="tags"].admin-guide-current-section')){
-          throw new Error("tags should be the second guide section");
+        if(!document.querySelector('#resEditor [data-guide-section="forGroups"].admin-guide-current-section')){
+          throw new Error("For groups should be the second guide section");
         }
-        const tagButtons = Array.from(document.querySelectorAll("#adminView .admin-guide-tip button")).map(button => button.textContent);
-        if(JSON.stringify(tagButtons) !== JSON.stringify(["Back", "Next"])){
-          throw new Error(`middle resource guide section should show Back and Next, got ${JSON.stringify(tagButtons)}`);
+        const forGroupButtons = Array.from(document.querySelectorAll("#adminView .admin-guide-tip button")).map(button => button.textContent);
+        if(JSON.stringify(forGroupButtons) !== JSON.stringify(["Back", "Next"])){
+          throw new Error(`middle resource guide section should show Back and Next, got ${JSON.stringify(forGroupButtons)}`);
         }
         retreatAdminGuideResourceSection();
         if(!document.querySelector('#resEditor [data-guide-section="basics"].admin-guide-current-section')){
@@ -2915,7 +2907,7 @@ function runSelfTests(){
       try{
         data = {
           categories:[{ id:"food", label:"Food" }],
-          resources:[{ id:"food-aid", name:"Food Aid", categories:["food"], informationText:"", tags:[], lastModified:nowISO() }],
+          resources:[{ id:"food-aid", name:"Food Aid", categories:["food"], informationText:"", lastModified:nowISO() }],
           changes:[],
           lastModified:nowISO()
         };
@@ -3061,16 +3053,16 @@ function runSelfTests(){
       const previousView = view;
       const previousCurrentCategory = currentCategory;
       const previousPrintSelection = printSelection.slice();
-      const previousCategoryTagFilters = JSON.parse(JSON.stringify(categoryTagFilters));
+      const previousSelectedCategoryFilters = JSON.parse(JSON.stringify(selectedCategoryFilters));
       try{
         data = {
           categories:[{ id:"food", label:"Food" }],
           resources:[
-            { id:"pantry", name:"Pantry Resource", categories:["food"], tags:[], informationText:"" }
+            { id:"pantry", name:"Pantry Resource", categories:["food"], informationText:"" }
           ],
           changes:[]
         };
-        categoryTagFilters = {};
+        selectedCategoryFilters = {};
         view = "category";
         currentCategory = "food";
 
@@ -3094,7 +3086,7 @@ function runSelfTests(){
         view = previousView;
         currentCategory = previousCurrentCategory;
         printSelection = previousPrintSelection;
-        categoryTagFilters = previousCategoryTagFilters;
+        selectedCategoryFilters = previousSelectedCategoryFilters;
         updatePrintSelectionIndicator();
       }
     }
@@ -3114,8 +3106,8 @@ function runSelfTests(){
         data = {
           categories:[],
           resources:[
-            { id:"zeta", name:"Zeta Resource", categories:[], tags:[], informationText:"" },
-            { id:"alpha", name:"Alpha Resource", categories:[], tags:[], informationText:"" }
+            { id:"zeta", name:"Zeta Resource", categories:[], informationText:"" },
+            { id:"alpha", name:"Alpha Resource", categories:[], informationText:"" }
           ],
           changes:[]
         };
@@ -3223,7 +3215,7 @@ function runSelfTests(){
   tests.push({
     name: "BLANK RESOURCE CLEANUP DETECTION",
     fn: () => {
-      const blank = { name:"", description:"", phone:"", address:"", website:"", hours:"", informationText:"", categories:[], tags:[] };
+      const blank = { name:"", description:"", phone:"", address:"", website:"", hours:"", informationText:"", categories:[] };
       const named = { ...blank, name:"Named Resource" };
       const categorized = { ...blank, categories:["food"] };
       if(!isBlankResourceDraft(blank)) throw new Error("empty resource was not detected");
@@ -3243,8 +3235,8 @@ function runSelfTests(){
         data = {
           categories:[],
           resources:[
-            { id:"existing", name:"Existing", categories:[], tags:[], informationText:"" },
-            { id:"draft", name:"", categories:[], tags:[], informationText:"" }
+            { id:"existing", name:"Existing", categories:[], informationText:"" },
+            { id:"draft", name:"", categories:[], informationText:"" }
           ]
         };
         newResourceIds = new Set(["draft"]);
@@ -3278,9 +3270,9 @@ function runSelfTests(){
     fn: () => {
       const container = document.createElement("div");
       PrintWorkflow.renderPrintableResourceCards(container, [
-        { id:"print-one", name:"Print One", categories:[], tags:[], informationText:"" },
-        { id:"print-two", name:"Print Two", categories:[], tags:[], informationText:"" },
-        { id:"print-three", name:"Print Three", categories:[], tags:[], informationText:"" }
+        { id:"print-one", name:"Print One", categories:[], informationText:"" },
+        { id:"print-two", name:"Print Two", categories:[], informationText:"" },
+        { id:"print-three", name:"Print Three", categories:[], informationText:"" }
       ]);
       if(container.querySelectorAll(".resource-card").length !== 3){
         throw new Error("print resource cards were not rendered");
@@ -3298,7 +3290,7 @@ function runSelfTests(){
     name: "PRINT PREVIEW STARTS WITH RESOURCE CONTENT",
     fn: () => {
       PrintWorkflow.openPreview([
-        { id:"print-start", name:"Print Start", categories:[], tags:[], informationText:"" }
+        { id:"print-start", name:"Print Start", categories:[], informationText:"" }
       ]);
       if(/Suggested Resources/.test(printContent.textContent || "")){
         throw new Error("print preview still includes Suggested Resources header");
@@ -3308,7 +3300,7 @@ function runSelfTests(){
       }
 
       PrintWorkflow.renderPrintSelectionPacket([], [
-        { id:"print-list-start", name:"Print List Start", categories:[], tags:[], informationText:"List information." }
+        { id:"print-list-start", name:"Print List Start", categories:[], informationText:"List information." }
       ]);
       if(/Suggested Resources/.test(printContent.textContent || "")){
         throw new Error("print packet still includes Suggested Resources header");
@@ -3351,7 +3343,7 @@ function runSelfTests(){
       try{
         data = {
           categories:[],
-          resources:[{ id:"print-empty-source", name:"Print Empty Source", categories:[], tags:[], informationText:"" }],
+          resources:[{ id:"print-empty-source", name:"Print Empty Source", categories:[], informationText:"" }],
           changes:[]
         };
         printSelection = [];
@@ -3422,7 +3414,7 @@ function runSelfTests(){
         throw new Error(`unexpected governed forGroups ${JSON.stringify(sample.forGroups)}`);
       }
       const legacy = { tags:["ignored"], resources:[{ tags:["ignored"] }] };
-      normalizeDataTagsShape(legacy);
+      normalizeLegacyTagsShape(legacy);
       if("tags" in legacy || "tags" in legacy.resources[0]){
         throw new Error("legacy tags should be removed");
       }
@@ -3463,7 +3455,7 @@ function runSelfTests(){
           ],
           changes:[]
         };
-        adminTab = "tags";
+        adminTab = "forGroups";
         applyForGroupsDraft({ forGroups:["List", "Food"] });
         const adult = data.resources.find(resource => resource.id === "adult-ed");
         const career = data.resources.find(resource => resource.id === "career-ed");
@@ -3528,7 +3520,7 @@ function runSelfTests(){
           resources:[{ id:"vet", name:"Veterans Resource", categories:[], forGroups:["Veterans"], informationText:"" }],
           changes:[]
         };
-        adminTab = "tags";
+        adminTab = "forGroups";
         renderAdmin();
         let newBtn = document.getElementById("forGroupNewBtn");
         let deleteBtn = document.getElementById("forGroupDeleteBtn");
@@ -3685,8 +3677,8 @@ function runSelfTests(){
             { id:"health", label:"Health Care" }
           ],
           resources:[
-            { id:"bio", name:"BioLife Plasma", categories:["employment","employment","health"], tags:[], informationText:"" },
-            { id:"talecris", name:"Talecris Plasma", categories:["employment"], tags:[], informationText:"" }
+            { id:"bio", name:"BioLife Plasma", categories:["employment","employment","health"], informationText:"" },
+            { id:"talecris", name:"Talecris Plasma", categories:["employment"], informationText:"" }
           ]
         };
         const results = buildSearchResults("plasma");
@@ -3710,8 +3702,8 @@ function runSelfTests(){
         data = {
           categories:[{ id:"housing", label:"Housing" }],
           resources:[
-            { id:"parent", name:"Parent Support", categories:["housing"], tags:[], informationText:"paid utility help" },
-            { id:"uca", name:"Utah Community Action", categories:["housing"], tags:[], informationText:"Emergency rental assistance and deposit help" }
+            { id:"parent", name:"Parent Support", categories:["housing"], informationText:"paid utility help" },
+            { id:"uca", name:"Utah Community Action", categories:["housing"], informationText:"Emergency rental assistance and deposit help" }
           ]
         };
         const rentResults = buildSearchResults("rent");
@@ -3721,7 +3713,7 @@ function runSelfTests(){
         if(emergencyResults.groups[0].items[0].resourceId !== "uca") throw new Error("information result resource was incorrect");
         if(!emergencyResults.groups[0].items[0].snippet) throw new Error("information result snippet was missing");
 
-        data.resources.push({ id:"emergency-name", name:"Emergency Center", categories:["housing"], tags:[], informationText:"" });
+        data.resources.push({ id:"emergency-name", name:"Emergency Center", categories:["housing"], informationText:"" });
         const nameResults = buildSearchResults("emergency");
         if(nameResults.mode !== "name") throw new Error("name matches should suppress information fallback");
         if(nameResults.groups[0].items.some(item => item.resourceId === "uca")) throw new Error("information fallback appeared when name matches existed");
@@ -3791,25 +3783,25 @@ function runSelfTests(){
       const previousView = view;
       const previousCategory = currentCategory;
       const previousExpanded = expandedSearchResourceId;
-      const previousFilters = categoryTagFilters;
+      const previousFilters = selectedCategoryFilters;
       const previousSearchOpen = isSearchOpen;
       try{
         data = {
           categories:[{ id:"housing", label:"Housing" }],
-          resources:[{ id:"uca", name:"Utah Community Action", categories:["housing"], tags:[], informationText:"" }]
+          resources:[{ id:"uca", name:"Utah Community Action", categories:["housing"], informationText:"" }]
         };
-        categoryTagFilters = { housing:["Shelter"] };
+        selectedCategoryFilters = { housing:["Shelter"] };
         openSearchResult("housing", "uca");
         if(view !== "category") throw new Error("search result did not switch to category view");
         if(currentCategory !== "housing") throw new Error("search result did not set category");
         if(expandedSearchResourceId !== "uca") throw new Error("search result did not mark resource for expansion");
-        if(getCategoryFilterTags("housing").length) throw new Error("category filters were not cleared");
+        if(getSelectedCategoryFilters("housing").length) throw new Error("category filters were not cleared");
       }finally{
         data = previousData;
         view = previousView;
         currentCategory = previousCategory;
         expandedSearchResourceId = previousExpanded;
-        categoryTagFilters = previousFilters;
+        selectedCategoryFilters = previousFilters;
         isSearchOpen = previousSearchOpen;
       }
     }
@@ -3821,7 +3813,7 @@ function runSelfTests(){
       const previousData = data;
       const previousView = view;
       const previousCategory = currentCategory;
-      const previousFilters = categoryTagFilters;
+      const previousFilters = selectedCategoryFilters;
       try{
         data = {
           categories:[{ id:"employment", label:"Employment", filters:["Career Training", "Unused Filter"] }],
@@ -3834,7 +3826,7 @@ function runSelfTests(){
         };
         view = "category";
         currentCategory = "employment";
-        categoryTagFilters = {};
+        selectedCategoryFilters = {};
         render();
         const text = appView.textContent || "";
         if(!text.includes("Specifically")) throw new Error("Specifically heading was not rendered");
@@ -3850,7 +3842,7 @@ function runSelfTests(){
         data = previousData;
         view = previousView;
         currentCategory = previousCategory;
-        categoryTagFilters = previousFilters;
+        selectedCategoryFilters = previousFilters;
       }
     }
   });
@@ -3861,7 +3853,7 @@ function runSelfTests(){
       const previousData = data;
       const previousView = view;
       const previousCategory = currentCategory;
-      const previousFilters = categoryTagFilters;
+      const previousFilters = selectedCategoryFilters;
       try{
         data = {
           categories:[{ id:"food", label:"Food" }],
@@ -3887,7 +3879,7 @@ function runSelfTests(){
 
         view = "category";
         currentCategory = LISTS_CATEGORY_ID;
-        categoryTagFilters = {};
+        selectedCategoryFilters = {};
         render();
         const text = appView.textContent || "";
         if(!text.includes("Lists")) throw new Error("Lists category title was not rendered");
@@ -3904,7 +3896,7 @@ function runSelfTests(){
         data = previousData;
         view = previousView;
         currentCategory = previousCategory;
-        categoryTagFilters = previousFilters;
+        selectedCategoryFilters = previousFilters;
       }
     }
   });
@@ -3925,8 +3917,8 @@ function runSelfTests(){
             { id:"ged", name:"GED", categories:["education"], categoryFilters:{ education:["GED"] }, forGroups:[] }
           ]
         };
-        const employmentOptions = getCategoryTagOptions("employment").map(option => option.label);
-        const educationOptions = getCategoryTagOptions("education").map(option => option.label);
+        const employmentOptions = getCategoryFilterOptions("employment").map(option => option.label);
+        const educationOptions = getCategoryFilterOptions("education").map(option => option.label);
         if(!employmentOptions.includes("Career Training") || !employmentOptions.includes("Veterans")){
           throw new Error("employment category did not include category and For filters");
         }
@@ -4467,7 +4459,7 @@ function getAdminGuideTipText(){
   if(adminGuideStep === "renameFile") return TIP_TEXT.adminGuideRenameFile;
   if(adminGuideStep === "reopenAdmin") return "";
   if(adminGuideStep === "resourceFields" || adminResourceEditMode){
-    if(adminGuideResourceSection === "tags") return TIP_TEXT.adminGuideTags;
+    if(adminGuideResourceSection === "forGroups") return TIP_TEXT.adminGuideForGroups;
     if(adminGuideResourceSection === "categories") return TIP_TEXT.adminGuideCategories;
     if(adminGuideResourceSection === "information") return TIP_TEXT.adminGuideInformation;
     if(adminGuideResourceSection === "save") return TIP_TEXT.adminGuideSaveResource;
@@ -4479,7 +4471,7 @@ function getAdminGuideTipText(){
 }
 
 function getAdminGuideResourceSections(){
-  return ["basics", "tags", "categories", "information", "update"];
+  return ["basics", "forGroups", "categories", "information", "update"];
 }
 
 function saveGuidedResourceEditorProgress(){
@@ -4955,30 +4947,30 @@ function buildResourceCard(res,{expanded=false,showDescription=false,showPrintTo
 // Category view helpers handle category filters and For-group filters within the selected category.
 // Filters are transient UI state; they are not saved into the resource package.
 
-function getCategoryFilterTags(categoryId){
-  return Array.isArray(categoryTagFilters[categoryId]) ? categoryTagFilters[categoryId] : [];
+function getSelectedCategoryFilters(categoryId){
+  return Array.isArray(selectedCategoryFilters[categoryId]) ? selectedCategoryFilters[categoryId] : [];
 }
 
-function setCategoryFilterTags(categoryId, tags){
-  const cleaned = normalizeResourceTags(tags);
+function setSelectedCategoryFilters(categoryId, filterKeys){
+  const cleaned = normalizeTaxonomyLabels(filterKeys);
   if(cleaned.length){
-    categoryTagFilters[categoryId] = cleaned;
+    selectedCategoryFilters[categoryId] = cleaned;
   }else{
-    delete categoryTagFilters[categoryId];
+    delete selectedCategoryFilters[categoryId];
   }
 }
 
 function clearAllCategoryFilters(shouldRender = true){
-  categoryTagFilters = {};
+  selectedCategoryFilters = {};
   if(shouldRender && view === "category") safeRender();
 }
 
 function makeCategorySpecificFilterKey(filter){
-  return `filter:${canonicalizeResourceTag(filter).toLowerCase()}`;
+  return `filter:${canonicalizeTaxonomyLabel(filter).toLowerCase()}`;
 }
 
 function makeForGroupFilterKey(group){
-  return `for:${canonicalizeResourceTag(group).toLowerCase()}`;
+  return `for:${canonicalizeTaxonomyLabel(group).toLowerCase()}`;
 }
 
 function getCategoryFilterOptions(categoryId){
@@ -4999,7 +4991,7 @@ function getCategoryFilterOptions(categoryId){
       options.push({ key, label:filter, kind:"filter" });
     }
   });
-  normalizeResourceTags(data.forGroups).forEach(group => {
+  normalizeTaxonomyLabels(data.forGroups).forEach(group => {
     const key = makeForGroupFilterKey(group);
     if(usedForGroupKeys.has(key)){
       options.push({ key, label:group, kind:"for" });
@@ -5014,7 +5006,7 @@ function getResourceCategoryFilterKeys(resource, categoryId){
 }
 
 function getResourceForGroupFilterKeys(resource){
-  return new Set(normalizeResourceTags(resource && resource.forGroups).map(makeForGroupFilterKey));
+  return new Set(normalizeTaxonomyLabels(resource && resource.forGroups).map(makeForGroupFilterKey));
 }
 
 function countSelectedCategoryFilterMatches(resource, categoryId, activeFilterKeys){
@@ -5031,12 +5023,12 @@ function countSelectedCategoryFilterMatches(resource, categoryId, activeFilterKe
 }
 
 function resourceMatchesSelectedCategoryFilters(resource, categoryId, selectedFilterKeys){
-  const activeFilterKeys = new Set(normalizeResourceTags(selectedFilterKeys));
+  const activeFilterKeys = new Set(normalizeTaxonomyLabels(selectedFilterKeys));
   return !activeFilterKeys.size || countSelectedCategoryFilterMatches(resource, categoryId, activeFilterKeys) > 0;
 }
 
 function filterResourcesBySelectedCategoryFilters(resources, categoryId, selectedFilterKeys){
-  const activeFilterKeys = new Set(normalizeResourceTags(selectedFilterKeys));
+  const activeFilterKeys = new Set(normalizeTaxonomyLabels(selectedFilterKeys));
   return (Array.isArray(resources) ? resources : [])
     .filter(resource => resourceMatchesSelectedCategoryFilters(resource, categoryId, selectedFilterKeys))
     .sort((a, b) => {
@@ -5067,14 +5059,6 @@ function getCategoryResources(categoryId){
   if(isListsCategory(categoryId)) return getListsResources();
   return (Array.isArray(data.resources) ? data.resources : [])
     .filter(r => Array.isArray(r.categories) && r.categories.includes(categoryId));
-}
-
-function getTagsForCategory(categoryId){
-  return getCategoryFilterOptions(categoryId).map(option => option.label);
-}
-
-function getCategoryTagOptions(categoryId){
-  return getCategoryFilterOptions(categoryId);
 }
 
 function renderSearchResultsView(){
@@ -5163,7 +5147,7 @@ function undoLastDeletion(){
   if(!snapshot || !snapshot.dataSnapshot) return;
       data = snapshot.dataSnapshot;
       normalizeDataInformationShape(data);
-      normalizeDataTagsShape(data);
+      normalizeLegacyTagsShape(data);
       normalizeDataVerifiedOnShape(data);
       normalizeChanges(data);
   clearUndoSnapshot();
@@ -5259,7 +5243,7 @@ function render(){
           safeRender();
         };
       }
-      card.onclick=()=>{ currentCategory=cat.id; expandedSearchResourceId=""; setCategoryFilterTags(currentCategory, []); view="category"; safeRender(); };
+      card.onclick=()=>{ currentCategory=cat.id; expandedSearchResourceId=""; setSelectedCategoryFilters(currentCategory, []); view="category"; safeRender(); };
       grid.appendChild(card);
     });
 
@@ -5294,12 +5278,12 @@ function render(){
       title.style.marginBottom = "6px";
       appView.appendChild(title);
     }
-    const categoryFilterOptions = getCategoryTagOptions(currentCategory);
-    let activeFilters = getCategoryFilterTags(currentCategory).filter(filterKey =>
+    const categoryFilterOptions = getCategoryFilterOptions(currentCategory);
+    let activeFilters = getSelectedCategoryFilters(currentCategory).filter(filterKey =>
       categoryFilterOptions.some(option => option.key === filterKey)
     );
-    if(activeFilters.length !== getCategoryFilterTags(currentCategory).length){
-      setCategoryFilterTags(currentCategory, activeFilters);
+    if(activeFilters.length !== getSelectedCategoryFilters(currentCategory).length){
+      setSelectedCategoryFilters(currentCategory, activeFilters);
     }
     const categoryResources = getCategoryResources(currentCategory);
     const filtered = filterResourcesBySelectedCategoryFilters(categoryResources, currentCategory, activeFilters);
@@ -5338,7 +5322,7 @@ function render(){
             const nextFilters = selected
               ? activeFilters.filter(active => active !== option.key)
               : [...activeFilters, option.key];
-            setCategoryFilterTags(currentCategory, nextFilters);
+            setSelectedCategoryFilters(currentCategory, nextFilters);
             safeRender();
           };
           buttons.appendChild(btn);
@@ -5355,7 +5339,7 @@ function render(){
         clearFilterBtn.className = "button";
         clearFilterBtn.textContent = "Clear";
         clearFilterBtn.onclick = () => {
-          setCategoryFilterTags(currentCategory, []);
+          setSelectedCategoryFilters(currentCategory, []);
           safeRender();
         };
         filterArea.appendChild(clearFilterBtn);
@@ -5781,8 +5765,8 @@ function renderAdmin(){
           Resources
         </button>
 
-        <button class="button ${adminTab==='tags'?'primary':''}"
-          onclick="switchAdminTab('tags')">
+        <button class="button ${adminTab==='forGroups'?'primary':''}"
+          onclick="switchAdminTab('forGroups')">
           For
         </button>
       </div>
@@ -5794,7 +5778,7 @@ function renderAdmin(){
   resetAdminEditorStateForTab(adminTab);
   if(adminTab === "categories") renderAdminCategories(container);
   if(adminTab === "resources") renderAdminResources(container);
-  if(adminTab === "tags") renderAdminTags(container);
+  if(adminTab === "forGroups") renderAdminForGroups(container);
   renderAdminGuideTip(container);
 }
 
@@ -6112,7 +6096,7 @@ function normalizePackageData(nextData){
   if(!Array.isArray(nextData.categories)) nextData.categories = [];
   if(!Array.isArray(nextData.resources)) nextData.resources = [];
   normalizeDataInformationShape(nextData);
-  normalizeDataTagsShape(nextData);
+  normalizeLegacyTagsShape(nextData);
   normalizeDataForGroupsShape(nextData);
   normalizeDataCategoryFilterShape(nextData);
   normalizeDataVerifiedOnShape(nextData);
@@ -6179,7 +6163,7 @@ function mergeResourcePackages(localData, incomingData){
     categories: categoryMerge.merged,
     resources: resourceMerge.merged,
     changes: mergeChanges(local.changes, incoming.changes),
-    forGroups: normalizeResourceTags([...(local.forGroups || []), ...(incoming.forGroups || [])]),
+    forGroups: normalizeTaxonomyLabels([...(local.forGroups || []), ...(incoming.forGroups || [])]),
     resourcePackageSchemaVersion: RESOURCE_PACKAGE_SCHEMA_VERSION
   };
   normalizePackageData(mergedData);
@@ -6623,7 +6607,7 @@ function addTaxonomySearchResults(groupMap, groups, cleanQuery, resources){
     });
   });
 
-  normalizeResourceTags(data.forGroups).forEach(group => {
+  normalizeTaxonomyLabels(data.forGroups).forEach(group => {
     if(!textContainsTokenPhrase(group, cleanQuery)) return;
     const groupKey = makeForGroupFilterKey(group);
     resourceList
@@ -6694,7 +6678,7 @@ function openSearchResult(categoryId, resourceId){
   const nextResource = String(resourceId || "");
   if(!nextCategory || !nextResource) return;
   currentCategory = nextCategory;
-  setCategoryFilterTags(currentCategory, []);
+  setSelectedCategoryFilters(currentCategory, []);
   expandedSearchResourceId = nextResource;
   isSearchOpen = false;
   view = "category";
@@ -6827,7 +6811,7 @@ function handleAdminListReferenceInspection(event, resource){
 
 function switchAdminTab(nextTab){
   if(adminTab === nextTab) return;
-  if(!["categories", "resources", "tags"].includes(nextTab)) return;
+  if(!["categories", "resources", "forGroups"].includes(nextTab)) return;
   if(!commitPendingEditsIfChanged()) return;
   if(nextTab !== "resources"){
     adminResourceEditMode = false;
@@ -7173,7 +7157,7 @@ function applyResourceDraft(idx, draft){
   if("verifiedDate" in res) delete res.verifiedDate;
   res.categories = draft.categories;
   res.categoryFilters = draft.categoryFilters || {};
-  res.forGroups = normalizeResourceTags(draft.forGroups);
+  res.forGroups = normalizeTaxonomyLabels(draft.forGroups);
   res.lastModified = nowISO();
   refreshAdminCategoryResourceList();
 }
@@ -7484,7 +7468,7 @@ function cancelCategoryEdit(){
   if(cat && newCategoryIds.has(cat.id)){
     data.categories.splice(editing.idx, 1);
     newCategoryIds.delete(cat.id);
-    delete categoryTagFilters[cat.id];
+    delete selectedCategoryFilters[cat.id];
     selectedCategoryIndex = "";
     editing = null;
     persist();
@@ -7572,7 +7556,7 @@ function completeCategoryDelete(categoryId, updateDescription){
   });
 
   data.categories.splice(idx,1);
-  delete categoryTagFilters[cat.id];
+  delete selectedCategoryFilters[cat.id];
   addChangeEntry(createChangeEntry("category", "removed", cat.id, cat.label || "(Unnamed category)", changeDescription));
   newCategoryIds.delete(cat.id);
   selectedCategoryIndex = "";
@@ -8021,11 +8005,11 @@ function editResource(idx){
   normalizeResourceVerifiedOn(res);
   normalizeDataForGroupsShape(data);
   normalizeDataCategoryFilterShape(data);
-  res.forGroups = normalizeResourceTags(res.forGroups);
+  res.forGroups = normalizeTaxonomyLabels(res.forGroups);
   const verifiedDisplay = formatVerifiedOnForDisplay(res.verifiedOn);
   const informationDraft = parseInformationText(res.informationText || "");
-  const selectedForKeys = new Set(normalizeResourceTags(res.forGroups).map(group => group.toLowerCase()));
-  const forGroupChecks = normalizeResourceTags(data.forGroups)
+  const selectedForKeys = new Set(normalizeTaxonomyLabels(res.forGroups).map(group => group.toLowerCase()));
+  const forGroupChecks = normalizeTaxonomyLabels(data.forGroups)
     .map(group => `
       <label style="display:block; margin:2px 0;">
         <input type="checkbox" class="resForGroup" value="${escapeHTML(group)}" ${selectedForKeys.has(group.toLowerCase()) ? "checked" : ""}>
@@ -8105,7 +8089,7 @@ function editResource(idx){
       </label><br>
     </div>
 
-    <div class="resource-editor-guide-section ${adminGuideResourceSection === "tags" ? "admin-guide-current-section" : ""}" data-guide-section="tags">
+    <div class="resource-editor-guide-section ${adminGuideResourceSection === "forGroups" ? "admin-guide-current-section" : ""}" data-guide-section="forGroups">
       <div style="margin-top:8px;">
         <strong>For</strong>
         <div style="margin-top:4px;">
@@ -8274,11 +8258,11 @@ function editResource(idx){
 // reference these values through resource.forGroups.
 
 function getResourcesUsingForGroup(group){
-  const normalizedGroup = normalizeResourceTags([group])[0] || "";
+  const normalizedGroup = normalizeTaxonomyLabels([group])[0] || "";
   const groupKey = normalizedGroup.toLowerCase();
   if(!groupKey) return [];
   return (Array.isArray(data.resources) ? data.resources : [])
-    .filter(resource => normalizeResourceTags(resource && resource.forGroups).some(resourceGroup => resourceGroup.toLowerCase() === groupKey))
+    .filter(resource => normalizeTaxonomyLabels(resource && resource.forGroups).some(resourceGroup => resourceGroup.toLowerCase() === groupKey))
     .sort((a,b)=>String(a && a.name || "").localeCompare(String(b && b.name || ""), undefined, { sensitivity:"base" }));
 }
 
@@ -8290,7 +8274,7 @@ function forGroupsEditorDraft(){
   const groups = Array.from(document.querySelectorAll(".forGroupInput"))
     .map(input => input.value)
     .filter(value => String(value || "").trim());
-  return { forGroups: normalizeResourceTags(groups) };
+  return { forGroups: normalizeTaxonomyLabels(groups) };
 }
 
 function snapshotForGroupsEditor(){
@@ -8299,8 +8283,8 @@ function snapshotForGroupsEditor(){
 }
 
 function applyForGroupsDraft(draft){
-  const previousGroups = normalizeResourceTags(data.forGroups);
-  const nextGroups = normalizeResourceTags(draft && draft.forGroups);
+  const previousGroups = normalizeTaxonomyLabels(data.forGroups);
+  const nextGroups = normalizeTaxonomyLabels(draft && draft.forGroups);
   const nextKeys = new Set(nextGroups.map(group => group.toLowerCase()));
   const removedGroups = previousGroups.filter(group => !nextKeys.has(group.toLowerCase()));
   const removedKeys = new Set(removedGroups.map(group => group.toLowerCase()));
@@ -8309,7 +8293,7 @@ function applyForGroupsDraft(draft){
   if(removedKeys.size){
     const modifiedAt = nowISO();
     (Array.isArray(data.resources) ? data.resources : []).forEach(resource => {
-      const current = normalizeResourceTags(resource && resource.forGroups);
+      const current = normalizeTaxonomyLabels(resource && resource.forGroups);
       const next = current.filter(group => !removedKeys.has(group.toLowerCase()));
       if(next.length === current.length) return;
       resource.forGroups = next;
@@ -8394,7 +8378,7 @@ function refreshForGroupDetails(){
   if(!detail) return;
   const rows = Array.from(document.querySelectorAll(".for-group-row"));
   const row = rows[selectedForGroupIndex] || null;
-  const group = normalizeResourceTags([row && row.querySelector(".forGroupInput") ? row.querySelector(".forGroupInput").value : ""])[0] || "";
+  const group = normalizeTaxonomyLabels([row && row.querySelector(".forGroupInput") ? row.querySelector(".forGroupInput").value : ""])[0] || "";
   const resources = group ? getResourcesUsingForGroup(group) : [];
   detail.innerHTML = group ? `
     <h3 style="margin-top:0;">${escapeHTML(group)}</h3>
@@ -8410,7 +8394,7 @@ function refreshForGroupDetails(){
   `;
 }
 
-function renderAdminTags(container){
+function renderAdminForGroups(container){
   normalizeDataForGroupsShape(data);
 
   container.innerHTML += `
@@ -8429,7 +8413,7 @@ function renderAdminTags(container){
     </div>
   `;
 
-  normalizeResourceTags(data.forGroups).forEach(group => addForGroupRow(group));
+  normalizeTaxonomyLabels(data.forGroups).forEach(group => addForGroupRow(group));
   editing = { kind:"forGroups" };
   editorSnapshot = snapshotForGroupsEditor();
   updateForGroupsEditorActionBar();
