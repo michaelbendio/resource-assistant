@@ -957,25 +957,6 @@ function normalizeResourceTags(tags){
   return normalized;
 }
 
-function parseResourceTagsInput(value){
-  return normalizeResourceTags(String(value || "").split(/[,\n]/));
-}
-
-function formatResourceTagsInput(tags){
-  return normalizeResourceTags(tags).join("\n");
-}
-
-function toggleResourceTag(tags, tag){
-  const currentTags = normalizeResourceTags(tags);
-  const normalizedTag = normalizeResourceTags([tag])[0];
-  if(!normalizedTag) return currentTags;
-  const key = normalizedTag.toLowerCase();
-  if(currentTags.some(current => current.toLowerCase() === key)){
-    return currentTags.filter(current => current.toLowerCase() !== key);
-  }
-  return normalizeResourceTags([...currentTags, normalizedTag]);
-}
-
 function normalizeDataTagsShape(nextData){
   if(!nextData || typeof nextData !== "object") return;
   if("tags" in nextData) delete nextData.tags;
@@ -1027,57 +1008,10 @@ function normalizeDataForGroupsShape(nextData){
   });
 }
 
-const TAG_CATEGORY_HINTS = [
-  {
-    categoryLabel: "Housing",
-    tags: ["Shelter", "Rental", "Subsidized Housing", "Eviction Help", "Hotel/Motel", "Room for Rent", "Rent/Mortgage Assistance"]
-  },
-  {
-    categoryLabel: "Employment",
-    tags: ["Temp Agency", "Employment Agency", "Employment Counseling", "Career/Vocational Training", "Apprenticeship", "Ex-Offender Support"]
-  },
-  {
-    categoryLabel: "Education",
-    tags: ["Career/Vocational Training", "GED", "Scholarships", "Apprenticeship"]
-  }
-];
-
-// Tags are stored on resources. These hints warn admins when tags imply a
-// category assignment that was probably missed.
-function getSuggestedCategoriesFromTags(tags){
-  const tagKeys = new Set(normalizeResourceTags(tags).map(tag => tag.toLowerCase()));
-  return TAG_CATEGORY_HINTS
-    .filter(hint => hint.tags.some(tag => tagKeys.has(canonicalizeResourceTag(tag).toLowerCase())))
-    .map(hint => hint.categoryLabel);
-}
-
-function findCategoryByLabelOrId(label){
-  const key = String(label || "").trim().toLowerCase();
-  return (Array.isArray(data.categories) ? data.categories : [])
-    .find(cat => String(cat && cat.label || "").trim().toLowerCase() === key || String(cat && cat.id || "").trim().toLowerCase() === key);
-}
-
-function getMissingSuggestedCategories(draft){
-  const selected = new Set(Array.isArray(draft && draft.categories) ? draft.categories.map(String) : []);
-  return getSuggestedCategoriesFromTags(draft && draft.tags)
-    .filter(label => {
-      const category = findCategoryByLabelOrId(label);
-      return category && !selected.has(String(category.id || ""));
-    });
-}
-
 function formatCategoryList(labels){
   if(labels.length <= 1) return labels[0] || "";
   if(labels.length === 2) return `${labels[0]} and ${labels[1]}`;
   return `${labels.slice(0, -1).join(", ")}, and ${labels[labels.length - 1]}`;
-}
-
-function confirmCategoryAssignmentHint(draft){
-  const missing = getMissingSuggestedCategories(draft);
-  if(!missing.length) return true;
-  const categoryList = formatCategoryList(missing);
-  const categoryPhrase = missing.length === 1 ? "that category is" : "those categories are";
-  return confirm(`This resource has tags suggesting ${categoryList}, but ${categoryPhrase} not selected. Continue?`);
 }
 
 const INFORMATION_ADDITIONAL_LABEL = "Additional text:";
@@ -1210,22 +1144,23 @@ const DATA_STORAGE_KEY = "newData";
 const OPENED_AS_NEW_TEMPLATE = isNewTemplateFile();
 let data = JSON.parse(localStorage.getItem(DATA_STORAGE_KEY) || "null");
 const APP_VERSION = "0.1.8";
+const RESOURCE_PACKAGE_SCHEMA_VERSION = 2;
 const UPDATE_SEEN_STORAGE_KEY = "newRecentUpdatesSeen";
 const PRINT_SELECTION_STORAGE_KEY = "newPrintSelection";
 const LEGACY_FAVORITES_STORAGE_KEY = "newFavorites";
 const TIP_TEXT = {
   user: "Click on a category to see its resources. Click a resource to see details. Click ⬜ to include it in the printed handout.",
   newAdminWelcome: "Welcome to your new TSO Resources app. Press Ctrl+Alt+A to add an Admin button to the top blue bar. Then click it.",
-  newAdminMode: "Click Ctrl+Alt+A to hide the Admin button when you're done. Now click the gray Help button",
-  adminGuideResources: "Click the gray Resources button to enter the Resource editor.",
-  adminGuideNewResource: "Click the gray New button to create a resource.",
+  newAdminMode: "Click Ctrl+Alt+A to hide the Admin button when you're done. Now click Help.",
+  adminGuideResources: "Click Resources to enter the Resource editor.",
+  adminGuideNewResource: "Click New to create a resource.",
   adminGuideResourceFields: "Fill in Name, Phone, Address, Website, Hours, and a short Description. Users see the Description first; fuller information comes later. If this resource is a list, such as a list of food pantries, enter a description but you can skip the rest of this section. Click Next.",
-  adminGuideTags: "Optionally add the groups this resource is for, then click Next.",
+  adminGuideTags: "Optionally choose who this resource is for, then click Next.",
   adminGuideCategories: "Choose the categories where this resource should appear, then click Next",
   adminGuideInformation: "Add the public information users see when they click the description. Use the formatting guide to improve readability, and use Preview to check it. Then click Next.",
   adminGuideUpdate: "Describe this update, then click Done",
   adminGuideSaveResource: "Now click Done to save the resource",
-  adminGuideSetupName: "Click the gray Change TSO Name button.",
+  adminGuideSetupName: "Click Change TSO Name.",
   adminGuideVerifyName: "Check the blue title bar. It should say your TSO name followed by TSO Resources. If it looks right, click Next.",
   adminGuideRenameFile: "Click Quit and rename new.html to [new TSO name].html. Then open [new TSO name].html.",
   renamedFileWelcome: "Press Ctrl+Alt+A, click Admin and follow the red tips to continue guided quick start"
@@ -1252,6 +1187,7 @@ normalizeDataVerifiedOnShape(data);
 normalizeChanges(data);
 normalizeLastLoadedPackageInfo(data);
 data.appVersion = APP_VERSION;
+data.resourcePackageSchemaVersion = RESOURCE_PACKAGE_SCHEMA_VERSION;
 
 let printSelection = loadPrintSelection();
 sanitizePrintSelection();
@@ -1452,7 +1388,7 @@ if(appErrorDismiss){
 // ============================================================
 // SELF TESTS
 // ============================================================
-// Smoke tests for high-risk flows (create/delete/undo/tags/services/import/export/sorting).
+// Smoke tests for high-risk flows (create/delete/undo/For groups/information/import/export/sorting).
 
 function runSelfTests(){
   const tests = [];
@@ -1838,6 +1774,85 @@ function runSelfTests(){
       }
       if(!fallback.includes("Resource Two - Resource added")){
         throw new Error("missing added resource fallback summary");
+      }
+    }
+  });
+
+  tests.push({
+    name: "PACKAGE MERGE PRESERVES TAXONOMY SHAPE",
+    fn: () => {
+      const local = {
+        resourcePackageSchemaVersion:RESOURCE_PACKAGE_SCHEMA_VERSION,
+        packageVersion:20,
+        categories:[
+          { id:"housing", label:"Housing", filters:["Shared Rooms"], lastModified:"2026-02-01T00:00:00.000Z" }
+        ],
+        forGroups:["Veterans"],
+        resources:[
+          {
+            id:"rooms",
+            name:"Rooms",
+            categories:["housing"],
+            categoryFilters:{ housing:["Shared Rooms"] },
+            forGroups:["Veterans"],
+            informationText:"",
+            lastModified:"2026-02-01T00:00:00.000Z"
+          }
+        ],
+        changes:[]
+      };
+      const incoming = {
+        resourcePackageSchemaVersion:RESOURCE_PACKAGE_SCHEMA_VERSION,
+        packageVersion:21,
+        categories:[
+          { id:"housing", label:"Housing", filters:["Temporary"], lastModified:"2026-01-01T00:00:00.000Z" },
+          { id:"food", label:"Food", filters:["Food Pantries"], lastModified:"2026-03-01T00:00:00.000Z" }
+        ],
+        forGroups:["Seniors"],
+        resources:[
+          {
+            id:"rooms",
+            name:"Rooms",
+            categories:["housing"],
+            categoryFilters:{ housing:["Temporary"] },
+            forGroups:["Seniors"],
+            informationText:"",
+            lastModified:"2026-01-01T00:00:00.000Z"
+          },
+          {
+            id:"pantry",
+            name:"Pantry",
+            categories:["food"],
+            categoryFilters:{ food:["Food Pantries"] },
+            forGroups:["Seniors"],
+            informationText:"",
+            lastModified:"2026-03-01T00:00:00.000Z"
+          }
+        ],
+        changes:[]
+      };
+      const { mergedData } = mergeResourcePackages(local, incoming);
+      const housing = mergedData.categories.find(category => category.id === "housing");
+      const food = mergedData.categories.find(category => category.id === "food");
+      const rooms = mergedData.resources.find(resource => resource.id === "rooms");
+      const pantry = mergedData.resources.find(resource => resource.id === "pantry");
+      if(JSON.stringify(housing.filters) !== JSON.stringify(["Shared Rooms"])){
+        throw new Error("newer local category filters were not preserved");
+      }
+      if(!food || JSON.stringify(food.filters) !== JSON.stringify(["Food Pantries"])){
+        throw new Error("incoming category filters were not added");
+      }
+      if(JSON.stringify(rooms.categoryFilters) !== JSON.stringify({ housing:["Shared Rooms"] })){
+        throw new Error("newer local resource category filters were not preserved");
+      }
+      if(!pantry || JSON.stringify(pantry.categoryFilters) !== JSON.stringify({ food:["Food Pantries"] })){
+        throw new Error("incoming resource category filters were not added");
+      }
+      if(JSON.stringify(mergedData.forGroups) !== JSON.stringify(["Seniors", "Veterans"])){
+        throw new Error(`For groups were not merged, got ${JSON.stringify(mergedData.forGroups)}`);
+      }
+      if(mergedData.resourcePackageSchemaVersion !== RESOURCE_PACKAGE_SCHEMA_VERSION){
+        throw new Error("merged package schema version was not preserved");
       }
     }
   });
@@ -3184,22 +3199,27 @@ function runSelfTests(){
   });
 
   tests.push({
-    name: "RESOURCE TAG NORMALIZATION",
+    name: "RESOURCE PACKAGE SCHEMA VERSION",
     fn: () => {
-      data.resources.forEach(resource => {
-        const seen = new Set();
-        (resource.tags || []).forEach(tag => {
-          if(typeof tag !== "string" || tag !== tag.trim() || !tag){
-            throw new Error(`invalid tag '${tag}' on resource '${resource.id}'`);
-          }
-          const key = tag.toLowerCase();
-          if(seen.has(key)) throw new Error(`duplicate tag '${tag}' on resource '${resource.id}'`);
-          seen.add(key);
-        });
+      const packageData = buildResourcePackageData({
+        packageVersion:7,
+        categories:[{ id:"food", label:"Food", filters:["Pantries"] }],
+        forGroups:["Veterans"],
+        resources:[{ id:"pantry", name:"Pantry", categories:["food"], categoryFilters:{ food:["Pantries"] }, forGroups:["Veterans"], informationText:"" }],
+        changes:[],
+        lastLoadedPackageInfo:{ packageVersion:1 }
       });
+      if(packageData.resourcePackageSchemaVersion !== RESOURCE_PACKAGE_SCHEMA_VERSION){
+        throw new Error("resource package schema version was not exported");
+      }
+      if("lastLoadedPackageInfo" in packageData){
+        throw new Error("local loaded-package state should not be exported");
+      }
+      if("tags" in packageData || packageData.resources.some(resource => "tags" in resource)){
+        throw new Error("legacy tags should not be exported");
+      }
     }
   });
-
   tests.push({
     name: "BLANK RESOURCE CLEANUP DETECTION",
     fn: () => {
@@ -3365,8 +3385,8 @@ function runSelfTests(){
         data = {
           categories:[],
           resources:[
-            { id:"normal", name:"Normal Resource", categories:[], tags:[], informationText:"" },
-            { id:"list", name:"List Resource", categories:[], tags:["List"], informationText:"" }
+            { id:"normal", name:"Normal Resource", categories:[], phone:"555-1212", informationText:"" },
+            { id:"list", name:"List Resource", categories:[], phone:"", website:"", hours:"", informationText:"" }
           ]
         };
         printSelection = ["normal", "list"];
@@ -3410,26 +3430,22 @@ function runSelfTests(){
   });
 
   tests.push({
-    name: "TAG BUTTON TEXT SYNC HELPERS",
+    name: "LEGACY RESOURCE PACKAGE FIELDS ARE REJECTED",
     fn: () => {
-      const added = toggleResourceTag(["GED"], "List");
-      if(JSON.stringify(added) !== JSON.stringify(["GED", "List"])){
-        throw new Error(`expected GED/List, got ${JSON.stringify(added)}`);
-      }
-      const removed = toggleResourceTag(added, "ged");
-      if(JSON.stringify(removed) !== JSON.stringify(["List"])){
-        throw new Error(`expected GED removal, got ${JSON.stringify(removed)}`);
-      }
-      const addedTrimmed = toggleResourceTag([], " List ");
-      if(JSON.stringify(addedTrimmed) !== JSON.stringify(["List"])){
-        throw new Error(`expected trimmed List tag, got ${JSON.stringify(addedTrimmed)}`);
-      }
-      if(formatResourceTagsInput(["GED", "List"]) !== "GED\nList"){
-        throw new Error("tag input formatting changed");
-      }
+      const legacyPackage = {
+        resourcePackageSchemaVersion:RESOURCE_PACKAGE_SCHEMA_VERSION,
+        categories:[{ id:"food", label:"Food", displayOrder:10 }],
+        resources:[{ id:"pantry", name:"Pantry", categories:["food"], tags:["List"], pdfUrl:"old.pdf" }],
+        tags:["List"]
+      };
+      const report = validateImportData(legacyPackage);
+      if(report.ok) throw new Error("legacy package fields should be rejected");
+      const errorText = report.errors.join("\n");
+      ["Top-level 'tags'", "displayOrder", "legacy tags", "PDF field"].forEach(expected => {
+        if(!errorText.includes(expected)) throw new Error("missing legacy package error " + expected);
+      });
     }
   });
-
   tests.push({
     name: "ADMIN FOR GROUP DELETE BULK UPDATE",
     fn: () => {
@@ -3603,18 +3619,18 @@ function runSelfTests(){
             { id:"education", label:"Education" }
           ],
           resources:[
-            { id:"target", name:"Community Action", categories:["food"], tags:["Food","List"], informationText:"Community Action" },
-            { id:"list-food", name:"Food Pantries", categories:["food"], tags:["List"], informationText:"Community-Action\ncommunity action" },
-            { id:"list-housing", name:"Housing Lists", categories:["housing","food"], tags:["List"], informationText:"community action" },
-            { id:"not-list", name:"Caseworker Note", categories:["food"], tags:["Food"], informationText:"Community Action" },
-            { id:"ged", name:"GED", categories:["education"], tags:["Education"], informationText:"" },
-            { id:"can", name:"CAN", categories:["education"], tags:["Education"], informationText:"" },
-            { id:"ican", name:"ICAN", categories:["education"], tags:["Education"], informationText:"" },
-            { id:"aid", name:"Aid", categories:["education"], tags:["Education"], informationText:"" },
-            { id:"story", name:"My Story Matters", categories:["education"], tags:["Education"], informationText:"" },
-            { id:"list-education", name:"Education Lists", categories:["education"], tags:["List"], informationText:"GED preparation, earn a GED, abridged notes, American Fork resources, vacancy listings, Captain Your Story - My Story Matters, GED." },
-            { id:"long-guide", name:"Long Education Guide", categories:["education"], tags:["Education"], informationText:longText },
-            { id:"short-guide", name:"Short Education Note", categories:["education"], tags:["Education"], informationText:"GED preparation and My Story Matters" }
+            { id:"target", name:"Community Action", categories:["food"], phone:"555-0000", informationText:"Community Action" },
+            { id:"list-food", name:"Food Pantries", categories:["food"], phone:"", website:"", hours:"", informationText:"Community-Action\ncommunity action" },
+            { id:"list-housing", name:"Housing Lists", categories:["housing","food"], phone:"", website:"", hours:"", informationText:"community action" },
+            { id:"not-list", name:"Caseworker Note", categories:["food"], phone:"555-1111", informationText:"Community Action" },
+            { id:"ged", name:"GED", categories:["education"], phone:"555-2222", informationText:"" },
+            { id:"can", name:"CAN", categories:["education"], phone:"555-3333", informationText:"" },
+            { id:"ican", name:"ICAN", categories:["education"], phone:"555-4444", informationText:"" },
+            { id:"aid", name:"Aid", categories:["education"], phone:"555-5555", informationText:"" },
+            { id:"story", name:"My Story Matters", categories:["education"], phone:"555-6666", informationText:"" },
+            { id:"list-education", name:"Education Lists", categories:["education"], phone:"", website:"", hours:"", informationText:"GED preparation, earn a GED, abridged notes, American Fork resources, vacancy listings, Captain Your Story - My Story Matters, GED." },
+            { id:"long-guide", name:"Long Education Guide", categories:["education"], phone:"", website:"", hours:"", informationText:longText },
+            { id:"short-guide", name:"Short Education Note", categories:["education"], phone:"555-7777", informationText:"GED preparation and My Story Matters" }
           ]
         };
 
@@ -3728,7 +3744,7 @@ function runSelfTests(){
           forGroups:["Veterans", "Seniors"],
           resources:[
             { id:"training", name:"Training Resource", categories:["employment"], categoryFilters:{ employment:["Career Training"] }, forGroups:[], informationText:"" },
-            { id:"vets", name:"Veterans Resource", categories:["employment","housing"], categoryFilters:{}, forGroups:["Veterans"], informationText:"" },
+            { id:"vets", name:"Service Resource", categories:["employment","housing"], categoryFilters:{}, forGroups:["Veterans"], phone:"555-1212", informationText:"" },
             { id:"senior", name:"Community Help", categories:["housing"], categoryFilters:{}, forGroups:["Seniors"], informationText:"" },
             { id:"room", name:"Room Resource", categories:["housing"], categoryFilters:{ housing:["Shared Rooms"] }, forGroups:[], informationText:"" }
           ]
@@ -3751,8 +3767,17 @@ function runSelfTests(){
         if(!/For: Seniors/.test(forResults.groups[0].items[0].snippet)){
           throw new Error("For group search snippet was missing");
         }
+        const veteranResults = buildSearchResults("veterans");
+        if(veteranResults.mode !== "taxonomy") throw new Error("Veterans For group search should use taxonomy mode");
+        const veteranCategories = veteranResults.groups.map(group => group.categoryId).sort();
+        if(veteranCategories.join(",") !== "employment,housing"){
+          throw new Error("For group search did not include each resource category");
+        }
         const forOnlyResults = buildSearchResults("shared rooms");
         if(forOnlyResults.mode !== "taxonomy") throw new Error("second category filter search should use taxonomy mode");
+        if(forOnlyResults.groups.length !== 1 || forOnlyResults.groups[0].categoryId !== "housing" || forOnlyResults.groups[0].items[0].resourceId !== "room"){
+          throw new Error("category filter search returned resources without the selected filter");
+        }
       }finally{
         data = previousData;
       }
@@ -3914,36 +3939,6 @@ function runSelfTests(){
         ]).map(r => r.id);
         if(!matching.includes("shared") || !matching.includes("ged")){
           throw new Error("OR category filtering missed expected education resources");
-        }
-      }finally{
-        data = previousData;
-      }
-    }
-  });
-
-  tests.push({
-    name: "CATEGORY ASSIGNMENT TAG HINT",
-    fn: () => {
-      const previousData = data;
-      try{
-        data = {
-          categories:[
-            { id:"housing", label:"Housing" },
-            { id:"employment", label:"Employment" },
-            { id:"education", label:"Education" }
-          ],
-          resources:[]
-        };
-        const suggested = getSuggestedCategoriesFromTags(["Shelter", "Apprenticeship"]);
-        if(JSON.stringify(suggested) !== JSON.stringify(["Housing", "Employment", "Education"])){
-          throw new Error(`unexpected suggestions ${JSON.stringify(suggested)}`);
-        }
-        const missing = getMissingSuggestedCategories({
-          tags:["Shelter", "Apprenticeship"],
-          categories:["housing"]
-        });
-        if(JSON.stringify(missing) !== JSON.stringify(["Employment", "Education"])){
-          throw new Error(`unexpected missing categories ${JSON.stringify(missing)}`);
         }
       }finally{
         data = previousData;
@@ -4803,7 +4798,7 @@ function showAdminHelp(){
         <details>
           <summary>Resources</summary>
           <div class="admin-help-section-body">
-            <p>Use <code>Resources</code> to add, edit, delete, categorize, tag, and verify resource records.</p>
+            <p>Use <code>Resources</code> to add, edit, delete, categorize, assign For groups, and verify resource records.</p>
             <p>In the resource list:</p>
             <ul>
               <li>Click a resource to select it.</li>
@@ -4819,8 +4814,8 @@ function showAdminHelp(){
               <li><code>Verified</code> stores a <code>MM/YY</code> date. Click <code>Update</code> to fill in the current month and year.</li>
               <li><code>Description</code> is the short public summary.</li>
               <li><code>Describe this update</code> is used in the change log and package update summary.</li>
-              <li><code>For</code> can be comma-separated or entered one per line.</li>
-              <li><code>Categories</code> controls where the resource appears.</li>
+              <li><code>For</code> identifies who the resource is for.</li>
+              <li><code>Categories</code> controls where the resource appears and shows category-specific filters when available.</li>
               <li><code>Information</code> is the detailed public service text.</li>
             </ul>
             <p>Click <code>Done</code> to save the editor. If you leave <code>Describe this update</code> blank after changing a category or resource, the app asks whether you want to describe the change or save without a description.</p>
@@ -4844,8 +4839,8 @@ function showAdminHelp(){
         <details>
           <summary>For</summary>
           <div class="admin-help-section-body">
-            <p><code>For</code> shows the groups currently used by one or more resources.</p>
-            <p>Select a group to see which resources use it. <code>Delete Group</code> removes that group from every listed resource, updates each changed resource, and creates change-log entries.</p>
+            <p><code>For</code> manages the governed list of groups a resource can be for.</p>
+            <p>Select a group to see which resources use it. <code>Delete</code> removes that group from the list and from every resource that uses it.</p>
             <p>Before deleting groups, make sure you have loaded the latest package. If another admin later saves an older version of a resource, a merge can bring the deleted group back.</p>
           </div>
         </details>
@@ -4858,7 +4853,7 @@ function showAdminHelp(){
             <ul>
               <li><code>Updated phone number</code></li>
               <li><code>Added eligibility details</code></li>
-              <li><code>Removed duplicate housing tag</code></li>
+              <li><code>Renamed housing filter</code></li>
               <li><code>Deleted outdated resource</code></li>
             </ul>
             <p>After a package is merged successfully, the local change log is cleared.</p>
@@ -4868,7 +4863,7 @@ function showAdminHelp(){
         <details>
           <summary>Undo</summary>
           <div class="admin-help-section-body">
-            <p>Undo is available only for destructive deletions: category deletion, resource deletion, and tag deletion.</p>
+            <p>Undo is available only for destructive deletions: category deletion, resource deletion, and For group deletion.</p>
             <p>Only the most recent deletion can be undone. Use <code>Undo ...</code> in Admin mode to restore the saved snapshot, or <code>Clear undo</code> to remove it.</p>
             <p>Normal edits are not undone this way. If you make a wrong normal edit, edit the item again and describe the correction.</p>
           </div>
@@ -4957,7 +4952,7 @@ function buildResourceCard(res,{expanded=false,showDescription=false,showPrintTo
 // ============================================================
 // RENDERING — CATEGORIES
 // ============================================================
-// Category view helpers handle tag-based filtering within the selected category.
+// Category view helpers handle category filters and For-group filters within the selected category.
 // Filters are transient UI state; they are not saved into the resource package.
 
 function getCategoryFilterTags(categoryId){
@@ -5137,7 +5132,7 @@ function renderSearchResultsView(){
 // ============================================================
 // Undo is intentionally narrow: destructive admin deletes save one complete data
 // snapshot in localStorage. Restoring that snapshot is simpler and safer than
-// trying to reverse individual category/resource/tag mutations.
+// trying to reverse individual category, resource, or For-group mutations.
 
 function getUndoSnapshot(){
   try{
@@ -5549,10 +5544,7 @@ const PrintWorkflow = {
   initiatedByButton: false,
 
   isListResource(res){
-    if(!Array.isArray(res?.tags)) return false;
-    return res.tags.some(tag => {
-      return String(tag || "").trim().toLowerCase() === "list";
-    });
+    return resourceMatchesListsHeuristic(res);
   },
 
   getPrintSelectionGroups(){
@@ -6116,6 +6108,7 @@ function mergeItemsById(localItems, incomingItems, options = {}){
 
 function normalizePackageData(nextData){
   if(!nextData || typeof nextData !== "object") nextData = {};
+  nextData.resourcePackageSchemaVersion = RESOURCE_PACKAGE_SCHEMA_VERSION;
   if(!Array.isArray(nextData.categories)) nextData.categories = [];
   if(!Array.isArray(nextData.resources)) nextData.resources = [];
   normalizeDataInformationShape(nextData);
@@ -6127,6 +6120,50 @@ function normalizePackageData(nextData){
   nextData.packageVersion = normalizePackageVersionValue(nextData.packageVersion);
   normalizeLastLoadedPackageInfo(nextData);
   return nextData;
+}
+
+function buildResourcePackageData(sourceData){
+  const source = normalizePackageData(cloneDataObject(sourceData || {}));
+  return {
+    resourcePackageSchemaVersion: RESOURCE_PACKAGE_SCHEMA_VERSION,
+    appVersion: APP_VERSION,
+    packageVersion: source.packageVersion,
+    lastModified: source.lastModified || nowISO(),
+    categories: source.categories,
+    forGroups: source.forGroups,
+    resources: source.resources,
+    changes: source.changes
+  };
+}
+
+function collectLegacyPackageFieldErrors(packageData){
+  const errors = [];
+  if(!packageData || typeof packageData !== "object") return errors;
+  if("tags" in packageData) errors.push("Top-level 'tags' is not supported in resource package schema 2.");
+  if("lastLoadedPackageInfo" in packageData) errors.push("Local 'lastLoadedPackageInfo' is not part of resource package schema 2.");
+
+  const hasPdfKey = key => /pdf/i.test(String(key || ""));
+  Object.keys(packageData).forEach(key => {
+    if(hasPdfKey(key)) errors.push(`Top-level PDF field '${key}' is not supported.`);
+  });
+
+  (Array.isArray(packageData.categories) ? packageData.categories : []).forEach((category, index) => {
+    if(!category || typeof category !== "object") return;
+    if("displayOrder" in category) errors.push(`Category '${category.id || index}' uses legacy displayOrder.`);
+    Object.keys(category).forEach(key => {
+      if(hasPdfKey(key)) errors.push(`Category '${category.id || index}' uses unsupported PDF field '${key}'.`);
+    });
+  });
+
+  (Array.isArray(packageData.resources) ? packageData.resources : []).forEach((resource, index) => {
+    if(!resource || typeof resource !== "object") return;
+    if("tags" in resource) errors.push(`Resource '${resource.id || index}' uses legacy tags.`);
+    Object.keys(resource).forEach(key => {
+      if(hasPdfKey(key)) errors.push(`Resource '${resource.id || index}' uses unsupported PDF field '${key}'.`);
+    });
+  });
+
+  return errors;
 }
 
 function mergeResourcePackages(localData, incomingData){
@@ -6142,7 +6179,8 @@ function mergeResourcePackages(localData, incomingData){
     categories: categoryMerge.merged,
     resources: resourceMerge.merged,
     changes: mergeChanges(local.changes, incoming.changes),
-    forGroups: normalizeResourceTags([...(local.forGroups || []), ...(incoming.forGroups || [])])
+    forGroups: normalizeResourceTags([...(local.forGroups || []), ...(incoming.forGroups || [])]),
+    resourcePackageSchemaVersion: RESOURCE_PACKAGE_SCHEMA_VERSION
   };
   normalizePackageData(mergedData);
   return {
@@ -6236,7 +6274,8 @@ async function exportPackage(){
     data.packageVersion = getNextPackageVersionValue(data.packageVersion);
     packageVersionBumped = true;
 
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const packageData = buildResourcePackageData(data);
+    const blob = new Blob([JSON.stringify(packageData, null, 2)], { type: "application/json" });
     await saveResourcePackageBlob(saveTarget, blob);
     persist();
     showToast(`Resources saved to ${RESOURCE_PACKAGE_FILENAME}`);
@@ -6277,6 +6316,12 @@ function validateImportData(imported){
   if(!Array.isArray(imported.resources)){
     errors.push("Missing or invalid 'resources' array");
   }
+
+  if(imported.resourcePackageSchemaVersion !== RESOURCE_PACKAGE_SCHEMA_VERSION){
+    errors.push(`Unsupported resource package schema. Expected ${RESOURCE_PACKAGE_SCHEMA_VERSION}.`);
+  }
+
+  collectLegacyPackageFieldErrors(imported).forEach(error => errors.push(error));
 
   const categoryIds = new Set();
   (Array.isArray(imported.categories) ? imported.categories : []).forEach((c, i) => {
@@ -6656,14 +6701,8 @@ function openSearchResult(categoryId, resourceId){
   safeRender();
 }
 
-function resourceHasListTag(resource){
-  return normalizeResourceTags(resource && resource.tags)
-    .some(tag => tag.toLowerCase() === "list");
-}
-
 function resourceIsListStyle(resource){
-  if(resourceHasListTag(resource)) return true;
-  return String(resource && resource.informationText || "").trim().length > 500;
+  return resourceMatchesListsHeuristic(resource);
 }
 
 function findReferencingLists(resourceOrName){
@@ -7258,7 +7297,6 @@ function commitPendingEditsIfChanged(){
       return false;
     }
     if(nextSnapshot !== editorSnapshot){
-      if(!confirmCategoryAssignmentHint(draft)) return false;
       if(!confirmBlankUpdateDescription(draft)) return false;
       const resource = data.resources[editing.idx];
       const resourceId = resource && resource.id ? resource.id : "";
@@ -7676,11 +7714,11 @@ function renderCategoryFilterRows(filters){
 }
 
 /* ---------- Admin: Resources ---------- */
-// Resource admin owns the large resource editor. It normalizes tags, categories,
+// Resource admin owns the large resource editor. It normalizes For groups, categories,
 // verification dates, and structured information text before saving.
 
 function renderAdminResources(container){
-  // Resource management view (browse list, edit mode, and tags).
+  // Resource management view (browse list, edit mode, and For groups).
   if(adminResourceEditMode && !selectedResourceId && data.resources[0] && data.resources[0].id){
     selectedResourceId = data.resources[0].id;
   }
