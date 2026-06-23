@@ -1171,16 +1171,23 @@ data.resourcePackageSchemaVersion = RESOURCE_PACKAGE_SCHEMA_VERSION;
 let printSelection = loadPrintSelection();
 sanitizePrintSelection();
 if(DEBUG) assertInvariants("startup");
-// Remaining fields are runtime UI state; they are not persisted directly. They
-// describe the currently visible view, selected admin row, open editor, filters,
-// and temporary update-review screens.
+// Runtime UI state. These values describe what the current browser tab is doing:
+// public view routing, selected rows, open editors, transient filters, and update
+// review screens. Do not put package data here; package data belongs in `data`.
 let view = "categories";
 let currentCategory = null;
 const LISTS_CATEGORY_ID = "__lists__";
+
+// Public navigation/search state. The selected category filters are deliberately
+// transient: they narrow the current view but are never exported in a package.
 let isSearchOpen = false;
 let searchQuery = "";
 let searchResults = null;
 let expandedSearchResourceId = "";
+let selectedCategoryFilters = {}; // categoryId -> transient selected category/For filters
+
+// Admin navigation/editor state. `editing` and `editorSnapshot` are the dirty
+// checking pair used by commitPendingEditsIfChanged().
 let isAdminVisible = false;
 let adminTab = "categories";
 let adminShowVerifiedDates = false;
@@ -1189,9 +1196,11 @@ let selectedResourceId = "";
 let selectedCategoryIndex = "";
 let editing = null;
 let editorSnapshot = "";
-let selectedCategoryFilters = {}; // categoryId -> transient selected category/For filters
 let selectedForGroupIndex = 0;
 const UNDO_STORAGE_KEY = "albqUndo";
+
+// Recent-update state. Package imports set these fields so the next public render
+// can show what changed; the recent-updates view clears them after displaying.
 let pendingRecentUpdates = [];
 let recentUpdateDetail = null;
 let showUpdateInfo = false;
@@ -1211,6 +1220,8 @@ function isNewTemplateFile(){
 }
 
 function normalizeAdminGuidePhase(phase){
+  // The guide has two startup phases: while still named new.html it teaches setup
+  // and renaming; after rename it resumes with category filters and resources.
   if(isNewTemplateFile() && phase !== "renameFile") return "setupName";
   if(phase === "renameFile" && !isNewTemplateFile()) return "createResource";
   if(phase === "createResource") return "createResource";
@@ -1227,6 +1238,9 @@ let adminGuideStep = adminGuidePhase === "createResource" ? "categoryFilters" : 
 let adminGuideResourceSection = "basics";
 let adminGuidePracticeResourceId = localStorage.getItem(ADMIN_GUIDE_PRACTICE_RESOURCE_STORAGE_KEY) || "";
 let adminHelpPrintRestoreState = null;
+
+// A new category/resource is inserted immediately so the normal editor can own
+// it. These sets mark those temporary drafts so Cancel can remove them cleanly.
 let allowBlankUpdateDescriptionOnce = false;
 let newCategoryIds = new Set();
 let newResourceIds = new Set();
@@ -1368,7 +1382,11 @@ if(appErrorDismiss){
 // ============================================================
 // SELF TESTS
 // ============================================================
-// Smoke tests for high-risk flows (create/delete/undo/For groups/information/import/export/sorting).
+// In-browser smoke tests for high-risk flows (create/delete/undo/For groups/
+// information/import/export/sorting). Run with Ctrl+Shift+T while the page is
+// open; use ?debug when you also want invariant checks before/after rendering.
+// Tests temporarily replace global state and then restore it, so each test must
+// save every global it mutates in a finally block.
 
 function runSelfTests(){
   const tests = [];
@@ -4418,6 +4436,12 @@ function refreshAppTitle(){
 
 refreshAppTitle();
 
+// Guided quick start is driven by three small state fields:
+// - adminGuidePhase: broad startup phase that survives reload/rename.
+// - adminGuideStep: current admin screen prompt.
+// - adminGuideResourceSection: current section inside the Resource editor.
+// Completed admins can click Guide later; getContextualAdminGuideStep() starts
+// them at the tip that matches the admin tab they are already using.
 function isNewAdminSetupState(){
   if(!isNewTemplateFile()) return false;
   return !getTsoName()
@@ -4620,6 +4644,9 @@ function getAdminGuideResourceSections(){
 }
 
 function saveGuidedResourceEditorProgress(){
+  // The guide advances through the Resource editor one section at a time, but the
+  // editor itself is one form. Save each section into the resource draft before
+  // moving forward so going Back/Next never loses typed practice data.
   if(!(editing && editing.kind === "resource")) return true;
   const draft = resourceEditorDraft();
   if(!draft) return true;
@@ -5302,6 +5329,9 @@ function undoLastDeletion(){
 
 /* ---------- Render ---------- */
 
+// Render helpers are grouped by public screen. They all append into appView and
+// assume render() has already cleared it, except recent-updates which clears
+// again because it can be opened from several flows.
 function prepareRenderShell(){
   updatePrintSelectionIndicator();
   tabAdmin.style.display = isAdminVisible ? "" : "none";
@@ -5361,6 +5391,7 @@ function renderPendingUpdatesNotice(){
 }
 
 function getCategoryCardsForRender(){
+  // Lists is derived from resource shape, not stored as a real package category.
   return data.categories
     .map(cat => ({ id:cat.id, label:cat.label, source:cat }))
     .concat(getListsResources().length ? [{ id:LISTS_CATEGORY_ID, label:"Lists", source:null }] : [])
@@ -5368,6 +5399,8 @@ function getCategoryCardsForRender(){
 }
 
 function openRecentUpdates(entries){
+  // Opening a badge marks only those changes as viewed, then lets the
+  // recent-updates screen render the details.
   recentUpdateDetail = entries;
   markChangesViewed(entries.map(entry => entry.id));
   view = "recent-updates";
@@ -5407,6 +5440,8 @@ function renderCategoriesGrid(){
 }
 
 function renderCategoriesView(){
+  // Main public landing screen: guide/user tip, update notice, category grid,
+  // and resource-package merge entry point.
   renderCategoryGuideTip();
   renderPendingUpdatesNotice();
   renderCategoryReminder();
@@ -5560,6 +5595,8 @@ function renderCategoryResources(filtered, activeFilters){
 }
 
 function renderCategoryView(){
+  // Public category detail screen. Category filters and For buttons are OR'd
+  // together by filterResourcesBySelectedCategoryFilters().
   renderCategoryBackButton();
   renderCategoryTitle();
   const categoryFilterOptions = getCategoryFilterOptions(currentCategory);
@@ -5606,6 +5643,8 @@ function renderRecentChangeLog(entries){
 }
 
 function renderRecentUpdatesView(){
+  // Recent updates can be a full package-summary screen or a small detail list
+  // opened from an update badge. Both modes share the same view state.
   const entries = Array.isArray(recentUpdateDetail) ? recentUpdateDetail : getRecentChanges();
   const packageInfo = (data && data.lastLoadedPackageInfo && typeof data.lastLoadedPackageInfo === "object")
     ? data.lastLoadedPackageInfo
@@ -5619,6 +5658,8 @@ function renderRecentUpdatesView(){
 }
 
 function renderPrintSelectionView(){
+  // This is only the review screen. The actual printable packet is owned by
+  // PrintWorkflow so list-style resources can render differently.
   const { normalSelections, listSelections } = PrintWorkflow.getPrintSelectionGroups();
   const selections = [...normalSelections, ...listSelections];
   if(!selections.length){
@@ -6311,6 +6352,8 @@ function normalizePackageData(nextData){
 }
 
 function buildResourcePackageData(sourceData){
+  // Resource packages are intentionally smaller than local app state. Do not add
+  // UI-only fields such as lastLoadedPackageInfo, undo, or selected filters here.
   const source = normalizePackageData(cloneDataObject(sourceData || {}));
   return {
     resourcePackageSchemaVersion: RESOURCE_PACKAGE_SCHEMA_VERSION,
@@ -6325,6 +6368,9 @@ function buildResourcePackageData(sourceData){
 }
 
 function collectLegacyPackageFieldErrors(packageData){
+  // Schema 2 deliberately rejects old package shapes instead of silently
+  // translating them. That keeps admins from mixing PDF/tag/displayOrder-era
+  // packages with the current filters/For model.
   const errors = [];
   if(!packageData || typeof packageData !== "object") return errors;
   if("tags" in packageData) errors.push("Top-level 'tags' is not supported in resource package schema 2.");
@@ -7353,7 +7399,9 @@ function openAdminCategoryResourceById(resourceId){
 }
 
 function applyResourceDraft(idx, draft){
-  // Apply validated resource draft into canonical data model.
+  // Apply validated resource draft into canonical data model. The editor stores
+  // empty text fields as empty strings, but taxonomy fields are always arrays or
+  // objects so package export stays predictable.
   const res = data.resources[idx];
   if(!res) return;
   res.name = draft.name || res.name;
@@ -7391,6 +7439,8 @@ function closeBlankUpdateDescriptionPrompt(){
 }
 
 function promptBlankUpdateDescription(){
+  // Update descriptions are not required forever, but the first blank save asks
+  // the admin to confirm so accidental silent edits are less likely.
   closeBlankUpdateDescriptionPrompt();
   const modal = document.createElement("div");
   modal.id = "blankUpdateDescriptionPrompt";
@@ -8379,6 +8429,8 @@ function renderResourceInformationSection(informationDraft){
 }
 
 function renderResourceEditorMarkup(res){
+  // The Resource editor renders once, then setupResource* functions attach all
+  // behavior. Keep IDs stable because draft capture and self-tests depend on them.
   const verifiedDisplay = formatVerifiedOnForDisplay(res.verifiedOn);
   const informationDraft = parseInformationText(res.informationText || "");
   return [
@@ -8446,6 +8498,9 @@ function updateResourceVerifiedDisplayAndWarning(elements){
 }
 
 function validateResourceEditorState(idx){
+  // Validation drives the sticky Done/Cancel buttons. Dirty-state visibility is
+  // handled by updateResourceEditorActionBar(); this function only decides
+  // whether Done must be disabled.
   const draft = resourceEditorDraft();
   if(!draft){
     showResourceNameWarning("");
@@ -8523,6 +8578,8 @@ function setupResourceEditorValidation(editor, elements, validateEditorState){
 }
 
 function normalizeResourceForEditor(res){
+  // Normalize in place before rendering so older resources and imported records
+  // use the same canonical shapes as newly-created resources.
   normalizeResourceInformation(res);
   normalizeResourceVerifiedOn(res);
   normalizeDataForGroupsShape(data);
@@ -8531,6 +8588,8 @@ function normalizeResourceForEditor(res){
 }
 
 function editResource(idx){
+  // High-level Resource editor lifecycle:
+  // normalize resource -> render markup -> wire controls -> snapshot baseline.
   const res = data.resources[idx];
   const editor = document.getElementById("resEditor");
   if(!res || !editor) return;
