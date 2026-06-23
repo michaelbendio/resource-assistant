@@ -598,7 +598,7 @@ textarea.information-editor { min-height:320px; resize:vertical; }
 <div id="adminView" class="hidden"></div>
 
 <div id="selfTestPanel" style="display:none; position:fixed; bottom:0; left:0; right:0; background:#f5f5f5; border-top:2px solid #888; padding:10px; font-size:14px; max-height:250px; overflow:auto;">
-  <strong>ALBQ Self Tests</strong>
+  <strong>TSO Self Tests</strong>
   <div id="selfTestResults"></div>
   <button class="button" id="selfTestClose">Close</button>
 </div>
@@ -617,38 +617,37 @@ textarea.information-editor { min-height:320px; resize:vertical; }
 <script id="seed-data" type="application/json">
 {
   "categories": [
-    { "id": "addiction", "label": "Addiction", "active": true, "filters": ["Treatment", "Recovery Support"] },
-    { "id": "children-pregnancy", "label": "Children/Pregnancy", "active": true, "filters": ["Child Care", "Pregnancy", "WIC"] },
-    { "id": "clothing-household", "label": "Clothing/Household", "active": true, "filters": ["Clothing", "Household Goods", "Hygiene Products", "Laundry"] },
+    { "id": "addiction", "label": "Addiction", "active": true, "filters": ["In-patient", "Out-patient", "Sober Living"] },
+    { "id": "children-pregnancy", "label": "Children/Pregnancy", "active": true, "filters": ["Obstetric care", "Pregnancy Education"] },
+    { "id": "clothing-household", "label": "Clothing/Household", "active": true },
     { "id": "disability", "label": "Disability", "active": true },
     { "id": "domestic-violence", "label": "Domestic Violence", "active": true },
-    { "id": "education", "label": "Education", "active": true, "filters": ["GED", "High School Diploma", "Scholarships", "Skilled Trade Education"] },
-    { "id": "employment", "label": "Employment", "active": true, "filters": ["Apprenticeship", "Career Training", "Permanent Employment", "Temporary Employment"] },
-    { "id": "financial-assistance", "label": "Financial Assistance", "active": true, "filters": ["Rent Assistance", "Utilities Assistance"] },
+    { "id": "education", "label": "Education", "active": true, "filters": ["GED", "Evening classes", "Scholarships", "Trades", "Career", "Guidance", "Certification", "Degree"] },
+    { "id": "employment", "label": "Employment", "active": true, "filters": ["Temp Agencies", "Apps", "Résumé assistance", "Job application assistance"] },
+    { "id": "financial-assistance", "label": "Financial Assistance", "active": true, "filters": ["Rent Assistance", "Utilities assistance"] },
     { "id": "reentry-support", "label": "Reentry Support", "active": true },
-    { "id": "food", "label": "Food", "active": true, "filters": ["Food Pantries", "Meals", "SNAP", "WIC"] },
-    { "id": "medical-dental-vision", "label": "Medical, Dental, Vision", "active": true, "filters": ["Dental", "Medical Equipment", "Medicaid", "Physical Therapy", "Vision"] },
-    { "id": "homeless-services", "label": "Homeless Services", "active": true, "filters": ["Shelters", "Showers", "Laundry", "Meals"] },
-    { "id": "housing", "label": "Housing", "active": true, "filters": ["Assistance", "Government Subsidized", "Permanent", "Repairs", "Shared Rooms", "Temporary", "Transitional"] },
+    { "id": "food", "label": "Food", "active": true, "filters": ["Pantry", "Meals"] },
+    { "id": "medical-dental-vision", "label": "Medical, Dental, Vision", "active": true, "filters": ["No Insurance", "Lab"] },
+    { "id": "homeless-services", "label": "Homeless Services", "active": true, "filters": ["Shelters", "Showers", "Laundry", "Haircuts", "Meals", "Mailing address", "Storage", "Computers", "Phones", "Hygiene kits", "Clothing", "Benefit enrollment", "Medical", "Dental", "Vision"] },
+    { "id": "housing", "label": "Housing", "active": true, "filters": ["Houses", "Apartments", "Rooms", "Subsidized"] },
     { "id": "id-recovery", "label": "ID Recovery", "active": true },
     { "id": "immigration", "label": "Immigration", "active": true },
-    { "id": "legal", "label": "Legal", "active": true, "filters": ["Civil Legal Help", "Immigration Legal Help"] },
-    { "id": "mental-health", "label": "Mental Health", "active": true, "filters": ["Addiction", "Counseling", "Crisis Support"] },
+    { "id": "legal", "label": "Legal", "active": true, "filters": ["Pro bono", "Immigration"] },
+    { "id": "mental-health", "label": "Mental Health", "active": true },
     { "id": "miscellaneous", "label": "Miscellaneous", "active": true },
-    { "id": "seniors", "label": "Seniors", "active": true, "filters": ["Medically Vulnerable"] },
-    { "id": "transportation", "label": "Transportation", "active": true },
-    { "id": "utilities-phone-internet", "label": "Utilities, Phone, Internet", "active": true },
-    { "id": "veterans", "label": "Veterans", "active": true }
+    { "id": "seniors", "label": "Seniors", "active": true },
+    { "id": "transportation", "label": "Transportation", "active": true, "filters": ["Bus passes", "One-way tickets", "Gas cards", "Car repairs"] },
+    { "id": "utilities-phone-internet", "label": "Utilities, Phone, Internet", "active": true, "filters": ["Low-cost phones", "Low-cost internet"] },
+    { "id": "veterans", "label": "Veterans", "active": true, "filters": ["Government benefits", "Coaching"] }
   ],
   "forGroups": [
     "Veterans",
-    "Ex-offenders",
+    "Families with children",
     "Women",
-    "Children",
-    "Seniors",
-    "Immigrants",
-    "People with Disabilities",
-    "Medically Vulnerable People"
+    "Spanish speaking",
+    "Exiting corrections",
+    "Medically vulnerable",
+    "Seniors"
   ],
   "resources": []
 }
@@ -657,7 +656,7 @@ textarea.information-editor { min-height:320px; resize:vertical; }
 <!-- ===== APP JS START ===== -->
 <script>
 /* ============================================================
-ALBQ RESOURCE ASSISTANT — SECTION INDEX
+TSO RESOURCE ASSISTANT — SECTION INDEX
 This file is intentionally organized into stable sections.
 Agents must modify only the relevant section.
 
@@ -742,7 +741,7 @@ function showToast(message, options = {}){
 // DATA NORMALIZATION
 // ============================================================
 // Data can come from three places: embedded seed JSON, localStorage, and imported
-// albq-resources.json files. These helpers convert older or partial records into
+// resource package JSON files. These helpers convert older or partial records into
 // the canonical shapes expected by rendering, admin editing, persistence, and
 // package merging.
 
@@ -1093,7 +1092,7 @@ const FRESH_START_STORAGE_KEYS = [
   "newAdminGuidePhase",
   "newAdminGuideCompleted",
   "newAdminGuidePracticeResourceId",
-  "albqUndo"
+  "newUndo"
 ];
 
 function runFreshStart(){
@@ -1126,12 +1125,12 @@ const TIP_TEXT = {
   user: "Click on a category to see its resources. Click a resource to see details. Click ⬜ to include it in the printed handout.",
   newAdminWelcome: "Welcome to your new TSO Resources app. Press Ctrl+Alt+A to add an Admin button to the top blue bar. Then click it.",
   newAdminMode: "Click Ctrl+Alt+A to hide the Admin button when you're done. Now click Help.",
-  adminGuideCategoryFilters: "Filters are category-specific choices that appear as Specifically buttons for users and as checkboxes under that category in the Resource editor. Select Seniors, click New under Filters, add Medically Vulnerable if it is not already listed, then click Done.",
+  adminGuideCategoryFilters: "Filters are category-specific choices that appear as Specifically buttons for users and as checkboxes under that category in the Resource editor. Select Transportation, click New under Filters, add Bus passes if it is not already listed, then click Done.",
   adminGuideResources: "Click Resources to enter the Resource editor.",
   adminGuideNewResource: "Click New to create a practice resource.",
   adminGuideResourceFields: "Create a dummy temp agency resource. Enter Name: Quick Start Temp Agency. Enter Description: Practice temporary employment agency. Click Next.",
-  adminGuideForGroups: "Check Ex-offenders. \"For\" groups describe who the resource is for across categories. Click Next.",
-  adminGuideCategories: "Check Employment, then check Temporary Employment under Employment. Category filters describe the specific help offered inside that category. Click Next.",
+  adminGuideForGroups: "Check Exiting corrections. \"For\" groups describe who the resource is for across categories. Click Next.",
+  adminGuideCategories: "Check Employment, then check Temp Agencies under Employment. Category filters describe the specific help offered inside that category. Click Next.",
   adminGuideInformation: "Practice formatting Information. Click Edit and enter: Quick start practice information. * Bring a photo ID * Ask about daily work **This is only a practice resource.** --- Delete this resource when the guide tells you to. Use *[space] for each bullet, then click Preview and Next.",
   adminGuideUpdate: "Describe this update as Added quick start practice resource, then click Done.",
   adminGuideSaveResource: "Click Done again to save the practice resource.",
@@ -1147,7 +1146,7 @@ const ADMIN_GUIDE_DISABLED_STORAGE_KEY = "newAdminGuideDisabled";
 const ADMIN_GUIDE_PHASE_STORAGE_KEY = "newAdminGuidePhase";
 const ADMIN_GUIDE_COMPLETED_STORAGE_KEY = "newAdminGuideCompleted";
 const ADMIN_GUIDE_PRACTICE_RESOURCE_STORAGE_KEY = "newAdminGuidePracticeResourceId";
-const RESOURCE_PACKAGE_FILENAME = "albq-resources.json";
+const DEFAULT_RESOURCE_PACKAGE_FILENAME = "tso-resources.json";
 const CATEGORY_REMINDER_TEXT = "Report bugs or request enhancments to Elder Bendio (michaelbendio@gmail.com)"
 
 if(!data){
@@ -1197,7 +1196,7 @@ let selectedCategoryIndex = "";
 let editing = null;
 let editorSnapshot = "";
 let selectedForGroupIndex = 0;
-const UNDO_STORAGE_KEY = "albqUndo";
+const UNDO_STORAGE_KEY = "newUndo";
 
 // Recent-update state. Package imports set these fields so the next public render
 // can show what changed; the recent-updates view clears them after displaying.
@@ -1719,7 +1718,7 @@ function runSelfTests(){
       const originalClick = HTMLAnchorElement.prototype.click;
       let clicked = null;
       try{
-        URL.createObjectURL = () => "blob:albq-test";
+        URL.createObjectURL = () => "blob:tso-test";
         URL.revokeObjectURL = () => {};
         HTMLAnchorElement.prototype.click = function(){
           clicked = {
@@ -1728,15 +1727,36 @@ function runSelfTests(){
             type: this.getAttribute("type")
           };
         };
-        downloadResourcePackageBlob(RESOURCE_PACKAGE_FILENAME, new Blob(["{}"], { type:"application/json" }));
+        const expectedFileName = getResourcePackageFilename();
+        downloadResourcePackageBlob(expectedFileName, new Blob(["{}"], { type:"application/json" }));
         if(!clicked) throw new Error("download link was not clicked");
-        if(clicked.href !== "blob:albq-test") throw new Error("download link did not use object URL");
-        if(clicked.download !== RESOURCE_PACKAGE_FILENAME) throw new Error(`download filename was '${clicked.download}'`);
+        if(clicked.href !== "blob:tso-test") throw new Error("download link did not use object URL");
+        if(clicked.download !== expectedFileName) throw new Error(`download filename was '${clicked.download}'`);
         if(clicked.type !== "application/json") throw new Error("download link should advertise JSON");
       }finally{
         URL.createObjectURL = originalCreateObjectURL;
         URL.revokeObjectURL = originalRevokeObjectURL;
         HTMLAnchorElement.prototype.click = originalClick;
+      }
+    }
+  });
+
+  tests.push({
+    name: "RESOURCE PACKAGE FILENAME DERIVATION",
+    fn: () => {
+      const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
+      try{
+        localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+        if(isNewTemplateFile() && getResourcePackageFilename() !== "tso-resources.json"){
+          throw new Error(`new.html package filename was ${getResourcePackageFilename()}`);
+        }
+        localStorage.setItem(TSO_NAME_STORAGE_KEY, "Provo");
+        if(getResourcePackageFilename() !== "provo-resources.json"){
+          throw new Error(`Provo package filename was ${getResourcePackageFilename()}`);
+        }
+      }finally{
+        if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+        else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoName);
       }
     }
   });
@@ -2701,10 +2721,10 @@ function runSelfTests(){
       try{
         data = {
           categories:[
-            { id:"seniors", label:"Seniors", filters:[] },
-            { id:"employment", label:"Employment", filters:["Temporary Employment"] }
+            { id:"transportation", label:"Transportation", filters:[] },
+            { id:"employment", label:"Employment", filters:["Temp Agencies"] }
           ],
-          forGroups:["Ex-offenders"],
+          forGroups:["Exiting corrections"],
           resources:[],
           changes:[],
           lastModified:nowISO()
@@ -2725,15 +2745,15 @@ function runSelfTests(){
           throw new Error("guide should start with category filter tip");
         }
         const categoryLabel = document.getElementById("cat_label");
-        if(!categoryLabel || categoryLabel.value !== "Seniors"){
-          throw new Error("category filter guide should open Seniors");
+        if(!categoryLabel || categoryLabel.value !== "Transportation"){
+          throw new Error("category filter guide should open Transportation");
         }
         document.getElementById("cat_filter_new_btn").click();
         const filterInput = Array.from(document.querySelectorAll(".catFilterInput")).pop();
-        filterInput.value = "Medically Vulnerable";
+        filterInput.value = "Bus passes";
         filterInput.dispatchEvent(new Event("input", { bubbles:true }));
         const categoryUpdate = document.getElementById("cat_update_description");
-        categoryUpdate.value = "Added Medically Vulnerable filter";
+        categoryUpdate.value = "Added Bus passes filter";
         categoryUpdate.dispatchEvent(new Event("input", { bubbles:true }));
         closeCategoryEditor();
         if(adminGuideStep !== "resources"){
@@ -2780,10 +2800,10 @@ function runSelfTests(){
         if(!document.querySelector('#resEditor [data-guide-section="forGroups"].admin-guide-current-section')){
           throw new Error("For groups should be the second guide section");
         }
-        const exOffenders = document.querySelector('.resForGroup[value="Ex-offenders"]');
-        if(!exOffenders) throw new Error("Ex-offenders For checkbox was missing");
-        exOffenders.checked = true;
-        exOffenders.dispatchEvent(new Event("change", { bubbles:true }));
+        const exitingCorrections = document.querySelector('.resForGroup[value="Exiting corrections"]');
+        if(!exitingCorrections) throw new Error("Exiting corrections For checkbox was missing");
+        exitingCorrections.checked = true;
+        exitingCorrections.dispatchEvent(new Event("change", { bubbles:true }));
         advanceAdminGuideResourceSection();
         tip = document.querySelector("#adminView .admin-guide-tip");
         if(!tip || !tip.textContent.includes(TIP_TEXT.adminGuideCategories)){
@@ -2793,8 +2813,8 @@ function runSelfTests(){
         if(!employment) throw new Error("Employment category checkbox was missing");
         employment.checked = true;
         employment.dispatchEvent(new Event("change", { bubbles:true }));
-        const temporary = document.querySelector('.resCatFilter[data-category-id="employment"][value="Temporary Employment"]');
-        if(!temporary) throw new Error("Temporary Employment filter checkbox was missing");
+        const temporary = document.querySelector('.resCatFilter[data-category-id="employment"][value="Temp Agencies"]');
+        if(!temporary) throw new Error("Temp Agencies filter checkbox was missing");
         temporary.checked = true;
         temporary.dispatchEvent(new Event("change", { bubbles:true }));
         advanceAdminGuideResourceSection();
@@ -2844,10 +2864,10 @@ Delete this resource when the guide tells you to.`;
         if(JSON.stringify(saved.categories) !== JSON.stringify(["employment"])){
           throw new Error(`practice resource categories were wrong: ${JSON.stringify(saved.categories)}`);
         }
-        if(JSON.stringify(saved.categoryFilters) !== JSON.stringify({ employment:["Temporary Employment"] })){
+        if(JSON.stringify(saved.categoryFilters) !== JSON.stringify({ employment:["Temp Agencies"] })){
           throw new Error(`practice resource filters were wrong: ${JSON.stringify(saved.categoryFilters)}`);
         }
-        if(JSON.stringify(saved.forGroups) !== JSON.stringify(["Ex-offenders"])){
+        if(JSON.stringify(saved.forGroups) !== JSON.stringify(["Exiting corrections"])){
           throw new Error(`practice resource For groups were wrong: ${JSON.stringify(saved.forGroups)}`);
         }
         if(!saved.informationText.includes("* Bring a photo ID")){
@@ -3070,8 +3090,8 @@ Delete this resource when the guide tells you to.`;
       const previousGuideCompleted = localStorage.getItem(ADMIN_GUIDE_COMPLETED_STORAGE_KEY);
       try{
         data = {
-          categories:[{ id:"employment", label:"Employment", filters:["Temporary Employment"] }],
-          forGroups:["Ex-offenders"],
+          categories:[{ id:"employment", label:"Employment", filters:["Temp Agencies"] }],
+          forGroups:["Exiting corrections"],
           resources:[{ id:"practice", name:"Quick Start Temp Agency", categories:["employment"], categoryFilters:{}, forGroups:[], informationText:"" }],
           changes:[]
         };
@@ -4413,14 +4433,25 @@ function getTsoName(){
   return getTsoNameFromHtmlFileName(getCurrentHtmlFileName());
 }
 
-function getTsoFileName(){
-  const fallback = "new-name";
-  const name = getTsoName() || fallback;
-  const cleaned = name.toLowerCase()
+function slugifyFileStem(value, fallback){
+  const cleaned = String(value || "")
+    .toLowerCase()
     .replace(/&/g, " and ")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
-  return `${cleaned || fallback}.html`;
+  return cleaned || fallback;
+}
+
+function getTsoFileName(){
+  const fallback = "new-name";
+  const name = getTsoName() || fallback;
+  return `${slugifyFileStem(name, fallback)}.html`;
+}
+
+function getResourcePackageFilename(){
+  const baseName = getTsoName() || (isNewTemplateFile() ? "tso" : getTsoNameFromHtmlFileName(getCurrentHtmlFileName()));
+  const stem = slugifyFileStem(baseName, "tso");
+  return stem === "tso" ? DEFAULT_RESOURCE_PACKAGE_FILENAME : `${stem}-resources.json`;
 }
 
 function getAppTitleText(){
@@ -4907,6 +4938,7 @@ function showUserHelp(){
 
 function showAdminHelp(){
   const modal = getReferenceModal();
+  const resourcePackageFilename = escapeHTML(getResourcePackageFilename());
   modal.innerHTML = `
     <div class="reference-modal-panel" role="dialog" aria-modal="true" aria-labelledby="adminHelpTitle">
       <div class="reference-modal-header">
@@ -4925,7 +4957,7 @@ function showAdminHelp(){
             <ol>
               <li>Go to the Categories screen.</li>
               <li>Click <code>Merge Resources</code>.</li>
-              <li>Choose the latest <code>albq-resources.json</code> file.</li>
+              <li>Choose the latest <code>${resourcePackageFilename}</code> file.</li>
               <li>Wait for the merge to finish before making edits.</li>
             </ol>
             <p>This matters because resource packages are merged by <code>lastModified</code> timestamps. If you edit from an older package, a later merge can bring back old details, old groups, or old category assignments.</p>
@@ -4940,7 +4972,7 @@ function showAdminHelp(){
             <ol>
               <li>Click <code>Show change log</code> and review the listed changes.</li>
               <li>Click <code>Save Resource Package</code>.</li>
-              <li>Save the file as <code>albq-resources.json</code>.</li>
+              <li>Save the file as <code>${resourcePackageFilename}</code>.</li>
               <li>Share that JSON file through the normal distribution process.</li>
             </ol>
             <p><code>Save Resource Package</code> commits any open editor changes, increases the package version, and exports the current data.</p>
@@ -6441,13 +6473,13 @@ function applyMergedData(mergedData){
 
 async function beginResourcePackageSave(){
   // Request a save target up front so browsers can honor the user gesture.
-  const suggestedName = RESOURCE_PACKAGE_FILENAME;
+  const suggestedName = getResourcePackageFilename();
   if(typeof window.showSaveFilePicker === "function"){
     const handle = await window.showSaveFilePicker({
-      id: "albq-resources",
+      id: "tso-resources",
       suggestedName,
       types: [{
-        description: "ALBQ resource package",
+        description: "TSO resource package",
         accept: {
           "application/json": [".json"]
         }
@@ -6459,7 +6491,7 @@ async function beginResourcePackageSave(){
 }
 
 function downloadResourcePackageBlob(fileName, blob){
-  const cleanFileName = fileName || RESOURCE_PACKAGE_FILENAME;
+  const cleanFileName = fileName || getResourcePackageFilename();
   const downloadBlob = blob.type === "application/octet-stream"
     ? blob
     : new Blob([blob], { type:"application/octet-stream" });
@@ -6477,7 +6509,7 @@ function downloadResourcePackageBlob(fileName, blob){
 }
 
 async function saveResourcePackageBlob(target, blob){
-  const fileName = target && target.suggestedName ? target.suggestedName : RESOURCE_PACKAGE_FILENAME;
+  const fileName = target && target.suggestedName ? target.suggestedName : getResourcePackageFilename();
   if(target && target.kind === "file-handle" && target.handle){
     const writable = await target.handle.createWritable();
     try{
@@ -6512,7 +6544,7 @@ async function exportPackage(){
     const blob = new Blob([JSON.stringify(packageData, null, 2)], { type: "application/json" });
     await saveResourcePackageBlob(saveTarget, blob);
     persist();
-    showToast(`Resources saved to ${RESOURCE_PACKAGE_FILENAME}`);
+    showToast(`Resources saved to ${getResourcePackageFilename()}`);
   }catch(err){
     if(err && err.name === "AbortError") return;
     if(packageVersionBumped) data.packageVersion = previousPackageVersion;
@@ -6535,7 +6567,7 @@ function beginMergeImportPackage(){
 }
 
 function validateImportData(imported){
-  // Validates imported albq-resources.json structure before merging current data.
+  // Validates imported resource package JSON before merging current data.
   const errors = [];
   const warnings = [];
 
@@ -7581,8 +7613,8 @@ function commitPendingEditsIfChanged(){
 function renderAdminCategories(container){
   // Category management view (alphabetical list, full-width editor, and filters).
   if(adminGuideMode && adminGuideStep === "categoryFilters"){
-    const seniorsIndex = getCategoryIndexById("seniors");
-    if(seniorsIndex !== -1) selectedCategoryIndex = String(seniorsIndex);
+    const transportationIndex = getCategoryIndexById("transportation");
+    if(transportationIndex !== -1) selectedCategoryIndex = String(transportationIndex);
   }
 
   container.innerHTML += `
