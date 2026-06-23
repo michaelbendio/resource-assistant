@@ -4911,10 +4911,12 @@ function showUserHelp(){
       <div class="reference-modal-body">
         <h3>Finding Resources</h3>
         <p>Select a category to view available resources.</p>
-        <p>Click a resource to display additional information such as services, phone numbers, addresses, websites, and notes.</p>
+        <p>The <code>Lists</code> category appears automatically when a resource is a list rather than a normal service record.</p>
+        <p>Some category pages include <code>Specifically</code> and <code>For</code> buttons that narrow the visible resources.</p>
+        <p>Click a resource to display Information, phone numbers, addresses, websites, hours, and notes.</p>
         <p>Click the resource again to hide the additional information.</p>
         <h3>Search</h3>
-        <p>Use Search to find resources by text appearing in the resource information.</p>
+        <p>Use Search to find resources by name, category filters, For groups, Lists, and text in the resource information.</p>
         <h3>Selecting Resources for Printing</h3>
         <p>⬜ Resource is not selected for printing.</p>
         <p>🖨️ Resource is selected for printing.</p>
@@ -4950,6 +4952,8 @@ function showAdminHelp(){
         </div>
       </div>
       <div class="reference-modal-body admin-help-content">
+        <p><strong>NOTE:</strong> The <code>Lists</code> category is generated automatically. It is not edited in <code>Categories</code>. A resource appears in <code>Lists</code> when it has no phone, website, or hours, which usually means it is a list such as food pantries, shelters, rooms, or temp agencies.</p>
+
         <details>
           <summary>Before You Edit</summary>
           <div class="admin-help-section-body">
@@ -4984,6 +4988,7 @@ function showAdminHelp(){
           <div class="admin-help-section-body">
             <p>Use <code>Categories</code> to manage the sections users see on the main screen.</p>
             <p><code>New</code> creates a blank category. Enter the category label, add any filters for that category, describe the update, and click <code>Done</code>.</p>
+            <p>Category filters are category-specific choices that answer: what specific kind of help does this resource offer inside this category?</p>
             <p><code>Delete</code> removes the selected category. It does not delete the resources in that category, but those resources will no longer appear there. The app asks for confirmation and gives you a chance to describe the deletion.</p>
             <p>Categories are shown alphabetically.</p>
             <p>The category editor also shows <code>Resources in this category</code>. Click a resource name there to open it in the resource editor.</p>
@@ -5014,6 +5019,7 @@ function showAdminHelp(){
               <li><code>Categories</code> controls where the resource appears and shows category-specific filters when available.</li>
               <li><code>Information</code> is the detailed public service text.</li>
             </ul>
+            <p>If a resource is a list, leave <code>Phone</code>, <code>Website</code>, and <code>Hours</code> blank so the app can place it in the generated <code>Lists</code> category.</p>
             <p>Click <code>Done</code> to save the editor. If you leave <code>Describe this update</code> blank after changing a category or resource, the app asks whether you want to describe the change or save without a description.</p>
           </div>
         </details>
@@ -5036,6 +5042,7 @@ function showAdminHelp(){
           <summary>For</summary>
           <div class="admin-help-section-body">
             <p><code>For</code> manages the governed list of groups a resource can be for.</p>
+            <p>Use <code>For</code> for cross-category people-served groups, such as veterans or families with children. Use category filters for the specific service being offered.</p>
             <p>Select a group to see which resources use it. <code>Delete</code> removes that group from the list and from every resource that uses it.</p>
             <p>Before deleting groups, make sure you have loaded the latest package. If another admin later saves an older version of a resource, a merge can bring the deleted group back.</p>
           </div>
@@ -8414,7 +8421,7 @@ function renderResourceForGroupsSection(forGroupChecks){
   return `
     <div class="${getResourceGuideSectionClass("forGroups")}" data-guide-section="forGroups">
       <div style="margin-top:8px;">
-        <strong>For</strong>
+        <strong>For</strong> <span class="admin-note">(Check only if this resource is specifically intended for this group.)</span>
         <div style="margin-top:4px;">
           ${forGroupChecks || `<p class="admin-note">No For groups have been created yet.</p>`}
         </div>
@@ -8428,7 +8435,7 @@ function renderResourceCategoriesSection(catChecks){
   return `
     <div class="${getResourceGuideSectionClass("categories")}" data-guide-section="categories">
       <div>
-        <strong>Categories</strong><br>
+        <strong>Categories</strong> <span class="admin-note">(Check applicable subcategories too.)</span><br>
         ${catChecks}
       </div>
     </div>
