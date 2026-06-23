@@ -635,7 +635,7 @@ textarea.services-editor { min-height:320px; resize:vertical; }
     { "id": "legal", "label": "Legal", "active": true, "filters": ["Civil Legal Help", "Immigration Legal Help"] },
     { "id": "mental-health", "label": "Mental Health", "active": true, "filters": ["Addiction", "Counseling", "Crisis Support"] },
     { "id": "miscellaneous", "label": "Miscellaneous", "active": true },
-    { "id": "seniors", "label": "Seniors", "active": true },
+    { "id": "seniors", "label": "Seniors", "active": true, "filters": ["Medically Vulnerable"] },
     { "id": "transportation", "label": "Transportation", "active": true },
     { "id": "utilities-phone-internet", "label": "Utilities, Phone, Internet", "active": true },
     { "id": "veterans", "label": "Veterans", "active": true }
@@ -1145,14 +1145,17 @@ const TIP_TEXT = {
   user: "Click on a category to see its resources. Click a resource to see details. Click ⬜ to include it in the printed handout.",
   newAdminWelcome: "Welcome to your new TSO Resources app. Press Ctrl+Alt+A to add an Admin button to the top blue bar. Then click it.",
   newAdminMode: "Click Ctrl+Alt+A to hide the Admin button when you're done. Now click Help.",
+  adminGuideCategoryFilters: "Filters are category-specific choices that appear as Specifically buttons for users and as checkboxes under that category in the Resource editor. Select Seniors, click New under Filters, add Medically Vulnerable if it is not already listed, then click Done.",
   adminGuideResources: "Click Resources to enter the Resource editor.",
-  adminGuideNewResource: "Click New to create a resource.",
-  adminGuideResourceFields: "Fill in Name, Phone, Address, Website, Hours, and a short Description. Users see the Description first; fuller information comes later. If this resource is a list, such as a list of food pantries, enter a description but you can skip the rest of this section. Click Next.",
-  adminGuideForGroups: "Optionally choose who this resource is for, then click Next.",
-  adminGuideCategories: "Choose the categories where this resource should appear, then click Next",
-  adminGuideInformation: "Add the public information users see when they click the description. Use the formatting guide to improve readability, and use Preview to check it. Then click Next.",
-  adminGuideUpdate: "Describe this update, then click Done",
-  adminGuideSaveResource: "Now click Done to save the resource",
+  adminGuideNewResource: "Click New to create a practice resource.",
+  adminGuideResourceFields: "Create a dummy temp agency resource. Enter Name: Quick Start Temp Agency. Enter Description: Practice temporary employment agency. Click Next.",
+  adminGuideForGroups: "Check Ex-offenders. \"For\" groups describe who the resource is for across categories. Click Next.",
+  adminGuideCategories: "Check Employment, then check Temporary Employment under Employment. Category filters describe the specific help offered inside that category. Click Next.",
+  adminGuideInformation: "Practice formatting Information. Click Edit and enter: Quick start practice information. * Bring a photo ID * Ask about daily work **This is only a practice resource.** --- Delete this resource when the guide tells you to. Use *[space] for each bullet, then click Preview and Next.",
+  adminGuideUpdate: "Describe this update as Added quick start practice resource, then click Done.",
+  adminGuideSaveResource: "Click Done again to save the practice resource.",
+  adminGuideDeleteResource: "Now delete the practice resource. Select Quick Start Temp Agency if needed, click Delete, confirm, and describe the update as Deleted quick start practice resource.",
+  adminGuideForAdmin: "Use For to manage the governed list of people served across categories. These choices appear in the Resource editor and as For buttons for users.",
   adminGuideSetupName: "Click Change TSO Name.",
   adminGuideVerifyName: "Check the blue title bar. It should say your TSO name followed by TSO Resources. If it looks right, click Next.",
   adminGuideRenameFile: "Click Quit and rename new.html to [new TSO name].html. Then open [new TSO name].html.",
@@ -1161,6 +1164,7 @@ const TIP_TEXT = {
 const TSO_NAME_STORAGE_KEY = "newTsoName";
 const ADMIN_GUIDE_DISABLED_STORAGE_KEY = "newAdminGuideDisabled";
 const ADMIN_GUIDE_PHASE_STORAGE_KEY = "newAdminGuidePhase";
+const ADMIN_GUIDE_COMPLETED_STORAGE_KEY = "newAdminGuideCompleted";
 const RESOURCE_PACKAGE_FILENAME = "albq-resources.json";
 const CATEGORY_REMINDER_TEXT = "Report bugs or request enhancments to Elder Bendio (michaelbendio@gmail.com)"
 
@@ -1234,9 +1238,10 @@ function normalizeAdminGuidePhase(phase){
 
 let adminGuidePhase = normalizeAdminGuidePhase(localStorage.getItem(ADMIN_GUIDE_PHASE_STORAGE_KEY));
 localStorage.setItem(ADMIN_GUIDE_PHASE_STORAGE_KEY, adminGuidePhase);
+let adminGuideCompleted = localStorage.getItem(ADMIN_GUIDE_COMPLETED_STORAGE_KEY) === "1";
 let adminGuideDismissed = OPENED_AS_NEW_TEMPLATE ? false : localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY) === "1";
 let adminGuideMode = OPENED_AS_NEW_TEMPLATE ? true : !adminGuideDismissed;
-let adminGuideStep = adminGuidePhase === "createResource" ? "reopenAdmin" : "setupName";
+let adminGuideStep = adminGuidePhase === "createResource" ? "categoryFilters" : "setupName";
 let adminGuideResourceSection = "basics";
 let adminHelpPrintRestoreState = null;
 let allowBlankUpdateDescriptionOnce = false;
@@ -2684,20 +2689,54 @@ function runSelfTests(){
       const previousAdminGuidePhase = adminGuidePhase;
       const previousAdminGuideResourceSection = adminGuideResourceSection;
       const previousAdminGuideDismissed = adminGuideDismissed;
+      const previousAdminGuideCompleted = adminGuideCompleted;
       const previousAdminResourceEditMode = adminResourceEditMode;
       const previousSelectedResourceId = selectedResourceId;
+      const previousGuideCompleted = localStorage.getItem(ADMIN_GUIDE_COMPLETED_STORAGE_KEY);
+      const previousConfirm = window.confirm;
+      const previousPrompt = window.prompt;
       try{
-        data = { categories:[{ id:"food", label:"Food" }], resources:[], changes:[], lastModified:nowISO() };
+        data = {
+          categories:[
+            { id:"seniors", label:"Seniors", filters:[] },
+            { id:"employment", label:"Employment", filters:["Temporary Employment"] }
+          ],
+          forGroups:["Ex-offenders"],
+          resources:[],
+          changes:[],
+          lastModified:nowISO()
+        };
         view = "admin";
         adminTab = "categories";
         isAdminVisible = true;
         adminResourceEditMode = false;
         selectedResourceId = "";
-        startAdminGuide("resources");
+        adminGuideCompleted = false;
+        localStorage.removeItem(ADMIN_GUIDE_COMPLETED_STORAGE_KEY);
+        startAdminGuide("categoryFilters");
         render();
         let tip = document.querySelector("#adminView .admin-guide-tip");
+        if(!tip || tip.textContent !== TIP_TEXT.adminGuideCategoryFilters){
+          throw new Error("guide should start with category filter tip");
+        }
+        const categoryLabel = document.getElementById("cat_label");
+        if(!categoryLabel || categoryLabel.value !== "Seniors"){
+          throw new Error("category filter guide should open Seniors");
+        }
+        document.getElementById("cat_filter_new_btn").click();
+        const filterInput = Array.from(document.querySelectorAll(".catFilterInput")).pop();
+        filterInput.value = "Medically Vulnerable";
+        filterInput.dispatchEvent(new Event("input", { bubbles:true }));
+        const categoryUpdate = document.getElementById("cat_update_description");
+        categoryUpdate.value = "Added Medically Vulnerable filter";
+        categoryUpdate.dispatchEvent(new Event("input", { bubbles:true }));
+        closeCategoryEditor();
+        if(adminGuideStep !== "resources"){
+          throw new Error("category filter Done should advance guide to Resources step");
+        }
+        tip = document.querySelector("#adminView .admin-guide-tip");
         if(!tip || tip.textContent !== TIP_TEXT.adminGuideResources){
-          throw new Error("guide should start with Resources tip");
+          throw new Error("guide should prompt Resources after category filter step");
         }
         switchAdminTab("resources");
         tip = document.querySelector("#adminView .admin-guide-tip");
@@ -2709,11 +2748,8 @@ function runSelfTests(){
         if(!tip || !tip.textContent.includes(TIP_TEXT.adminGuideResourceFields)){
           throw new Error("guide should advance to resource fields tip");
         }
-        if(!tip.textContent.includes("If this resource is a list")){
-          throw new Error("resource fields guide tip should explain list resources can skip the rest of the section");
-        }
-        if(!document.querySelector("#adminView .admin-guide-tip button")){
-          throw new Error("resource fields guide tip should include a Next button");
+        if(!tip.textContent.includes("Quick Start Temp Agency")){
+          throw new Error("resource fields tip should provide the dummy resource name");
         }
         if(document.querySelector("#adminView .admin-guide-tip button").textContent !== "Next"){
           throw new Error("first resource guide section should only show Next");
@@ -2721,18 +2757,15 @@ function runSelfTests(){
         if(document.getElementById("res_cancel_btn").disabled || !document.getElementById("res_done_btn").disabled){
           throw new Error("new guided resource should allow Cancel and keep Done disabled until valid");
         }
-        if(document.querySelectorAll("#resEditor .resource-editor-guide-section:not(.admin-guide-current-section)").length < 1){
-          throw new Error("resource editor should be divided into guide sections");
-        }
-        if(!document.querySelector('#resEditor [data-guide-section="basics"].admin-guide-current-section')){
-          throw new Error("basic resource fields should be the first guide section");
-        }
         const nameInput = document.getElementById("res_name");
-        nameInput.value = "Food Aid";
+        nameInput.value = "Quick Start Temp Agency";
         nameInput.dispatchEvent(new Event("input", { bubbles:true }));
+        const descriptionInput = document.getElementById("res_description");
+        descriptionInput.value = "Practice temporary employment agency";
+        descriptionInput.dispatchEvent(new Event("input", { bubbles:true }));
         advanceAdminGuideResourceSection();
         const guidedResource = data.resources.find(resource => resource.id === selectedResourceId);
-        if(!guidedResource || guidedResource.name !== "Food Aid"){
+        if(!guidedResource || guidedResource.name !== "Quick Start Temp Agency"){
           throw new Error("guided Next should preserve the typed resource name");
         }
         tip = document.querySelector("#adminView .admin-guide-tip");
@@ -2742,36 +2775,48 @@ function runSelfTests(){
         if(!document.querySelector('#resEditor [data-guide-section="forGroups"].admin-guide-current-section')){
           throw new Error("For groups should be the second guide section");
         }
-        const forGroupButtons = Array.from(document.querySelectorAll("#adminView .admin-guide-tip button")).map(button => button.textContent);
-        if(JSON.stringify(forGroupButtons) !== JSON.stringify(["Back", "Next"])){
-          throw new Error(`middle resource guide section should show Back and Next, got ${JSON.stringify(forGroupButtons)}`);
-        }
-        retreatAdminGuideResourceSection();
-        if(!document.querySelector('#resEditor [data-guide-section="basics"].admin-guide-current-section')){
-          throw new Error("Back should return to the previous guide section");
-        }
+        const exOffenders = document.querySelector('.resForGroup[value="Ex-offenders"]');
+        if(!exOffenders) throw new Error("Ex-offenders For checkbox was missing");
+        exOffenders.checked = true;
+        exOffenders.dispatchEvent(new Event("change", { bubbles:true }));
         advanceAdminGuideResourceSection();
-        advanceAdminGuideResourceSection();
+        tip = document.querySelector("#adminView .admin-guide-tip");
+        if(!tip || !tip.textContent.includes(TIP_TEXT.adminGuideCategories)){
+          throw new Error("guide should advance to categories section");
+        }
+        const employment = document.querySelector('.resCat[value="employment"]');
+        if(!employment) throw new Error("Employment category checkbox was missing");
+        employment.checked = true;
+        employment.dispatchEvent(new Event("change", { bubbles:true }));
+        const temporary = document.querySelector('.resCatFilter[data-category-id="employment"][value="Temporary Employment"]');
+        if(!temporary) throw new Error("Temporary Employment filter checkbox was missing");
+        temporary.checked = true;
+        temporary.dispatchEvent(new Event("change", { bubbles:true }));
         advanceAdminGuideResourceSection();
         tip = document.querySelector("#adminView .admin-guide-tip");
         if(!tip || !tip.textContent.includes(TIP_TEXT.adminGuideInformation)){
           throw new Error("guide should advance to information section");
         }
-        if(tip.textContent.includes("If this resource is a list")){
-          throw new Error("information guide tip should not explain list resources");
+        if(!tip.textContent.includes("Use *[space]")){
+          throw new Error("information guide tip should explain bullet formatting");
         }
+        document.getElementById("res_information_edit_btn").click();
+        const informationInput = document.getElementById("res_info_additional");
+        informationInput.value = `Quick start practice information.
+* Bring a photo ID
+* Ask about daily work
+**This is only a practice resource.**
+---
+Delete this resource when the guide tells you to.`;
+        informationInput.dispatchEvent(new Event("input", { bubbles:true }));
+        document.getElementById("res_information_preview_btn").click();
         advanceAdminGuideResourceSection();
         const updateButtons = Array.from(document.querySelectorAll("#adminView .admin-guide-tip button")).map(button => button.textContent);
         if(JSON.stringify(updateButtons) !== JSON.stringify(["Back"])){
           throw new Error(`update resource guide section should show Back only, got ${JSON.stringify(updateButtons)}`);
         }
-        if(document.getElementById("res_cancel_btn").disabled || document.getElementById("res_done_btn").disabled){
-          throw new Error("Cancel and Done should be enabled on the update guided resource step");
-        }
-        const categoryCheckbox = document.querySelector('.resCat[value="food"]');
-        if(categoryCheckbox) categoryCheckbox.checked = true;
         const updateDescription = document.getElementById("res_update_description");
-        updateDescription.value = "Added Food Aid";
+        updateDescription.value = "Added quick start practice resource";
         updateDescription.dispatchEvent(new Event("input", { bubbles:true }));
         closeResourceEditor();
         tip = document.querySelector("#adminView .admin-guide-tip");
@@ -2781,18 +2826,42 @@ function runSelfTests(){
         if(!tip || !tip.textContent.includes(TIP_TEXT.adminGuideSaveResource)){
           throw new Error("guide should show final Done-to-save tip");
         }
-        if(!adminResourceEditMode){
-          throw new Error("resource editor should remain open for final save tip");
-        }
-        if(document.getElementById("res_done_btn").disabled){
-          throw new Error("Done should be enabled on the final save tip");
-        }
         closeResourceEditor();
-        if(adminGuideMode || adminResourceEditMode){
-          throw new Error("second Done should save resource and disable guide mode");
+        if(!adminGuideMode || adminGuideStep !== "deleteResource" || adminResourceEditMode){
+          throw new Error("second Done should save resource and advance to delete step");
+        }
+        tip = document.querySelector("#adminView .admin-guide-tip");
+        if(!tip || !tip.textContent.includes(TIP_TEXT.adminGuideDeleteResource)){
+          throw new Error("guide should show delete-resource tip after save");
+        }
+        const saved = data.resources.find(resource => resource.name === "Quick Start Temp Agency");
+        if(!saved) throw new Error("practice resource was not saved");
+        if(JSON.stringify(saved.categories) !== JSON.stringify(["employment"])){
+          throw new Error(`practice resource categories were wrong: ${JSON.stringify(saved.categories)}`);
+        }
+        if(JSON.stringify(saved.categoryFilters) !== JSON.stringify({ employment:["Temporary Employment"] })){
+          throw new Error(`practice resource filters were wrong: ${JSON.stringify(saved.categoryFilters)}`);
+        }
+        if(JSON.stringify(saved.forGroups) !== JSON.stringify(["Ex-offenders"])){
+          throw new Error(`practice resource For groups were wrong: ${JSON.stringify(saved.forGroups)}`);
+        }
+        if(!saved.informationText.includes("* Bring a photo ID")){
+          throw new Error("practice resource information was not saved");
+        }
+        window.confirm = () => true;
+        window.prompt = () => "Deleted quick start practice resource";
+        const deleteButton = Array.from(document.querySelectorAll("#adminView button"))
+          .find(button => button.textContent.trim() === "Delete");
+        if(!deleteButton) throw new Error("rendered Delete button was missing");
+        deleteButton.click();
+        if(adminGuideMode || !adminGuideCompleted){
+          throw new Error("deleting the practice resource should complete guide mode");
         }
         if(localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY) !== "1"){
           throw new Error("completed guided quick start should persist guide mode off");
+        }
+        if(localStorage.getItem(ADMIN_GUIDE_COMPLETED_STORAGE_KEY) !== "1"){
+          throw new Error("completed guided quick start should be tracked");
         }
       }finally{
         data = previousData;
@@ -2801,12 +2870,18 @@ function runSelfTests(){
         isAdminVisible = previousAdminVisible;
         adminGuideMode = previousAdminGuideMode;
         adminGuideStep = previousAdminGuideStep;
+        adminGuidePhase = previousAdminGuidePhase;
         adminGuideResourceSection = previousAdminGuideResourceSection;
         adminGuideDismissed = previousAdminGuideDismissed;
+        adminGuideCompleted = previousAdminGuideCompleted;
         adminResourceEditMode = previousAdminResourceEditMode;
         selectedResourceId = previousSelectedResourceId;
+        window.confirm = previousConfirm;
+        window.prompt = previousPrompt;
         if(previousStoredData === null) localStorage.removeItem(DATA_STORAGE_KEY);
         else localStorage.setItem(DATA_STORAGE_KEY, previousStoredData);
+        if(previousGuideCompleted === null) localStorage.removeItem(ADMIN_GUIDE_COMPLETED_STORAGE_KEY);
+        else localStorage.setItem(ADMIN_GUIDE_COMPLETED_STORAGE_KEY, previousGuideCompleted);
       }
     }
   });
@@ -2839,7 +2914,7 @@ function runSelfTests(){
         adminResourceEditMode = false;
         selectedResourceId = "";
         adminGuideMode = true;
-        adminGuideStep = "reopenAdmin";
+        adminGuideStep = "categoryFilters";
         adminGuideDismissed = false;
         render();
         let tip = appView.querySelector(".red-tip");
@@ -2849,8 +2924,8 @@ function runSelfTests(){
         setAdminVisibility(true);
         setView("admin");
         tip = document.querySelector("#adminView .admin-guide-tip");
-        if(!tip || tip.textContent !== TIP_TEXT.adminGuideResources){
-          throw new Error("renamed file admin guide should start with Resources tip");
+        if(!tip || tip.textContent !== TIP_TEXT.adminGuideCategoryFilters){
+          throw new Error("renamed file admin guide should start with category filter tip");
         }
         switchAdminTab("resources");
         tip = document.querySelector("#adminView .admin-guide-tip");
@@ -2938,10 +3013,10 @@ function runSelfTests(){
         }
         requestToggleAdminGuide();
         if(!adminGuideMode) throw new Error("Guide button should turn guide mode back on");
-        if(adminGuideStep !== "resources") throw new Error("Guide should restart resource quick start at Resources");
+        if(adminGuideStep !== "categoryFilters") throw new Error("Guide should restart resource quick start at category filters");
         const restartedTip = document.querySelector("#adminView .admin-guide-tip");
-        if(!restartedTip || restartedTip.textContent !== TIP_TEXT.adminGuideResources){
-          throw new Error("restarted resource quick start should show the Resources tip");
+        if(!restartedTip || restartedTip.textContent !== TIP_TEXT.adminGuideCategoryFilters){
+          throw new Error("restarted resource quick start should show the category filter tip");
         }
         if(document.querySelector("#adminView .admin-panel.admin-guide-active #resEditor")){
           throw new Error("restarted guide should not section the editor before the resource-fields step");
@@ -2967,6 +3042,77 @@ function runSelfTests(){
         else localStorage.setItem(ADMIN_GUIDE_PHASE_STORAGE_KEY, previousGuidePhase);
         if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
         else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoName);
+      }
+    }
+  });
+
+  tests.push({
+    name: "COMPLETED GUIDE RESTARTS AT CURRENT ADMIN CONTEXT",
+    fn: () => {
+      const previousData = data;
+      const previousView = view;
+      const previousAdminTab = adminTab;
+      const previousAdminVisible = isAdminVisible;
+      const previousAdminGuideMode = adminGuideMode;
+      const previousAdminGuideStep = adminGuideStep;
+      const previousAdminGuideCompleted = adminGuideCompleted;
+      const previousAdminResourceEditMode = adminResourceEditMode;
+      const previousSelectedResourceId = selectedResourceId;
+      const previousGuideDisabled = localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
+      const previousGuideCompleted = localStorage.getItem(ADMIN_GUIDE_COMPLETED_STORAGE_KEY);
+      try{
+        data = {
+          categories:[{ id:"employment", label:"Employment", filters:["Temporary Employment"] }],
+          forGroups:["Ex-offenders"],
+          resources:[{ id:"practice", name:"Quick Start Temp Agency", categories:["employment"], informationText:"" }],
+          changes:[]
+        };
+        view = "admin";
+        isAdminVisible = true;
+        adminGuideMode = false;
+        adminGuideCompleted = true;
+        localStorage.setItem(ADMIN_GUIDE_COMPLETED_STORAGE_KEY, "1");
+        localStorage.setItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY, "1");
+
+        adminTab = "categories";
+        adminResourceEditMode = false;
+        requestToggleAdminGuide();
+        if(!adminGuideMode || adminGuideStep !== "categoryFilters"){
+          throw new Error("completed guide should restart at category filters from Categories");
+        }
+        requestToggleAdminGuide();
+        document.getElementById("quitGuideYesButton").click();
+
+        adminTab = "forGroups";
+        requestToggleAdminGuide();
+        if(!adminGuideMode || adminGuideStep !== "forGroupsAdmin"){
+          throw new Error("completed guide should restart at For editor from For");
+        }
+        requestToggleAdminGuide();
+        document.getElementById("quitGuideYesButton").click();
+
+        adminTab = "resources";
+        adminResourceEditMode = true;
+        selectedResourceId = "practice";
+        requestToggleAdminGuide();
+        if(!adminGuideMode || adminGuideStep !== "resourceFields"){
+          throw new Error("completed guide should restart at resource fields from an open resource editor");
+        }
+      }finally{
+        data = previousData;
+        view = previousView;
+        adminTab = previousAdminTab;
+        isAdminVisible = previousAdminVisible;
+        adminGuideMode = previousAdminGuideMode;
+        adminGuideStep = previousAdminGuideStep;
+        adminGuideCompleted = previousAdminGuideCompleted;
+        adminResourceEditMode = previousAdminResourceEditMode;
+        selectedResourceId = previousSelectedResourceId;
+        closeReferenceModal();
+        if(previousGuideDisabled === null) localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
+        else localStorage.setItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY, previousGuideDisabled);
+        if(previousGuideCompleted === null) localStorage.removeItem(ADMIN_GUIDE_COMPLETED_STORAGE_KEY);
+        else localStorage.setItem(ADMIN_GUIDE_COMPLETED_STORAGE_KEY, previousGuideCompleted);
       }
     }
   });
@@ -4123,7 +4269,7 @@ function setAdminVisibility(visible){
   if(isAdminVisible && adminGuideMode && !adminGuideDismissed){
     adminGuideMode = true;
     if(adminGuidePhase === "createResource"){
-      adminGuideStep = "resources";
+      adminGuideStep = "categoryFilters";
     }else if(adminGuidePhase === "renameFile"){
       adminGuideStep = "renameFile";
     }else if(adminGuidePhase === "setupName"){
@@ -4306,7 +4452,7 @@ function createGuideTip(tipText){
 }
 
 function getFirstAdminGuideStep(){
-  if(adminGuidePhase === "createResource") return "reopenAdmin";
+  if(adminGuidePhase === "createResource") return "categoryFilters";
   if(adminGuidePhase === "renameFile") return "renameFile";
   return "setupName";
 }
@@ -4323,7 +4469,7 @@ function setAdminGuideStep(step){
 
 function advanceAdminGuideToResourceCreation(){
   setAdminGuidePhase("createResource");
-  setAdminGuideStep("reopenAdmin");
+  setAdminGuideStep("categoryFilters");
 }
 
 function formatGuideTipText(tipText){
@@ -4338,7 +4484,7 @@ function getCategoryTipId(){
 }
 
 function getCategoryGuideTipText(){
-  if(adminGuideMode && adminGuidePhase === "createResource" && view === "categories" && (!isNewTemplateFile() || adminGuideStep === "reopenAdmin")){
+  if(adminGuideMode && adminGuidePhase === "createResource" && view === "categories" && (!isNewTemplateFile() || adminGuideStep === "reopenAdmin" || adminGuideStep === "categoryFilters")){
     return formatGuideTipText(TIP_TEXT.renamedFileWelcome);
   }
   return "";
@@ -4356,6 +4502,16 @@ function startAdminGuide(step = "resources"){
   if(step === "resourceFields") adminGuideResourceSection = "basics";
 }
 
+function completeAdminGuide(){
+  adminGuideMode = false;
+  adminGuideStep = getFirstAdminGuideStep();
+  adminGuideResourceSection = "basics";
+  adminGuideDismissed = true;
+  adminGuideCompleted = true;
+  localStorage.setItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY, "1");
+  localStorage.setItem(ADMIN_GUIDE_COMPLETED_STORAGE_KEY, "1");
+}
+
 function stopAdminGuide(){
   adminGuideMode = false;
   adminGuideStep = getFirstAdminGuideStep();
@@ -4364,16 +4520,37 @@ function stopAdminGuide(){
   localStorage.setItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY, "1");
 }
 
+function getContextualAdminGuideStep(){
+  if(view === "admin"){
+    if(adminTab === "categories") return "categoryFilters";
+    if(adminTab === "resources"){
+      return adminResourceEditMode ? "resourceFields" : "newResource";
+    }
+    if(adminTab === "forGroups") return "forGroupsAdmin";
+  }
+  return getFirstAdminGuideStep();
+}
+
+function prepareAdminGuideForStep(step){
+  if(step === "categoryFilters"){
+    adminTab = "categories";
+    adminResourceEditMode = false;
+  }else if(step === "newResource" || step === "deleteResource"){
+    adminTab = "resources";
+    adminResourceEditMode = false;
+  }else if(step === "forGroupsAdmin"){
+    adminTab = "forGroups";
+    adminResourceEditMode = false;
+  }
+}
+
 function toggleAdminGuide(){
   if(adminGuideMode){
     stopAdminGuide();
   }else{
-    const firstStep = getFirstAdminGuideStep();
+    const firstStep = adminGuideCompleted ? getContextualAdminGuideStep() : getFirstAdminGuideStep();
     const nextStep = view === "admin" && firstStep === "reopenAdmin" ? "resources" : firstStep;
-    if(nextStep === "resources"){
-      adminResourceEditMode = false;
-      adminTab = "categories";
-    }
+    prepareAdminGuideForStep(nextStep);
     startAdminGuide(nextStep);
   }
   if(view === "admin") safeRenderAdmin();
@@ -4381,12 +4558,9 @@ function toggleAdminGuide(){
 
 function requestToggleAdminGuide(source = "toolbar"){
   if(!adminGuideMode){
-    const firstStep = getFirstAdminGuideStep();
+    const firstStep = adminGuideCompleted ? getContextualAdminGuideStep() : getFirstAdminGuideStep();
     const nextStep = view === "admin" && firstStep === "reopenAdmin" ? "resources" : firstStep;
-    if(nextStep === "resources"){
-      adminResourceEditMode = false;
-      adminTab = "categories";
-    }
+    prepareAdminGuideForStep(nextStep);
     startAdminGuide(nextStep);
     if(view === "admin") safeRenderAdmin();
     return;
@@ -4458,6 +4632,9 @@ function getAdminGuideTipText(){
   if(adminGuideStep === "verifyName") return TIP_TEXT.adminGuideVerifyName;
   if(adminGuideStep === "renameFile") return TIP_TEXT.adminGuideRenameFile;
   if(adminGuideStep === "reopenAdmin") return "";
+  if(adminGuideStep === "categoryFilters") return TIP_TEXT.adminGuideCategoryFilters;
+  if(adminGuideStep === "deleteResource") return TIP_TEXT.adminGuideDeleteResource;
+  if(adminGuideStep === "forGroupsAdmin") return TIP_TEXT.adminGuideForAdmin;
   if(adminGuideStep === "resourceFields" || adminResourceEditMode){
     if(adminGuideResourceSection === "forGroups") return TIP_TEXT.adminGuideForGroups;
     if(adminGuideResourceSection === "categories") return TIP_TEXT.adminGuideCategories;
@@ -6815,8 +6992,11 @@ function switchAdminTab(nextTab){
   if(!commitPendingEditsIfChanged()) return;
   if(nextTab !== "resources"){
     adminResourceEditMode = false;
-  }else if(adminGuideMode){
-    adminGuideStep = "newResource";
+  }
+  if(adminGuideMode){
+    if(nextTab === "categories") adminGuideStep = "categoryFilters";
+    if(nextTab === "resources") adminGuideStep = "newResource";
+    if(nextTab === "forGroups") adminGuideStep = "forGroupsAdmin";
   }
   adminTab = nextTab;
   safeRenderAdmin();
@@ -6890,6 +7070,11 @@ function resourceEditorDraft(){
 function getResourceIndexById(resourceId){
   if(!resourceId) return -1;
   return data.resources.findIndex(r => r && r.id === resourceId);
+}
+
+function getCategoryIndexById(categoryId){
+  if(!categoryId) return -1;
+  return data.categories.findIndex(category => category && category.id === categoryId);
 }
 
 function validateResourceName(draft, idx){
@@ -7318,6 +7503,10 @@ function commitPendingEditsIfChanged(){
 
 function renderAdminCategories(container){
   // Category management view (alphabetical list, full-width editor, and filters).
+  if(adminGuideMode && adminGuideStep === "categoryFilters"){
+    const seniorsIndex = getCategoryIndexById("seniors");
+    if(seniorsIndex !== -1) selectedCategoryIndex = String(seniorsIndex);
+  }
 
   container.innerHTML += `
     <div class="admin-panel category-admin-panel">
@@ -7583,6 +7772,9 @@ function deleteCategory(){
 
 function closeCategoryEditor(){
   if(!commitPendingEditsIfChanged()) return;
+  if(adminGuideMode && adminGuideStep === "categoryFilters"){
+    adminGuideStep = "resources";
+  }
   safeRenderAdmin();
   const sel = document.getElementById("catSelect");
   if(sel) sel.focus();
@@ -7937,6 +8129,9 @@ function deleteResource(){
   data.resources.splice(idx,1);
   addChangeEntry(createChangeEntry("resource", "removed", res.id, res.name || "(Unnamed resource)", updateDescription, { categoryIds:res.categories }));
   newResourceIds.delete(res.id);
+  const shouldCompleteGuideAfterDelete = adminGuideMode
+    && adminGuideStep === "deleteResource"
+    && String(res.name || "").trim().toLowerCase() === "quick start temp agency";
 
   const remainingIds = getAdminResourceBrowseList().map(r => String(r.id || ""));
   if(!remainingIds.length){
@@ -7948,6 +8143,7 @@ function deleteResource(){
   }
 
   persist();
+  if(shouldCompleteGuideAfterDelete) completeAdminGuide();
   safeRenderAdmin();
 }
 
@@ -7979,7 +8175,12 @@ function closeResourceEditor(){
     && adminGuideResourceSection === "save";
   if(!commitPendingEditsIfChanged()) return;
   adminResourceEditMode = false;
-  if(shouldCompleteGuidedQuickStart) stopAdminGuide();
+  editing = null;
+  editorSnapshot = "";
+  if(shouldCompleteGuidedQuickStart){
+    adminGuideStep = "deleteResource";
+    adminTab = "resources";
+  }
   safeRenderAdmin();
 }
 
