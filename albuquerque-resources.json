@@ -1,0 +1,532 @@
+{
+  "resourcePackageSchemaVersion": 2,
+  "appVersion": "0.1.5",
+  "packageVersion": 5,
+  "lastModified": "2026-06-18T14:28:23.216Z",
+  "categories": [
+    {
+      "id": "addiction",
+      "label": "Addiction",
+      "active": true,
+      "lastModified": "2026-06-15T15:56:33.868Z",
+      "filters": [
+        "In-patient",
+        "Out-patient",
+        "Sober Living"
+      ]
+    },
+    {
+      "id": "children-pregnancy",
+      "label": "Children/Pregnancy",
+      "active": true,
+      "lastModified": "2026-06-15T15:56:33.868Z",
+      "filters": [
+        "Obstetric care",
+        "Pregnancy Education"
+      ]
+    },
+    {
+      "id": "clothing-household",
+      "label": "Clothing/Household",
+      "active": true,
+      "lastModified": "2026-06-15T15:56:33.868Z",
+      "filters": []
+    },
+    {
+      "id": "disability",
+      "label": "Disability",
+      "active": true,
+      "lastModified": "2026-06-15T15:56:33.868Z",
+      "filters": []
+    },
+    {
+      "id": "domestic-violence",
+      "label": "Domestic Violence",
+      "active": true,
+      "lastModified": "2026-06-15T15:56:33.868Z",
+      "filters": []
+    },
+    {
+      "id": "education",
+      "label": "Education",
+      "active": true,
+      "lastModified": "2026-06-15T15:56:33.868Z",
+      "filters": [
+        "GED",
+        "Evening classes",
+        "Scholarships",
+        "Trades",
+        "Career",
+        "Guidance",
+        "Certification",
+        "Degree"
+      ]
+    },
+    {
+      "id": "employment",
+      "label": "Employment",
+      "active": true,
+      "lastModified": "2026-06-15T15:56:33.868Z",
+      "filters": [
+        "Temp Agencies",
+        "Apps",
+        "Résumé assistance",
+        "Job application assistance"
+      ]
+    },
+    {
+      "id": "financial-assistance",
+      "label": "Financial Assistance",
+      "active": true,
+      "lastModified": "2026-06-15T15:56:33.868Z",
+      "filters": [
+        "Rent Assistance",
+        "Utilities assistance"
+      ]
+    },
+    {
+      "id": "reentry-support",
+      "label": "Reentry Support",
+      "active": true,
+      "lastModified": "2026-06-15T15:56:33.868Z",
+      "filters": []
+    },
+    {
+      "id": "food",
+      "label": "Food",
+      "active": true,
+      "lastModified": "2026-06-15T15:56:33.868Z",
+      "filters": [
+        "Pantry",
+        "Meals"
+      ]
+    },
+    {
+      "id": "medical-dental-vision",
+      "label": "Medical, Dental, Vision",
+      "active": true,
+      "lastModified": "2026-06-15T15:56:33.868Z",
+      "filters": [
+        "No Insurance",
+        "Lab"
+      ]
+    },
+    {
+      "id": "homeless-services",
+      "label": "Homeless Services",
+      "active": true,
+      "lastModified": "2026-06-15T15:56:33.868Z",
+      "filters": [
+        "Shelters",
+        "Showers",
+        "Laundry",
+        "Haircuts",
+        "Meals",
+        "Mailing address",
+        "Storage",
+        "Computers",
+        "Phones",
+        "Hygiene kits",
+        "Clothing",
+        "Benefit enrollment",
+        "Medical",
+        "Dental",
+        "Vision"
+      ]
+    },
+    {
+      "id": "housing",
+      "label": "Housing",
+      "active": true,
+      "lastModified": "2026-06-15T15:56:33.868Z",
+      "filters": [
+        "Houses",
+        "Apartments",
+        "Rooms",
+        "Subsidized"
+      ]
+    },
+    {
+      "id": "id-recovery",
+      "label": "ID Recovery",
+      "active": true,
+      "lastModified": "2026-06-15T15:56:33.868Z",
+      "filters": []
+    },
+    {
+      "id": "immigration",
+      "label": "Immigration",
+      "active": true,
+      "lastModified": "2026-06-15T15:56:33.868Z",
+      "filters": []
+    },
+    {
+      "id": "legal",
+      "label": "Legal",
+      "active": true,
+      "lastModified": "2026-06-15T15:56:33.868Z",
+      "filters": [
+        "Pro bono",
+        "Immigration"
+      ]
+    },
+    {
+      "id": "mental-health",
+      "label": "Mental Health",
+      "active": true,
+      "lastModified": "2026-06-15T15:56:33.868Z",
+      "filters": []
+    },
+    {
+      "id": "miscellaneous",
+      "label": "Miscellaneous",
+      "active": true,
+      "lastModified": "2026-06-15T15:56:33.868Z",
+      "filters": []
+    },
+    {
+      "id": "seniors",
+      "label": "Seniors",
+      "active": true,
+      "lastModified": "2026-06-15T15:56:33.868Z",
+      "filters": []
+    },
+    {
+      "id": "transportation",
+      "label": "Transportation",
+      "active": true,
+      "lastModified": "2026-06-15T15:56:33.868Z",
+      "filters": [
+        "Bus passes",
+        "One-way tickets",
+        "Gas cards",
+        "Car repairs"
+      ]
+    },
+    {
+      "id": "utilities-phone-internet",
+      "label": "Utilities, Phone, Internet",
+      "active": true,
+      "lastModified": "2026-06-15T15:56:33.868Z",
+      "filters": [
+        "Low-cost phones",
+        "Low-cost internet"
+      ]
+    },
+    {
+      "id": "veterans",
+      "label": "Veterans",
+      "active": true,
+      "lastModified": "2026-06-15T15:56:33.868Z",
+      "filters": [
+        "Government benefits",
+        "Coaching"
+      ]
+    }
+  ],
+  "forGroups": [
+    "Veterans",
+    "Families with children",
+    "Women",
+    "Spanish speaking",
+    "Exiting corrections",
+    "Medically vulnerable",
+    "Seniors"
+  ],
+  "resources": [
+    {
+      "id": "f8d014bdeae0ce896e3c06c63144784a",
+      "name": "2026 New Mexico Veteran Health Care/Mental Health List",
+      "description": "VA Health Care Options for Veterans",
+      "informationText": "The New Mexico VA Health Care System provides comprehensive primary, emergency, and specialty medical services to veterans across New Mexico, southern Colorado, and West Texas. The main hub is the Raymond G. Murphy VA Medical Center in Albuquerque, supported by 13 regional Community-Based Outpatient Clinics **Website:** https://www.va.gov/new-mexico-health-care/  \n\n**Contact & Appointment Resources**\n* **Main Appointment Line:** Call 505-265-1711 (Press 2) or use the toll-free Patient Response Center at 800-465-8262. \n* **24/7 Nurse Advice:** Call 505-265-1711 and press 3 to speak to a triage nurse immediately. \n* **Veterans Crisis Line:** Call 988 (then Press 1), text 838255, or chat online for immediate, confidential crisis intervention. \n* **Medical Transportation:** The New Mexico Department of Veterans Services provides free round-trip rides for medical appointments in rural counties via the Rural Veterans Transportation Program (call 505-429-5906) https://www.nm.gov/departments-and-agencies/department-of-veterans-services/\n\n**Raymond G. Murphy VA Medical Center** \n* **Address:** 1501 San Pedro Drive SE, Albuquerque, NM 87108 \n* **Phone:** 505-265-1711 \n* **Website:** https://www.va.gov/new-mexico-health-care/locations/raymond-g-murphy-department-of-veterans-affairs-medical-center/  \n* **Availability:** Emergency Department open 24/7; clinic appointments follow standard business hours. \n* **Key Services** include 50+ medical services, a 24-hour Emergency Room, a specialized Spinal Cord Injury Center, advanced surgery options, and psychiatric evaluations. \n\n**Regional Outpatient Clinics (CBOCs)** \nThe VA operates clinics throughout the state to provide local primary care, laboratory testing, and extensive telehealth services:  \n* **Northwest Metro VA Clinic:** Rio Rancho, NM https://www.va.gov/new-mexico-health-care/locations/northwest-metro-va-clinic/ \n\n**Specialized Care Programs** \n* **Mental Health Support:** Programs for PTSD, military sexual trauma (MST), substance use disorders, and transitional care for returning service members. https://www.va.gov/new-mexico-health-care/health-services/mental-health-care/\n* **Women Veteran Care:** Comprehensive services including gynecology, maternity support, mammograms, and specialized mental health counseling. https://www.va.gov/new-mexico-health-care/health-services/women-veteran-care/\n* **Caregiver Support:** Matching military caregivers with peer networks, local resources, and federal benefits. https://www.va.gov/new-mexico-health-care/health-services/caregiver-support/\n* **State Veterans' Home:** The state also operates the New Mexico State Veterans' Home in Truth or Consequences, which delivers long-term nursing and specialized care. https://www.nmhealth.org/about/ofm/ltcf/nmsvh/",
+      "verifiedOn": "06/26",
+      "phone": "",
+      "address": "",
+      "website": "",
+      "hours": "",
+      "categories": [
+        "medical-dental-vision",
+        "mental-health",
+        "veterans"
+      ],
+      "lastModified": "2026-06-15T20:52:34.576Z",
+      "forGroups": [
+        "Veterans"
+      ],
+      "categoryFilters": {
+        "veterans": [
+          "Government benefits"
+        ]
+      }
+    },
+    {
+      "id": "533ef10f2a63ef0092c98fdfb78f4b89",
+      "name": "2026 Food Pantries for Low Income Seniors and Veterans in Bernalillo County",
+      "description": "",
+      "informationText": "**Website**: https://www.bernco.gov/blog/2025/06/11/bernalillo-county-offers-free-groceries-to-low-income-seniors/  \n**Phone:** For questions or more information, please call 505-314-0425. \n**Requirements:** Low-income seniors in Bernalillo County are invited to pick up free groceries each month at a series of regularly scheduled food pantries hosted in partnership with Silver Horizons. All veterans are welcome with proof of veteran status. Each participating household may attend up to two food pantries per month. Food is available while supplies last, and doors open 30 minutes prior to the scheduled start time. \n\n**Monthly Pantry Locations and Schedules:** \n**Raymond G. Sanchez Senior Center** \n9800 Fourth St. NW, 87114 \nFirst Tuesday of every month \n10:30 a.m. – noon \n\n**County Extension Building**\n1510 Menaul Blvd. NW, 87107 \nSecond Wednesday of every month \n12:30 – 2 p.m. \n\n**South Valley Multipurpose Senior Center** \n2008 Larrazolo Rd. SW, 87105 \nSecond Friday of every month \n12:30 – 2 p.m. \n\n**Tijeras Senior Center** \n10 Tijeras Ave., Tijeras, 87059 \nThird Tuesday of every month \n10 – 11:30 a.m. \n\n**Paradise Hills Senior Center** \n6001 Paradise Blvd. NW, 87114 \nThird Saturday of every month \n10 – 11:30 a.m. \n\n**Rio Bravo Senior Center** \n3910 Isleta Blvd. SW, 87105 \nFourth Wednesday of every month \n12:30 – 2 p.m.\n\n**Seniors Only**\n**ECHO Food Bank** (age 60+) 300 Menaul NW #226 (east side-- located in the back of the\nshopping center with H&R block and Self Storage) 505-242-6777 (don’t need to call first)\n--drive-through Mon-Thurs, 7:30 am – 4 pm (closed for lunch 12-12:30 pm)\n\n**Home Delivered Meals for Homebound Seniors**\nSeniors age 60+ who are unable to cook for themselves, have no one else to cook for them, and are unable to attend a meal site may be eligible to receive a home-delivered meal on a donation basis. Case Management Coordinators will conduct an eligibility assessment for this program. For more information about Home Delivered Meals, contact our Senior Information and Assistance Program at 505-764-6400.\n\n**Veterans Only**\n**Veterans Integration Center (VIC)** 505-296-0800 -  2701 Mulberry SE (turn south\noff Gibson, west of University Blvd, just east of I-25)\n--food pantry Friday 10 am-1 pm only for veterans, spouses and widows/widowers, National Guard and Reserves.",
+      "verifiedOn": "06/26",
+      "phone": "",
+      "address": "",
+      "website": "",
+      "hours": "",
+      "categories": [
+        "food",
+        "seniors",
+        "veterans"
+      ],
+      "lastModified": "2026-06-15T21:49:11.747Z",
+      "forGroups": [
+        "Veterans",
+        "Seniors"
+      ],
+      "categoryFilters": {
+        "food": [
+          "Pantry"
+        ]
+      }
+    },
+    {
+      "id": "d76f5932ebe379c14ae0b255320f6af2",
+      "name": "2026 Free Meals in Albuquerque",
+      "description": "",
+      "informationText": "**Regular Weekly Schedule** \n\n**Breakfast Meal Sites**  \n\n**Hope Works Day Shelter**-  1201 3rd NW,     Monday-Friday 10 am-Noon\n**The Rock at Noon Day**-   2400 2nd NW,   Tuesday-Friday & 2nd and 4th Saturday 9 am  \n**Albuquerque Indian Center**-  105 Texas SE,    Monday-Friday 9 am\n**All Nations Wellness & Healing Center**- 6416 Zuni SE,    Monday-Friday 8 am\n**Sandia Nazarene Church**- 8216 Central SE,     Saturday 7:30 am\n\n\n**Lunch Meal Sites** \n\n**Hope Works Day Shelter**-  1201 3rd NW,    Monday-Friday 10 am - Noon\n**Good Shepherd Center**-  218 Iron SW,    Monday-Wednesday & Friday 2 pm, Saturday 11:30 am\n**The Rock at Noon Day**-  2400 2nd NW,   Tuesday-Friday 12 pm, Saturdays (2nd, 3rd, & 4th) 1 pm, Sundays (2nd, 3rd, 4th, & 5th) 12 pm\n**Albuquerque Indian Center**- 105 Texas SE,   Monday-Friday 12 pm \n**All Nations Wellness & Healing Center**-  6416 Zuni SE,   Monday-Friday 12 pm\n**Joy Junction**- 4500 2nd SW,    7 days per week 12 pm\n\n\n**Dinner Meal Sites**\n\n**Good Shepherd Center**-  218 Iron SW,    Monday-Wednesday & Friday  2 pm \n**God's Warehouse**-  8011 Central NE,     7 days per week 4 pm\n**Sandia Nazarene Church**- 8216 Central SE,    Thursday  4:30 pm\n**Joy Junction**- 4500 2nd SW,     7 days per week 5 pm\n\n\n**For Homebound Seniors: Meals On Wheels New Mexico**\nVisit Website to Apply Online: https://mow-nm.org/meals-services/meal-service/\nAddress: 5901 Harper Drive Northeast  \nPhone:(505) 808-6325\nHours: M - F 9 - 2",
+      "verifiedOn": "06/26",
+      "phone": "",
+      "address": "",
+      "website": "",
+      "hours": "",
+      "categories": [
+        "food",
+        "homeless-services",
+        "seniors"
+      ],
+      "lastModified": "2026-06-15T22:50:10.127Z",
+      "forGroups": [
+        "Seniors"
+      ],
+      "categoryFilters": {
+        "food": [
+          "Meals"
+        ],
+        "homeless-services": [
+          "Meals"
+        ]
+      }
+    },
+    {
+      "id": "5e6382c8c6c947a8dac40d61fbb1a21f",
+      "name": "Alamosa Health and Social Service Center",
+      "description": "Provides emergency food, utility assistance, and seasonal services and activities.",
+      "informationText": "**1. __Alamosa Health & Social Services Center__**\n• Address: 6900 Gonzales Rd. SW, Albuquerque, NM 87121\n• Phone: (505) 836-8800\n**2. __John Marshall Health & Social Services Center__**\n• Address: 1500 Walter St. SE, Albuquerque, NM 87102\n• Phone: (505) 848-1345\n**3. __Ruth M. Adams Health & Social Services Center (aka East Central Health)__**\n• Address: 7525 Zuni Rd. SE, Albuquerque, NM 87108\n• Phone: (505) 767-5700\n**4. __Dede Feldman Los Griegos Health and Social Services Center:__**\n• Address: 1231 Candelaria N",
+      "verifiedOn": null,
+      "phone": "",
+      "address": "",
+      "website": "",
+      "hours": "",
+      "categories": [
+        "addiction",
+        "clothing-household",
+        "food",
+        "housing",
+        "utilities-phone-internet"
+      ],
+      "lastModified": "2026-06-13T18:25:42.715Z",
+      "forGroups": [],
+      "categoryFilters": {
+        "food": [
+          "Pantry"
+        ]
+      }
+    },
+    {
+      "id": "36422cb0588541dd96885f803b38ef5a",
+      "name": "2026 Albuquerque Food Pantries and Mobile Pantries",
+      "description": "Food Pantries and Mobile Pantries Available in County",
+      "informationText": "**Holy Family Catholic Church Pantry**, 562 Dr SW, 505-908-4721\nEvery Tuesday and Thursday 8:30-10:00 am\n**Our Lady of Fatima Pantry**, 4020 Lomas Blvd NE\nThursdays 3:30-4:30 pm\n**Assumption Holy Ghost Pantry**, 811 Guaymas Pl NE, 505-346-1500 ext 4\nEvery 1st and 3rd Thursday 1-3:30 pm\n**San Martin de Porres**, 8301 Camino San Martin, 505-720-4885\n2nd Thursday of the month 11am-12:30pm\n**St Francis Xavier Pantry**, 4020 Lomas Blvd NE\nEvery 3rd Friday Noon-2pm\n**Nativity of the Blessed Virgin Mary Pantry**, 9502 4th St NW, 505-898-5253\nEvery 3rd Saturday of the month 1-3 pm. Drive up at the Parish Hall after Registration",
+      "verifiedOn": null,
+      "phone": "",
+      "address": "",
+      "website": "",
+      "hours": "",
+      "categories": [
+        "food"
+      ],
+      "lastModified": "2026-06-16T20:21:41.127Z",
+      "forGroups": [],
+      "categoryFilters": {
+        "food": [
+          "Pantry"
+        ]
+      }
+    },
+    {
+      "id": "898733b6ae2f695a6c79a0262cd5f64c",
+      "name": "GoodWill Opportunity Center",
+      "description": "Helps people needing housing support or those who are reentering the workforce, and people facing barriers in employment. ",
+      "informationText": "**What is offered:**\n* free career fairs\n* digital literacy classes\n* youth employment programs\n* wellness and life-skills classes\n* a mobile app with online resources and access to career specialists.\n**Eligibility:**\nHomeless persons or near homeless veterans\nAdditional text:\n**Main services:**\n* Job placement assistance\n* Job skills training\n* Veteran’s services\n* Community social services (partner organizations that can help with healthcare, housing, mental health and other needs).",
+      "verifiedOn": "06/26",
+      "phone": "(505)-881-6401",
+      "address": "5000 San Mateo Blvd. NE",
+      "website": "https://www.goodwillnm.org/?utm_source=google&utm_medium=Yext",
+      "hours": "M-F 8am-5pm, walk-in from 8amm-4:30pm.",
+      "categories": [
+        "employment",
+        "homeless-services",
+        "housing",
+        "veterans"
+      ],
+      "lastModified": "2026-06-18T14:11:32.205Z",
+      "forGroups": [
+        "Veterans"
+      ],
+      "categoryFilters": {
+        "employment": [
+          "Apps"
+        ],
+        "veterans": [
+          "Coaching"
+        ]
+      }
+    },
+    {
+      "id": "b14c97a348355b484179fc066ffd7643",
+      "name": "Supportive Housing Coalition of New Mexico",
+      "description": "Provides: Permanent supportive housing coordination, housing advocacy, and system‑level collaboration\nNote: Does not provide direct shelter intake.",
+      "informationText": "**Amity Foundation** – Social services, reentry, and rehabilitation programs\n**A Better Way of Living, Inc.** – Transitional and supportive housing\n* Resources: [greatnonprofits.org], [nonprofitlocator.org]\n* Phone: (505)-332-9164\n* Hours: Mon-Fri. From 9AM-4:30PM\n* Address: 2823 Richmond Drive NE\n* Albuquerque, NM 87107\n* Website: https://abetterwaynm.org/contact/\n* Information: Supports people with developmental disabilities to help them realize their potential in different areas of life such as  work, education, leisure, and relationships.\n**Amistad** - 1706 Centro Familiar SW 505-877-0371\n* Teen shelter for ages 12-17 yrs old 24-hour shelter\n**Family Promise** - 505-268-0331\n* Shelter for families with minor children\n**Haven House** - 505-896-4869\n* Shelter for victims of domestic violence and their children (Rio Rancho) - Domestic Violence\n**Noon day Ministry** - 2400 Second NW 505-246-8001\n* Day shelter Tues - Fri. 9 a.m. - 1 p.m., Sunday 11 a.m. - 1 p.m.\n**Valencia Shelter** - 505-565-3100\n* Shelter for women and children (Belen) Domestic violence",
+      "verifiedOn": null,
+      "phone": "(505) 243-9799",
+      "address": "625 Silver Ave SW, Suite 195, Albuauerque, NM 87102",
+      "website": "https://shcnm.org",
+      "hours": "M-F 9am-5pm",
+      "categories": [
+        "children-pregnancy",
+        "domestic-violence",
+        "homeless-services"
+      ],
+      "lastModified": "2026-06-13T18:49:24.965Z",
+      "forGroups": [],
+      "categoryFilters": {}
+    },
+    {
+      "id": "ed7a862df903e6b1f68c2a89b85c4459",
+      "name": "New Mexico Department of Veterans and Military Affairs (VMA) 2026",
+      "description": "",
+      "informationText": "Veterans of the United States armed forces who reside in the state of New Mexico may be eligible for a broad range of federal and state benefits and services. One of the primary responsibilities of the New Mexico Department of Veterans Affairs is to connect veterans and service members with the benefits and resources available to them.  \n\n**Website: https://www.dvs.nm.gov/** \n\n**Albuquerque VA Regional Office**\n**Address:** 500 Gold Street SW, Albuquerque, NM 87102 \n**Office Phone:** 505-346-4810 or 505-346-3986 \n**Email:** nmdvs.info@dvs.nm.gov  \n\n**For Assistance, call: 866-433-8387 OR if in Crisis - 988 (select 1)**\n\n**Some of Our New Mexico Services** \n\n* Veteran Enrollment Assistance - 505-346-6562  \n* Military ID to qualify for Services - 801 582 1565 X 2585  \n* Health Care - Dental, Medical, Mental Health, Women’s Health https://www.dvs.nm.gov/healthcare-coordination/  \n* Careers and Employment - https://www.dvs.nm.gov/field-services/  \n* Legal Assistance - https://www.dvs.nm.gov/field-services/  \n* Education and Training - https://www.dvs.nm.gov/veterans-education/  \n* Housing Assistance - https://www.dvs.nm.gov/field-services/ \n\n**If you are a Veteran who is homeless or at risk for homelessness or need to connect with a Veterans outreach specialist, CALL:** \n\n**New Mexico Homeless Outreach Specialist- Therese Castello - 505-548-0585**             \n\nThe team will assist with your questions relating to homeless services and more.  \n\n**OR call the National Call Center for Homeless Veterans at 877‐4AID‐VET (877‐424‐3838).  OR call 988 and press 1**   \n\n**OR visit** https://www.va.gov/homeless/nationalcallcenter.asp or https://department.va.gov/homeless/what-services-does-va-provide-to-homeless-and-at-risk-veterans/  \n\n**Need to speak with someone local?** \nTo best serve Veterans where they live, our **VA-accredited Veterans Service Officers (VSO)** will help you with benefits assistance, claims, records, and more. Meet with a VSO, Face to Face! \n* Walk In Appointment: Every Thursday from 9:00 AM to 3:30 PM \n* Location: Albuquerque - 4801 Indian School Road, NE, Bldg 2, Suite 2  \n* To schedule an appointment with a VSO see  https://www.nacvso.org/county-veterans-service-officers",
+      "verifiedOn": "06/26",
+      "phone": "",
+      "address": "",
+      "website": "",
+      "hours": "",
+      "categories": [
+        "veterans"
+      ],
+      "lastModified": "2026-06-16T20:47:18.420Z",
+      "forGroups": [
+        "Veterans"
+      ],
+      "categoryFilters": {
+        "veterans": [
+          "Government benefits"
+        ]
+      }
+    },
+    {
+      "id": "e6aba8a40dfad9780477736b2f85c30f",
+      "name": "Gig & APP-based Work Options to Earn Extra Income",
+      "description": "",
+      "informationText": "List of flexible work options you can use to earn money using your phone. These can be used alone or together with a job or staffing agency.\n**1. DoorDash (Food Delivery)**\n**What it is:** Deliver food to customers using a car, bike, or scooter. Best for flexible, ongoing income.\n**How to get started:** Sign up at www.doordash.com or download the app, submit ID, background check, and basic info, and start working once approved\n**Requirements:** Age 19+ in New Mexico, must have a Smartphone and Transportation (car, bike, or scooter)\n\n**2. Bacon (Flexible Shift Work)**\n**What it is:** App that connects you to local day labor and warehouse/event shifts.\n**Best for:** Quick extra income, no resume needed\n**How to get started:** Download the Bacon app, create a profile, apply for shifts near you, and show up to selected work locations to work\n**Tips:** Check the app daily. Good ratings lead to more jobs.\n\n**3. GigSmart (Get Gigs App)**\n**What it is:** App for finding local temporary jobs like moving, labor, and events. Best for filling income gaps.\n**How to get started:** Download 'GigSmart Get Gigs' app, create worker profile (basic info), apply for available shifts\n**Tips:** Check multiple times per day. Works best alongside other jobs.\n\n**4. Homeaglow (House Cleaning)**\n**What it is:** Get paid to clean homes for clients. Best for reliable, steady side income.\n**How to get started:** Apply online at www.homeaglow.com, complete background check, and accept cleaning jobs.\n**Requirements:** Smartphone, transportation, and ability to clean homes",
+      "verifiedOn": "06/26",
+      "phone": "",
+      "address": "",
+      "website": "",
+      "hours": "",
+      "categories": [
+        "employment"
+      ],
+      "lastModified": "2026-06-18T14:28:23.216Z",
+      "forGroups": [],
+      "categoryFilters": {
+        "employment": [
+          "Apps"
+        ]
+      }
+    }
+  ],
+  "changes": [
+    {
+      "id": "resource:36422cb0588541dd96885f803b38ef5a:2026-06-16T20:21:41.127Z:c2c1e3",
+      "type": "resource",
+      "action": "updated",
+      "targetId": "36422cb0588541dd96885f803b38ef5a",
+      "targetName": "2026 Albuquerque Food Pantries and Mobile Pantries",
+      "description": "List name change",
+      "timestamp": "2026-06-16T20:21:41.127Z",
+      "categoryIds": [
+        "food"
+      ]
+    },
+    {
+      "id": "resource:ed7a862df903e6b1f68c2a89b85c4459:2026-06-16T20:47:18.421Z:6b5ddb",
+      "type": "resource",
+      "action": "added",
+      "targetId": "ed7a862df903e6b1f68c2a89b85c4459",
+      "targetName": "New Mexico Department of Veterans and Military Affairs (VMA) 2026",
+      "description": "Veteran Benefit Guidance added",
+      "timestamp": "2026-06-16T20:47:18.421Z",
+      "categoryIds": [
+        "veterans"
+      ]
+    },
+    {
+      "id": "resource:898733b6ae2f695a6c79a0262cd5f64c:2026-06-18T14:11:32.207Z:cc993a",
+      "type": "resource",
+      "action": "updated",
+      "targetId": "898733b6ae2f695a6c79a0262cd5f64c",
+      "targetName": "GoodWill Opportunity Center",
+      "description": "Tag added",
+      "timestamp": "2026-06-18T14:11:32.207Z",
+      "categoryIds": [
+        "employment",
+        "homeless-services",
+        "housing",
+        "veterans"
+      ]
+    },
+    {
+      "id": "resource:e6aba8a40dfad9780477736b2f85c30f:2026-06-18T14:26:25.045Z:960b37",
+      "type": "resource",
+      "action": "added",
+      "targetId": "e6aba8a40dfad9780477736b2f85c30f",
+      "targetName": "Gig & APP-based Work Options to Earn Extra Income",
+      "description": "New List",
+      "timestamp": "2026-06-18T14:26:25.045Z",
+      "categoryIds": [
+        "education"
+      ]
+    },
+    {
+      "id": "resource:e6aba8a40dfad9780477736b2f85c30f:2026-06-18T14:27:27.554Z:3753be",
+      "type": "resource",
+      "action": "updated",
+      "targetId": "e6aba8a40dfad9780477736b2f85c30f",
+      "targetName": "Gig & APP-based Work Options to Earn Extra Income",
+      "description": "Tag added",
+      "timestamp": "2026-06-18T14:27:27.554Z",
+      "categoryIds": [
+        "education"
+      ]
+    },
+    {
+      "id": "resource:e6aba8a40dfad9780477736b2f85c30f:2026-06-18T14:28:23.216Z:39e6c5",
+      "type": "resource",
+      "action": "updated",
+      "targetId": "e6aba8a40dfad9780477736b2f85c30f",
+      "targetName": "Gig & APP-based Work Options to Earn Extra Income",
+      "description": "Corrected Category",
+      "timestamp": "2026-06-18T14:28:23.216Z",
+      "categoryIds": [
+        "employment"
+      ]
+    }
+  ]
+}
