@@ -6,12 +6,13 @@
 
 <!-- ===== APP CSS START ===== -->
 <style>
+:root { --page-gutter: clamp(28px, 4vw, 44px); }
 body { font-family: -apple-system, sans-serif; margin:0; padding:0; font-size:18px; line-height:1.45; }
 .topbar {
   display:flex;
   justify-content:space-between;
   align-items:center;
-  padding:16px 24px;
+  padding:16px var(--page-gutter);
   background:#003366;
   color:white;
   position:sticky;
@@ -42,7 +43,7 @@ body { font-family: -apple-system, sans-serif; margin:0; padding:0; font-size:18
 
 .hidden { display:none; }
 .search-panel {
-  padding:10px 24px;
+  padding:10px var(--page-gutter);
   background:white;
   border-bottom:1px solid #ddd;
   display:flex;
@@ -51,6 +52,10 @@ body { font-family: -apple-system, sans-serif; margin:0; padding:0; font-size:18
   flex-wrap:wrap;
 }
 .search-panel.hidden { display:none; }
+#appView, #adminView {
+  padding-left:var(--page-gutter);
+  padding-right:var(--page-gutter);
+}
 .search-panel input { flex:1; min-width:220px; max-width:520px; box-sizing:border-box; }
 .search-results-title { font-weight:bold; margin:0 0 12px; }
 .search-result-group { margin:0 0 16px; }
