@@ -5583,17 +5583,6 @@ function renderCategoryFilterControls(categoryFilterOptions, activeFilters){
   appendCategoryFilterGroup(filterArea, "Specifically", categoryFilterOptions.filter(option => option.kind === "filter"), activeFilters);
   appendCategoryFilterGroup(filterArea, "For", categoryFilterOptions.filter(option => option.kind === "for"), activeFilters);
 
-  if(activeFilters.length){
-    const clearFilterBtn = document.createElement("button");
-    clearFilterBtn.className = "button";
-    clearFilterBtn.textContent = "Clear";
-    clearFilterBtn.onclick = () => {
-      setSelectedCategoryFilters(currentCategory, []);
-      safeRender();
-    };
-    filterArea.appendChild(clearFilterBtn);
-  }
-
   appView.appendChild(filterArea);
 }
 
