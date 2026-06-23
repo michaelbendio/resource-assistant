@@ -96,31 +96,31 @@ textarea {
 .category-print-banner { margin:0 0 12px; padding:9px 12px; border:1px solid #c8d6e6; border-left:4px solid #003366; border-radius:6px; background:#f7fbff; color:#1f2d3d; font-size:16px; line-height:1.35; }
 .print-empty-instruction { color:#aa0000; }
 textarea.big { width:100%; min-height:80px; }
-textarea.services-editor { min-height:320px; resize:vertical; }
-.services-control-block { margin:10px 0 12px; }
-.services-control-header {
+textarea.information-editor { min-height:320px; resize:vertical; }
+.information-control-block { margin:10px 0 12px; }
+.information-control-header {
   margin-bottom:8px;
   padding:10px 12px;
   border:1px solid #ddd;
   border-radius:6px;
   background:#f7f7f7;
 }
-.services-hint { font-size:16px; color:#555; margin-top:6px; }
-.services-preview-toggle { margin-top:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-.services-control-header .services-preview-toggle { margin-top:0; }
-.services-control-header .services-hint { margin-bottom:0; }
-.services-preview-toggle .button.primary { box-shadow:0 0 0 2px rgba(0,51,102,0.18); }
-.services-preview-box {
+.information-hint { font-size:16px; color:#555; margin-top:6px; }
+.information-preview-toggle { margin-top:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.information-control-header .information-preview-toggle { margin-top:0; }
+.information-control-header .information-hint { margin-bottom:0; }
+.information-preview-toggle .button.primary { box-shadow:0 0 0 2px rgba(0,51,102,0.18); }
+.information-preview-box {
   margin-top:8px;
   border:1px solid #ddd;
   border-radius:6px;
   padding:10px;
   background:#fff;
 }
-.services-rendered ul { margin:6px 0; padding-left:1.15em; }
-.services-rendered .services-line { margin:0; }
-.services-rendered .services-blank { min-height:1.1em; }
-.services-rendered hr { border:0; border-top:1px solid #ccc; margin:10px 0; }
+.information-rendered ul { margin:6px 0; padding-left:1.15em; }
+.information-rendered .information-line { margin:0; }
+.information-rendered .information-blank { min-height:1.1em; }
+.information-rendered hr { border:0; border-top:1px solid #ccc; margin:10px 0; }
 .print-list-flyer {
   border:1px solid #ddd;
   border-radius:6px;
@@ -714,16 +714,6 @@ function generateResourceId(){
     .map(b => b.toString(16).padStart(2,"0"))
     .join("");
 }
-function slugifyId(value){
-  return String(value || "")
-    .trim()
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "") || generateResourceId();
-}
-
 function showToast(message, options = {}){
   let toast = document.getElementById("appToast");
   if(!toast){
@@ -1001,26 +991,15 @@ function normalizeDataForGroupsShape(nextData){
   });
 }
 
-function formatCategoryList(labels){
-  if(labels.length <= 1) return labels[0] || "";
-  if(labels.length === 2) return `${labels[0]} and ${labels[1]}`;
-  return `${labels.slice(0, -1).join(", ")}, and ${labels[labels.length - 1]}`;
-}
-
 const INFORMATION_ADDITIONAL_LABEL = "Additional text:";
 
-// Resource "Information" is stored as plain text. Older imported text may
-// include an "Additional text:" heading; the editor strips that heading when it
-// opens so the saved text remains plain.
+// Resource Information is stored as plain text. Strip the old editor heading
+// when a resource still has it so the saved text remains plain.
 function trimOuterBlankLines(lines){
   const next = lines.slice();
   while(next.length && next[0].trim() === "") next.shift();
   while(next.length && next[next.length - 1].trim() === "") next.pop();
   return next;
-}
-
-function emptyInformationDraft(){
-  return { additional:"" };
 }
 
 function parseInformationText(text){
@@ -1072,10 +1051,10 @@ function renderInformationMarkupHTML(text){
 
     flushList();
     if(line === ""){
-      out.push('<div class="services-line services-blank">&nbsp;</div>');
+      out.push('<div class="information-line information-blank">&nbsp;</div>');
       return;
     }
-    out.push(`<div class="services-line">${applyInformationMarkup(escapeHTML(line))}</div>`);
+    out.push(`<div class="information-line">${applyInformationMarkup(escapeHTML(line))}</div>`);
   });
 
   flushList();
@@ -1112,6 +1091,8 @@ const FRESH_START_STORAGE_KEYS = [
   "newTsoName",
   "newAdminGuideDisabled",
   "newAdminGuidePhase",
+  "newAdminGuideCompleted",
+  "newAdminGuidePracticeResourceId",
   "albqUndo"
 ];
 
@@ -1165,6 +1146,7 @@ const TSO_NAME_STORAGE_KEY = "newTsoName";
 const ADMIN_GUIDE_DISABLED_STORAGE_KEY = "newAdminGuideDisabled";
 const ADMIN_GUIDE_PHASE_STORAGE_KEY = "newAdminGuidePhase";
 const ADMIN_GUIDE_COMPLETED_STORAGE_KEY = "newAdminGuideCompleted";
+const ADMIN_GUIDE_PRACTICE_RESOURCE_STORAGE_KEY = "newAdminGuidePracticeResourceId";
 const RESOURCE_PACKAGE_FILENAME = "albq-resources.json";
 const CATEGORY_REMINDER_TEXT = "Report bugs or request enhancments to Elder Bendio (michaelbendio@gmail.com)"
 
@@ -1243,6 +1225,7 @@ let adminGuideDismissed = OPENED_AS_NEW_TEMPLATE ? false : localStorage.getItem(
 let adminGuideMode = OPENED_AS_NEW_TEMPLATE ? true : !adminGuideDismissed;
 let adminGuideStep = adminGuidePhase === "createResource" ? "categoryFilters" : "setupName";
 let adminGuideResourceSection = "basics";
+let adminGuidePracticeResourceId = localStorage.getItem(ADMIN_GUIDE_PRACTICE_RESOURCE_STORAGE_KEY) || "";
 let adminHelpPrintRestoreState = null;
 let allowBlankUpdateDescriptionOnce = false;
 let newCategoryIds = new Set();
@@ -2690,9 +2673,11 @@ function runSelfTests(){
       const previousAdminGuideResourceSection = adminGuideResourceSection;
       const previousAdminGuideDismissed = adminGuideDismissed;
       const previousAdminGuideCompleted = adminGuideCompleted;
+      const previousAdminGuidePracticeResourceId = adminGuidePracticeResourceId;
       const previousAdminResourceEditMode = adminResourceEditMode;
       const previousSelectedResourceId = selectedResourceId;
       const previousGuideCompleted = localStorage.getItem(ADMIN_GUIDE_COMPLETED_STORAGE_KEY);
+      const previousGuidePracticeResourceId = localStorage.getItem(ADMIN_GUIDE_PRACTICE_RESOURCE_STORAGE_KEY);
       const previousConfirm = window.confirm;
       const previousPrompt = window.prompt;
       try{
@@ -2712,7 +2697,9 @@ function runSelfTests(){
         adminResourceEditMode = false;
         selectedResourceId = "";
         adminGuideCompleted = false;
+        adminGuidePracticeResourceId = "";
         localStorage.removeItem(ADMIN_GUIDE_COMPLETED_STORAGE_KEY);
+        localStorage.removeItem(ADMIN_GUIDE_PRACTICE_RESOURCE_STORAGE_KEY);
         startAdminGuide("categoryFilters");
         render();
         let tip = document.querySelector("#adminView .admin-guide-tip");
@@ -2874,6 +2861,7 @@ Delete this resource when the guide tells you to.`;
         adminGuideResourceSection = previousAdminGuideResourceSection;
         adminGuideDismissed = previousAdminGuideDismissed;
         adminGuideCompleted = previousAdminGuideCompleted;
+        adminGuidePracticeResourceId = previousAdminGuidePracticeResourceId;
         adminResourceEditMode = previousAdminResourceEditMode;
         selectedResourceId = previousSelectedResourceId;
         window.confirm = previousConfirm;
@@ -2882,6 +2870,8 @@ Delete this resource when the guide tells you to.`;
         else localStorage.setItem(DATA_STORAGE_KEY, previousStoredData);
         if(previousGuideCompleted === null) localStorage.removeItem(ADMIN_GUIDE_COMPLETED_STORAGE_KEY);
         else localStorage.setItem(ADMIN_GUIDE_COMPLETED_STORAGE_KEY, previousGuideCompleted);
+        if(previousGuidePracticeResourceId === null) localStorage.removeItem(ADMIN_GUIDE_PRACTICE_RESOURCE_STORAGE_KEY);
+        else localStorage.setItem(ADMIN_GUIDE_PRACTICE_RESOURCE_STORAGE_KEY, previousGuidePracticeResourceId);
       }
     }
   });
@@ -3064,7 +3054,7 @@ Delete this resource when the guide tells you to.`;
         data = {
           categories:[{ id:"employment", label:"Employment", filters:["Temporary Employment"] }],
           forGroups:["Ex-offenders"],
-          resources:[{ id:"practice", name:"Quick Start Temp Agency", categories:["employment"], informationText:"" }],
+          resources:[{ id:"practice", name:"Quick Start Temp Agency", categories:["employment"], categoryFilters:{}, forGroups:[], informationText:"" }],
           changes:[]
         };
         view = "admin";
@@ -3848,8 +3838,8 @@ Delete this resource when the guide tells you to.`;
         data = {
           categories:[{ id:"housing", label:"Housing" }],
           resources:[
-            { id:"parent", name:"Parent Support", categories:["housing"], informationText:"paid utility help" },
-            { id:"uca", name:"Utah Community Action", categories:["housing"], informationText:"Emergency rental assistance and deposit help" }
+            { id:"parent", name:"Parent Support", categories:["housing"], categoryFilters:{}, forGroups:[], informationText:"paid utility help" },
+            { id:"uca", name:"Utah Community Action", categories:["housing"], categoryFilters:{}, forGroups:[], informationText:"Emergency rental assistance and deposit help" }
           ]
         };
         const rentResults = buildSearchResults("rent");
@@ -3859,7 +3849,7 @@ Delete this resource when the guide tells you to.`;
         if(emergencyResults.groups[0].items[0].resourceId !== "uca") throw new Error("information result resource was incorrect");
         if(!emergencyResults.groups[0].items[0].snippet) throw new Error("information result snippet was missing");
 
-        data.resources.push({ id:"emergency-name", name:"Emergency Center", categories:["housing"], informationText:"" });
+        data.resources.push({ id:"emergency-name", name:"Emergency Center", categories:["housing"], categoryFilters:{}, forGroups:[], informationText:"" });
         const nameResults = buildSearchResults("emergency");
         if(nameResults.mode !== "name") throw new Error("name matches should suppress information fallback");
         if(nameResults.groups[0].items.some(item => item.resourceId === "uca")) throw new Error("information fallback appeared when name matches existed");
@@ -3934,7 +3924,7 @@ Delete this resource when the guide tells you to.`;
       try{
         data = {
           categories:[{ id:"housing", label:"Housing" }],
-          resources:[{ id:"uca", name:"Utah Community Action", categories:["housing"], informationText:"" }]
+          resources:[{ id:"uca", name:"Utah Community Action", categories:["housing"], categoryFilters:{}, forGroups:[], informationText:"" }]
         };
         selectedCategoryFilters = { housing:["Shelter"] };
         openSearchResult("housing", "uca");
@@ -4127,7 +4117,7 @@ Delete this resource when the guide tells you to.`;
       if(typeof html !== "string" || !html.length) throw new Error("renderer returned empty output");
       const host = document.createElement("div");
       try{
-        host.className = "services-rendered";
+        host.className = "information-rendered";
         host.innerHTML = html;
         document.body.appendChild(host);
         const ul = host.querySelector("ul");
@@ -4435,12 +4425,7 @@ function isNewAdminSetupState(){
 }
 
 function createTip(tipId){
-  const tipText = TIP_TEXT[tipId];
-  if(!tipText) return null;
-  const tip = document.createElement("div");
-  tip.className = "red-tip";
-  tip.textContent = tipText;
-  return tip;
+  return createGuideTip(TIP_TEXT[tipId]);
 }
 
 function createGuideTip(tipText){
@@ -4467,11 +4452,6 @@ function setAdminGuideStep(step){
   if(view === "admin") safeRenderAdmin();
 }
 
-function advanceAdminGuideToResourceCreation(){
-  setAdminGuidePhase("createResource");
-  setAdminGuideStep("categoryFilters");
-}
-
 function formatGuideTipText(tipText){
   return String(tipText || "").replace(/\[new TSO name\]\.html/g, getTsoFileName());
 }
@@ -4484,7 +4464,7 @@ function getCategoryTipId(){
 }
 
 function getCategoryGuideTipText(){
-  if(adminGuideMode && adminGuidePhase === "createResource" && view === "categories" && (!isNewTemplateFile() || adminGuideStep === "reopenAdmin" || adminGuideStep === "categoryFilters")){
+  if(adminGuideMode && adminGuidePhase === "createResource" && view === "categories" && (!isNewTemplateFile() || adminGuideStep === "categoryFilters")){
     return formatGuideTipText(TIP_TEXT.renamedFileWelcome);
   }
   return "";
@@ -4508,8 +4488,10 @@ function completeAdminGuide(){
   adminGuideResourceSection = "basics";
   adminGuideDismissed = true;
   adminGuideCompleted = true;
+  adminGuidePracticeResourceId = "";
   localStorage.setItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY, "1");
   localStorage.setItem(ADMIN_GUIDE_COMPLETED_STORAGE_KEY, "1");
+  localStorage.removeItem(ADMIN_GUIDE_PRACTICE_RESOURCE_STORAGE_KEY);
 }
 
 function stopAdminGuide(){
@@ -4544,24 +4526,11 @@ function prepareAdminGuideForStep(step){
   }
 }
 
-function toggleAdminGuide(){
-  if(adminGuideMode){
-    stopAdminGuide();
-  }else{
-    const firstStep = adminGuideCompleted ? getContextualAdminGuideStep() : getFirstAdminGuideStep();
-    const nextStep = view === "admin" && firstStep === "reopenAdmin" ? "resources" : firstStep;
-    prepareAdminGuideForStep(nextStep);
-    startAdminGuide(nextStep);
-  }
-  if(view === "admin") safeRenderAdmin();
-}
-
 function requestToggleAdminGuide(source = "toolbar"){
   if(!adminGuideMode){
     const firstStep = adminGuideCompleted ? getContextualAdminGuideStep() : getFirstAdminGuideStep();
-    const nextStep = view === "admin" && firstStep === "reopenAdmin" ? "resources" : firstStep;
-    prepareAdminGuideForStep(nextStep);
-    startAdminGuide(nextStep);
+    prepareAdminGuideForStep(firstStep);
+    startAdminGuide(firstStep);
     if(view === "admin") safeRenderAdmin();
     return;
   }
@@ -4631,7 +4600,6 @@ function getAdminGuideTipText(){
   if(adminGuideStep === "setupName") return TIP_TEXT.adminGuideSetupName;
   if(adminGuideStep === "verifyName") return TIP_TEXT.adminGuideVerifyName;
   if(adminGuideStep === "renameFile") return TIP_TEXT.adminGuideRenameFile;
-  if(adminGuideStep === "reopenAdmin") return "";
   if(adminGuideStep === "categoryFilters") return TIP_TEXT.adminGuideCategoryFilters;
   if(adminGuideStep === "deleteResource") return TIP_TEXT.adminGuideDeleteResource;
   if(adminGuideStep === "forGroupsAdmin") return TIP_TEXT.adminGuideForAdmin;
@@ -4956,7 +4924,7 @@ function showAdminHelp(){
           <summary>Categories</summary>
           <div class="admin-help-section-body">
             <p>Use <code>Categories</code> to manage the sections users see on the main screen.</p>
-            <p><code>New</code> creates a blank category. Enter the category label, add any specific subcategories for that category, describe the update, and click <code>Done</code>.</p>
+            <p><code>New</code> creates a blank category. Enter the category label, add any filters for that category, describe the update, and click <code>Done</code>.</p>
             <p><code>Delete</code> removes the selected category. It does not delete the resources in that category, but those resources will no longer appear there. The app asks for confirmation and gives you a chance to describe the deletion.</p>
             <p>Categories are shown alphabetically.</p>
             <p>The category editor also shows <code>Resources in this category</code>. Click a resource name there to open it in the resource editor.</p>
@@ -5110,7 +5078,7 @@ function buildResourceCard(res,{expanded=false,showDescription=false,showPrintTo
   if(res.phone) html+=`<div><strong>Phone:</strong> <a href="tel:${res.phone}">${res.phone}</a></div>`;
   if(res.address) html+=`<div><strong>Address:</strong> ${escapeHTML(res.address)}</div>`;
   if(websiteURL) html+=`<div><strong>Website:</strong> <a href="${websiteURL}" target="_blank">${res.website}</a></div>`;
-  if(res.informationText) html+=`<div><strong>Information:</strong><div class="services-rendered resource-info-rendered">${renderInformationHTML(res.informationText)}</div></div>`;
+  if(res.informationText) html+=`<div><strong>Information:</strong><div class="information-rendered resource-info-rendered">${renderInformationHTML(res.informationText)}</div></div>`;
 
   details.innerHTML=html;
   main.appendChild(details);
@@ -5808,7 +5776,7 @@ const PrintWorkflow = {
     if(resource.address) html += `<div class="print-list-field"><strong>Address:</strong> ${escapeHTML(resource.address)}</div>`;
     if(resource.website) html += `<div class="print-list-field"><strong>Website:</strong> ${escapeHTML(resource.website)}</div>`;
     if(resource.informationText){
-      html += `<div class="print-list-field"><strong>Information:</strong><div class="services-rendered resource-info-rendered">${renderInformationHTML(resource.informationText)}</div></div>`;
+      html += `<div class="print-list-field"><strong>Information:</strong><div class="information-rendered resource-info-rendered">${renderInformationHTML(resource.informationText)}</div></div>`;
     }
     flyer.innerHTML = html;
     const toggle = flyer.querySelector(".print-selection-toggle");
@@ -5997,27 +5965,6 @@ function persist(){
   data.appVersion = APP_VERSION;
   data.lastModified = nowISO();
   localStorage.setItem(DATA_STORAGE_KEY, JSON.stringify(data));
-}
-
-async function clearAssets(){
-  const db = await openAssetsDB();
-  const tx = db.transaction("files", "readwrite");
-  tx.objectStore("files").clear();
-
-  return new Promise((resolve, reject) => {
-    tx.oncomplete = () => {
-      db.close();
-      resolve();
-    };
-    tx.onerror = () => {
-      db.close();
-      reject(tx.error);
-    };
-    tx.onabort = () => {
-      db.close();
-      reject(tx.error);
-    };
-  });
 }
 
 function cloneDataObject(value){
@@ -7802,7 +7749,7 @@ function editCategory(idx){
     <div class="category-editor-layout">
       <div>
         <h4 style="margin:0 0 8px;">Filters</h4>
-        <p class="admin-note">Add specific subcategories for this category.</p>
+        <p class="admin-note">Add specific filters for this category.</p>
         <div class="admin-action-row" style="margin-bottom:8px;">
           <button class="button" type="button" id="cat_filter_new_btn">New</button>
           <button class="button danger" type="button" id="cat_filter_delete_btn">Delete</button>
@@ -8067,7 +8014,13 @@ function newResource(){
   adminTab = "resources";
   selectedResourceId = resource.id;
   adminResourceEditMode = true;
-  if(adminGuideMode) startAdminGuide("resourceFields");
+  if(adminGuideMode){
+    if(adminGuideStep === "newResource"){
+      adminGuidePracticeResourceId = resourceId;
+      localStorage.setItem(ADMIN_GUIDE_PRACTICE_RESOURCE_STORAGE_KEY, resourceId);
+    }
+    startAdminGuide("resourceFields");
+  }
   safeRenderAdmin();
   focusAndSelectResourceName();
 }
@@ -8131,7 +8084,8 @@ function deleteResource(){
   newResourceIds.delete(res.id);
   const shouldCompleteGuideAfterDelete = adminGuideMode
     && adminGuideStep === "deleteResource"
-    && String(res.name || "").trim().toLowerCase() === "quick start temp agency";
+    && !!adminGuidePracticeResourceId
+    && String(res.id || "") === adminGuidePracticeResourceId;
 
   const remainingIds = getAdminResourceBrowseList().map(r => String(r.id || ""));
   if(!remainingIds.length){
@@ -8309,13 +8263,13 @@ function editResource(idx){
 
     <div class="resource-editor-guide-section ${adminGuideResourceSection === "information" ? "admin-guide-current-section" : ""}" data-guide-section="information">
       <label style="display:block; font-weight:bold; margin-top:12px;">Information</label>
-      <div class="services-control-block">
-        <div class="services-control-header">
-          <div class="services-preview-toggle">
+      <div class="information-control-block">
+        <div class="information-control-header">
+          <div class="information-preview-toggle">
             <button class="button primary" type="button" id="res_information_edit_btn">Edit</button>
             <button class="button" type="button" id="res_information_preview_btn">Preview</button>
           </div>
-          <div class="services-hint resource-info-guidance">
+          <div class="information-hint resource-info-guidance">
             Formatting: use *[space] at the start of a line for bullets, **bold** for bold text, __underline__ for underline, and --- on its own line for a horizontal line.
           </div>
         </div>
@@ -8324,7 +8278,7 @@ function editResource(idx){
             <textarea id="res_info_additional" class="big resource-info-input" style="min-height:90px;">${escapeHTML(informationDraft.additional || "")}</textarea>
           </div>
         </div>
-        <div id="res_information_preview" class="services-preview-box services-rendered resource-info-rendered hidden"></div>
+        <div id="res_information_preview" class="information-preview-box information-rendered resource-info-rendered hidden"></div>
       </div>
     </div><br>
   `;
