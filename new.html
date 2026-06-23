@@ -8149,34 +8149,30 @@ function cancelResourceEditor(){
   safeRenderAdmin();
 }
 
-function editResource(idx){
-  const res = data.resources[idx];
-  const editor = document.getElementById("resEditor");
-  if(!res || !editor) return;
-  selectedResourceId = res.id || selectedResourceId;
-  editing = { kind: "resource", idx };
+function getResourceGuideSectionClass(sectionName){
+  const active = sectionName === "update"
+    ? (adminGuideResourceSection === "update" || adminGuideResourceSection === "save")
+    : adminGuideResourceSection === sectionName;
+  return `resource-editor-guide-section ${active ? "admin-guide-current-section" : ""}`;
+}
 
-  normalizeResourceInformation(res);
-  normalizeResourceVerifiedOn(res);
-  normalizeDataForGroupsShape(data);
-  normalizeDataCategoryFilterShape(data);
-  res.forGroups = normalizeTaxonomyLabels(res.forGroups);
-  const verifiedDisplay = formatVerifiedOnForDisplay(res.verifiedOn);
-  const informationDraft = parseInformationText(res.informationText || "");
+function renderResourceForGroupChecks(res){
   const selectedForKeys = new Set(normalizeTaxonomyLabels(res.forGroups).map(group => group.toLowerCase()));
-  const forGroupChecks = normalizeTaxonomyLabels(data.forGroups)
+  return normalizeTaxonomyLabels(data.forGroups)
     .map(group => `
       <label style="display:block; margin:2px 0;">
         <input type="checkbox" class="resForGroup" value="${escapeHTML(group)}" ${selectedForKeys.has(group.toLowerCase()) ? "checked" : ""}>
         ${escapeHTML(group)}
       </label>
     `).join("");
+}
 
-  const catChecks = data.categories
+function renderResourceCategoryChecks(res){
+  return data.categories
     .slice()
     .sort(compareCategoriesByLabel)
-    .map(c=>{
-      const checked = (res.categories||[]).includes(c.id) ? "checked" : "";
+    .map(c => {
+      const checked = (res.categories || []).includes(c.id) ? "checked" : "";
       const categoryFilters = normalizeCategoryFilters(c.filters);
       const selectedFilters = normalizeCategoryFilters(res.categoryFilters && res.categoryFilters[c.id]);
       const selectedKeys = new Set(selectedFilters.map(filter => filter.toLowerCase()));
@@ -8200,9 +8196,11 @@ function editResource(idx){
         </div>
       `;
     }).join("");
+}
 
-  editor.innerHTML = `
-    <div class="resource-editor-guide-section ${adminGuideResourceSection === "basics" ? "admin-guide-current-section" : ""}" data-guide-section="basics">
+function renderResourceBasicsSection(res, verifiedDisplay){
+  return `
+    <div class="${getResourceGuideSectionClass("basics")}" data-guide-section="basics">
       <label>Name<br>
         <input id="res_name" value="${escapeHTML(res.name || "")}">
       </label>
@@ -8237,14 +8235,22 @@ function editResource(idx){
         <textarea id="res_description" class="big">${escapeHTML(res.description || "")}</textarea>
       </label><br>
     </div>
+  `;
+}
 
-    <div class="resource-editor-guide-section ${(adminGuideResourceSection === "update" || adminGuideResourceSection === "save") ? "admin-guide-current-section" : ""}" data-guide-section="update">
+function renderResourceUpdateSection(){
+  return `
+    <div class="${getResourceGuideSectionClass("update")}" data-guide-section="update">
       <label style="display:block; margin-top:8px;">Describe this update (optional)<br>
         <textarea id="res_update_description" class="big" style="min-height:60px;"></textarea>
       </label><br>
     </div>
+  `;
+}
 
-    <div class="resource-editor-guide-section ${adminGuideResourceSection === "forGroups" ? "admin-guide-current-section" : ""}" data-guide-section="forGroups">
+function renderResourceForGroupsSection(forGroupChecks){
+  return `
+    <div class="${getResourceGuideSectionClass("forGroups")}" data-guide-section="forGroups">
       <div style="margin-top:8px;">
         <strong>For</strong>
         <div style="margin-top:4px;">
@@ -8253,15 +8259,23 @@ function editResource(idx){
       </div>
       <br>
     </div>
+  `;
+}
 
-    <div class="resource-editor-guide-section ${adminGuideResourceSection === "categories" ? "admin-guide-current-section" : ""}" data-guide-section="categories">
+function renderResourceCategoriesSection(catChecks){
+  return `
+    <div class="${getResourceGuideSectionClass("categories")}" data-guide-section="categories">
       <div>
         <strong>Categories</strong><br>
         ${catChecks}
       </div>
     </div>
+  `;
+}
 
-    <div class="resource-editor-guide-section ${adminGuideResourceSection === "information" ? "admin-guide-current-section" : ""}" data-guide-section="information">
+function renderResourceInformationSection(informationDraft){
+  return `
+    <div class="${getResourceGuideSectionClass("information")}" data-guide-section="information">
       <label style="display:block; font-weight:bold; margin-top:12px;">Information</label>
       <div class="information-control-block">
         <div class="information-control-header">
@@ -8282,116 +8296,141 @@ function editResource(idx){
       </div>
     </div><br>
   `;
+}
 
-  const verifiedBtn = document.getElementById("res_verified_btn");
-  const verifiedInput = document.getElementById("res_verified_on");
-  const verifiedDisplayEl = document.getElementById("res_verified_display");
-  const verifiedWarning = document.getElementById("res_verified_warning");
-  const nameEl = document.getElementById("res_name");
-  const updateEl = document.getElementById("res_update_description");
-  const informationEditor = document.getElementById("res_information_editor");
-  const informationEditBtn = document.getElementById("res_information_edit_btn");
-  const informationPreviewBtn = document.getElementById("res_information_preview_btn");
-  const informationPreviewBox = document.getElementById("res_information_preview");
-  function getInformationDraftFromEditor(){
-    const additionalEl = document.getElementById("res_info_additional");
-    return { additional:additionalEl ? additionalEl.value : "" };
-  }
-  function refreshInformationPreview(){
-    if(!informationPreviewBox) return;
-    informationPreviewBox.innerHTML = renderInformationHTML(composeInformationText(getInformationDraftFromEditor()));
+function renderResourceEditorMarkup(res){
+  const verifiedDisplay = formatVerifiedOnForDisplay(res.verifiedOn);
+  const informationDraft = parseInformationText(res.informationText || "");
+  return [
+    renderResourceBasicsSection(res, verifiedDisplay),
+    renderResourceUpdateSection(),
+    renderResourceForGroupsSection(renderResourceForGroupChecks(res)),
+    renderResourceCategoriesSection(renderResourceCategoryChecks(res)),
+    renderResourceInformationSection(informationDraft)
+  ].join("");
+}
+
+function getResourceEditorElements(){
+  return {
+    editor:document.getElementById("resEditor"),
+    verifiedBtn:document.getElementById("res_verified_btn"),
+    verifiedInput:document.getElementById("res_verified_on"),
+    verifiedDisplay:document.getElementById("res_verified_display"),
+    verifiedWarning:document.getElementById("res_verified_warning"),
+    updateInput:document.getElementById("res_update_description"),
+    informationEditor:document.getElementById("res_information_editor"),
+    informationEditBtn:document.getElementById("res_information_edit_btn"),
+    informationPreviewBtn:document.getElementById("res_information_preview_btn"),
+    informationPreviewBox:document.getElementById("res_information_preview")
+  };
+}
+
+function getInformationDraftFromResourceEditor(){
+  const additionalEl = document.getElementById("res_info_additional");
+  return { additional:additionalEl ? additionalEl.value : "" };
+}
+
+function refreshResourceInformationPreview(elements){
+  if(!elements.informationPreviewBox) return;
+  const informationText = composeInformationText(getInformationDraftFromResourceEditor());
+  elements.informationPreviewBox.innerHTML = renderInformationHTML(informationText);
+}
+
+function setResourceInformationEditorMode(elements, mode){
+  if(!elements.informationEditor || !elements.informationPreviewBox || !elements.informationEditBtn || !elements.informationPreviewBtn) return;
+  const previewMode = mode === "preview";
+  elements.informationEditor.classList.toggle("hidden", previewMode);
+  elements.informationPreviewBox.classList.toggle("hidden", !previewMode);
+  elements.informationEditBtn.classList.toggle("primary", !previewMode);
+  elements.informationPreviewBtn.classList.toggle("primary", previewMode);
+  if(previewMode) refreshResourceInformationPreview(elements);
+}
+
+function syncResourceCategoryFilterVisibility(editor){
+  editor.querySelectorAll(".resCat").forEach(cb => {
+    const filterList = Array.from(editor.querySelectorAll("[data-category-filters-for]"))
+      .find(list => list.dataset.categoryFiltersFor === cb.value);
+    if(filterList) filterList.style.display = cb.checked ? "" : "none";
+  });
+}
+
+function updateResourceVerifiedDisplayAndWarning(elements){
+  if(!elements.verifiedInput || !elements.verifiedDisplay) return true;
+  const validation = validateVerifiedOnInput(elements.verifiedInput.value);
+  if(elements.verifiedWarning) elements.verifiedWarning.textContent = validation.message;
+  elements.verifiedDisplay.textContent = validation.valid
+    ? formatVerifiedOnForDisplay(validation.normalized)
+    : "----";
+  showResourceVerifiedWarning(validation.message);
+  return validation.valid;
+}
+
+function validateResourceEditorState(idx){
+  const draft = resourceEditorDraft();
+  if(!draft){
+    showResourceNameWarning("");
+    showResourceVerifiedWarning("");
+    updateResourceEditorActionBar();
+    const doneBtn = document.getElementById("res_done_btn");
+    if(doneBtn) doneBtn.disabled = false;
+    return;
   }
 
-  function setInformationEditorMode(mode){
-    if(!informationEditor || !informationPreviewBox || !informationEditBtn || !informationPreviewBtn) return;
-    const previewMode = mode === "preview";
-    informationEditor.classList.toggle("hidden", previewMode);
-    informationPreviewBox.classList.toggle("hidden", !previewMode);
-    informationEditBtn.classList.toggle("primary", !previewMode);
-    informationPreviewBtn.classList.toggle("primary", previewMode);
-    if(previewMode) refreshInformationPreview();
+  const nameValidation = validateResourceName(draft, idx);
+  const verifiedValidation = validateVerifiedOnInput(draft.verifiedOn);
+  showResourceNameWarning(nameValidation.message);
+  showResourceVerifiedWarning(verifiedValidation.message);
+  const shouldDisableDone = shouldForceEnableResourceEditorExit()
+    ? false
+    : shouldDisableResourceEditorExit() || !(nameValidation.valid && verifiedValidation.valid);
+  updateResourceEditorActionBar(shouldDisableDone);
+  const doneBtn = document.getElementById("res_done_btn");
+  if(doneBtn) doneBtn.disabled = shouldDisableDone;
+}
+
+function setupResourceInformationControls(elements, validateEditorState){
+  if(elements.informationEditBtn && elements.informationPreviewBtn){
+    elements.informationEditBtn.onclick = () => setResourceInformationEditorMode(elements, "edit");
+    elements.informationPreviewBtn.onclick = () => setResourceInformationEditorMode(elements, "preview");
+    setResourceInformationEditorMode(elements, "preview");
   }
 
-  if(informationEditBtn && informationPreviewBtn){
-    informationEditBtn.onclick = () => setInformationEditorMode("edit");
-    informationPreviewBtn.onclick = () => setInformationEditorMode("preview");
-    setInformationEditorMode("preview");
-  }
-  const informationInputs = Array.from(document.querySelectorAll(".resource-info-input"));
-  informationInputs.forEach(field => {
+  Array.from(document.querySelectorAll(".resource-info-input")).forEach(field => {
     fitTextareaToText(field);
     field.addEventListener("input", () => {
       fitTextareaToText(field);
-      refreshInformationPreview();
+      refreshResourceInformationPreview(elements);
       validateEditorState();
     });
   });
+}
 
-  function syncCategoryFilterVisibility(){
-    editor.querySelectorAll(".resCat").forEach(cb => {
-      const filterList = Array.from(editor.querySelectorAll("[data-category-filters-for]"))
-        .find(list => list.dataset.categoryFiltersFor === cb.value);
-      if(filterList) filterList.style.display = cb.checked ? "" : "none";
-    });
-  }
-
+function setupResourceCategoryControls(editor, validateEditorState){
   editor.querySelectorAll(".resCat").forEach(cb => {
     cb.addEventListener("change", () => {
-      syncCategoryFilterVisibility();
+      syncResourceCategoryFilterVisibility(editor);
       validateEditorState();
     });
   });
   editor.querySelectorAll(".resCatFilter").forEach(cb => {
     cb.addEventListener("change", validateEditorState);
   });
-  syncCategoryFilterVisibility();
+  syncResourceCategoryFilterVisibility(editor);
+}
 
-  function updateVerifiedDisplayAndWarning(){
-    if(!verifiedInput || !verifiedDisplayEl) return true;
-    const validation = validateVerifiedOnInput(verifiedInput.value);
-    if(verifiedWarning) verifiedWarning.textContent = validation.message;
-    verifiedDisplayEl.textContent = validation.valid
-      ? formatVerifiedOnForDisplay(validation.normalized)
-      : "----";
-    showResourceVerifiedWarning(validation.message);
-    return validation.valid;
-  }
+function setupResourceVerifiedControls(elements, validateEditorState){
+  if(!elements.verifiedBtn || !elements.verifiedInput) return;
+  elements.verifiedBtn.onclick = () => {
+    elements.verifiedInput.value = formatMMYYFromDate(new Date());
+    updateResourceVerifiedDisplayAndWarning(elements);
+    validateEditorState();
+    elements.verifiedInput.focus();
+    elements.verifiedInput.select();
+  };
+  elements.verifiedInput.addEventListener("input", () => updateResourceVerifiedDisplayAndWarning(elements));
+}
 
-  if(verifiedBtn && verifiedInput){
-    verifiedBtn.onclick = () => {
-      verifiedInput.value = formatMMYYFromDate(new Date());
-      updateVerifiedDisplayAndWarning();
-      validateEditorState();
-      verifiedInput.focus();
-      verifiedInput.select();
-    };
-    verifiedInput.addEventListener("input", updateVerifiedDisplayAndWarning);
-  }
-
-  function validateEditorState(){
-    const draft = resourceEditorDraft();
-    if(!draft){
-      showResourceNameWarning("");
-      showResourceVerifiedWarning("");
-      updateResourceEditorActionBar();
-      const doneBtn = document.getElementById("res_done_btn");
-      if(doneBtn) doneBtn.disabled = false;
-      return;
-    }
-    const nameValidation = validateResourceName(draft, idx);
-    const verifiedValidation = validateVerifiedOnInput(draft.verifiedOn);
-    showResourceNameWarning(nameValidation.message);
-    showResourceVerifiedWarning(verifiedValidation.message);
-    const shouldDisableDone = shouldForceEnableResourceEditorExit()
-      ? false
-      : shouldDisableResourceEditorExit() || !(nameValidation.valid && verifiedValidation.valid);
-    updateResourceEditorActionBar(shouldDisableDone);
-    const doneBtn = document.getElementById("res_done_btn");
-    if(doneBtn){
-      doneBtn.disabled = shouldDisableDone;
-    }
-  }
-
+function setupResourceEditorValidation(editor, elements, validateEditorState){
   ["res_name", "res_phone", "res_address", "res_website", "res_hours", "res_description"].forEach(id => {
     const field = document.getElementById(id);
     if(field) field.addEventListener("input", validateEditorState);
@@ -8399,11 +8438,37 @@ function editResource(idx){
   editor.querySelectorAll(".resForGroup").forEach(cb => {
     cb.addEventListener("change", validateEditorState);
   });
-  if(updateEl) updateEl.addEventListener("input", validateEditorState);
-  if(verifiedInput) verifiedInput.addEventListener("input", validateEditorState);
+  if(elements.updateInput) elements.updateInput.addEventListener("input", validateEditorState);
+  if(elements.verifiedInput) elements.verifiedInput.addEventListener("input", validateEditorState);
+}
+
+function normalizeResourceForEditor(res){
+  normalizeResourceInformation(res);
+  normalizeResourceVerifiedOn(res);
+  normalizeDataForGroupsShape(data);
+  normalizeDataCategoryFilterShape(data);
+  res.forGroups = normalizeTaxonomyLabels(res.forGroups);
+}
+
+function editResource(idx){
+  const res = data.resources[idx];
+  const editor = document.getElementById("resEditor");
+  if(!res || !editor) return;
+
+  selectedResourceId = res.id || selectedResourceId;
+  editing = { kind:"resource", idx };
+  normalizeResourceForEditor(res);
+  editor.innerHTML = renderResourceEditorMarkup(res);
+
+  const elements = getResourceEditorElements();
+  const validateEditorState = () => validateResourceEditorState(idx);
+  setupResourceInformationControls(elements, validateEditorState);
+  setupResourceCategoryControls(editor, validateEditorState);
+  setupResourceVerifiedControls(elements, validateEditorState);
+  setupResourceEditorValidation(editor, elements, validateEditorState);
 
   editorSnapshot = snapshotResourceEditor();
-  updateVerifiedDisplayAndWarning();
+  updateResourceVerifiedDisplayAndWarning(elements);
   validateEditorState();
   focusAndSelectResourceName();
 }
