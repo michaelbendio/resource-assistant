@@ -79,6 +79,7 @@ body { font-family: -apple-system, sans-serif; margin:0; padding:0; font-size:18
 .print-selection-toggle { position:absolute; left:8px; top:8px; cursor:pointer; font-size:18px; border:0; background:transparent; padding:0; line-height:1; }
 .resource-main { margin-left:24px; }
 .resource-details.collapsed { display:none; }
+.resource-info-separator { border:0; border-top:1px solid #ccc; margin:10px 0; }
 .button { padding:10px 14px; margin:4px 0; cursor:pointer; }
 button,
 input,
@@ -1088,7 +1089,6 @@ const seed = JSON.parse(document.getElementById("seed-data").textContent);
 const URL_PARAMS = new URLSearchParams(location.search);
 const DEBUG = URL_PARAMS.has("debug");
 const FRESH_START_STORAGE_KEYS = [
-  "newData",
   "newRecentUpdatesSeen",
   "newPrintSelection",
   "newFavorites",
@@ -1415,7 +1415,7 @@ function runSelfTests(){
   });
 
   tests.push({
-    name: "FRESH START CLEARS SAVED APP STATE",
+    name: "FRESH START CLEARS UI STATE BUT KEEPS RESOURCES",
     fn: () => {
       if(document.getElementById("freshStartButton")){
         throw new Error("Fresh Start should be a keyboard shortcut, not a button");
@@ -1428,7 +1428,7 @@ function runSelfTests(){
       if(!prompt || prompt.classList.contains("hidden")){
         throw new Error("Fresh Start should use an in-app confirmation prompt");
       }
-      if(!/Clear localStorage data and reload from a fresh start\?/.test(prompt.textContent || "")){
+      if(!/Reset app state and keep resources\?/.test(prompt.textContent || "")){
         throw new Error("Fresh Start prompt wording changed");
       }
       if(!document.getElementById("freshStartYesButton") || !document.getElementById("freshStartNoButton")){
@@ -1436,17 +1436,24 @@ function runSelfTests(){
       }
       document.getElementById("freshStartNoButton").click();
       const previousValues = FRESH_START_STORAGE_KEYS.map(key => [key, localStorage.getItem(key)]);
+      const previousDataValue = localStorage.getItem(DATA_STORAGE_KEY);
       const previousSessionValue = sessionStorage.getItem("newSelfTestSessionValue");
       try{
         FRESH_START_STORAGE_KEYS.forEach(key => localStorage.setItem(key, "self-test"));
+        localStorage.setItem(DATA_STORAGE_KEY, JSON.stringify({ resources:[{ id:"keep-resource" }] }));
         sessionStorage.setItem("newSelfTestSessionValue", "self-test");
         runFreshStart();
         const unclearedKey = FRESH_START_STORAGE_KEYS.find(key => localStorage.getItem(key) !== null);
         if(unclearedKey) throw new Error(`fresh start did not clear ${unclearedKey}`);
+        if(!/keep-resource/.test(localStorage.getItem(DATA_STORAGE_KEY) || "")){
+          throw new Error("fresh start should keep saved resources");
+        }
         if(sessionStorage.getItem("newSelfTestSessionValue") !== null){
           throw new Error("fresh start did not clear sessionStorage");
         }
       }finally{
+        if(previousDataValue === null) localStorage.removeItem(DATA_STORAGE_KEY);
+        else localStorage.setItem(DATA_STORAGE_KEY, previousDataValue);
         previousValues.forEach(([key, value]) => {
           if(value === null) localStorage.removeItem(key);
           else localStorage.setItem(key, value);
@@ -4349,7 +4356,7 @@ function showFreshStartPrompt(){
   modal.innerHTML = `
     <div class="reference-modal-panel" role="dialog" aria-modal="true" aria-labelledby="freshStartTitle">
       <div class="reference-modal-header">
-        <div id="freshStartTitle" class="reference-modal-title">Clear localStorage data and reload from a fresh start?</div>
+        <div id="freshStartTitle" class="reference-modal-title">Reset app state and keep resources?</div>
         <div class="reference-modal-actions">
           <button class="button danger" type="button" id="freshStartYesButton">Yes</button>
           <button class="button" type="button" id="freshStartNoButton">No</button>
@@ -5149,7 +5156,7 @@ function buildResourceCard(res,{expanded=false,showDescription=false,showPrintTo
   if(res.phone) html+=`<div><strong>Phone:</strong> <a href="tel:${res.phone}">${res.phone}</a></div>`;
   if(res.address) html+=`<div><strong>Address:</strong> ${escapeHTML(res.address)}</div>`;
   if(websiteURL) html+=`<div><strong>Website:</strong> <a href="${websiteURL}" target="_blank">${res.website}</a></div>`;
-  if(res.informationText) html+=`<div><strong>Information:</strong><div class="information-rendered resource-info-rendered">${renderInformationHTML(res.informationText)}</div></div>`;
+  if(res.informationText) html+=`<hr class="resource-info-separator"><div class="information-rendered resource-info-rendered">${renderInformationHTML(res.informationText)}</div>`;
 
   details.innerHTML=html;
   main.appendChild(details);
