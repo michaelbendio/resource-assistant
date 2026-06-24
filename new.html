@@ -1088,11 +1088,10 @@ function fitTextareaToText(textarea){
 const seed = JSON.parse(document.getElementById("seed-data").textContent);
 const URL_PARAMS = new URLSearchParams(location.search);
 const DEBUG = URL_PARAMS.has("debug");
-const FRESH_START_STORAGE_KEYS = [
+const STARTUP_STATE_STORAGE_KEYS = [
   "newRecentUpdatesSeen",
   "newPrintSelection",
   "newFavorites",
-  "newTsoName",
   "newAdminGuideDisabled",
   "newAdminGuidePhase",
   "newAdminGuideCompleted",
@@ -1100,22 +1099,11 @@ const FRESH_START_STORAGE_KEYS = [
   "newUndo"
 ];
 
-function runFreshStart(){
-  FRESH_START_STORAGE_KEYS.forEach(key => localStorage.removeItem(key));
+function runStartupStateReset(){
+  STARTUP_STATE_STORAGE_KEYS.forEach(key => localStorage.removeItem(key));
   sessionStorage.clear();
 }
-
-function buildUrlWithParams(nextParams){
-  const nextSearch = nextParams.toString();
-  return `${location.pathname}${nextSearch ? `?${nextSearch}` : ""}${location.hash || ""}`;
-}
-
-if(URL_PARAMS.has("fresh")){
-  runFreshStart();
-  URL_PARAMS.delete("fresh");
-  URL_PARAMS.set("freshReload", Date.now().toString());
-  location.replace(buildUrlWithParams(URL_PARAMS));
-}
+runStartupStateReset();
 
 // Main persisted app data snapshot (categories/resources + metadata).
 const DATA_STORAGE_KEY = "newData";
@@ -1130,6 +1118,7 @@ const TIP_TEXT = {
   user: "Click on a category to see its resources. Click a resource to see details. Click ⬜ to include it in the printed handout.",
   newAdminWelcome: "Welcome to your new TSO Resources app. Press Ctrl+Alt+A to add an Admin button to the top blue bar. Then click it.",
   newAdminMode: "Click Ctrl+Alt+A to hide the Admin button when you're done. Now click Help.",
+  adminGuideChoice: "Click Guide for a guided quick start.",
   adminGuideCategoryFilters: "Filters are category-specific choices that appear as Specifically buttons for users and as checkboxes under that category in the Resource editor. Select Transportation, click New under Filters, add Bus passes if it is not already listed, then click Done.",
   adminGuideResources: "Click Resources to enter the Resource editor.",
   adminGuideNewResource: "Click New to create a practice resource.",
@@ -1237,7 +1226,7 @@ let adminGuidePhase = normalizeAdminGuidePhase(localStorage.getItem(ADMIN_GUIDE_
 localStorage.setItem(ADMIN_GUIDE_PHASE_STORAGE_KEY, adminGuidePhase);
 let adminGuideCompleted = localStorage.getItem(ADMIN_GUIDE_COMPLETED_STORAGE_KEY) === "1";
 let adminGuideDismissed = OPENED_AS_NEW_TEMPLATE ? false : localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY) === "1";
-let adminGuideMode = OPENED_AS_NEW_TEMPLATE ? true : !adminGuideDismissed;
+let adminGuideMode = false;
 let adminGuideStep = adminGuidePhase === "createResource" ? "categoryFilters" : "setupName";
 let adminGuideResourceSection = "basics";
 let adminGuidePracticeResourceId = localStorage.getItem(ADMIN_GUIDE_PRACTICE_RESOURCE_STORAGE_KEY) || "";
@@ -1415,49 +1404,38 @@ function runSelfTests(){
   });
 
   tests.push({
-    name: "FRESH START CLEARS UI STATE BUT KEEPS RESOURCES",
+    name: "STARTUP RESET CLEARS UI STATE BUT KEEPS DATA AND NAME",
     fn: () => {
-      if(document.getElementById("freshStartButton")){
-        throw new Error("Fresh Start should be a keyboard shortcut, not a button");
-      }
-      if(typeof requestFreshStart !== "function"){
-        throw new Error("Fresh Start shortcut handler is missing");
-      }
-      requestFreshStart();
-      const prompt = document.getElementById("referenceModal");
-      if(!prompt || prompt.classList.contains("hidden")){
-        throw new Error("Fresh Start should use an in-app confirmation prompt");
-      }
-      if(!/Reset app state and keep resources\?/.test(prompt.textContent || "")){
-        throw new Error("Fresh Start prompt wording changed");
-      }
-      if(!document.getElementById("freshStartYesButton") || !document.getElementById("freshStartNoButton")){
-        throw new Error("Fresh Start prompt should include Yes and No buttons");
-      }
-      document.getElementById("freshStartNoButton").click();
-      const previousValues = FRESH_START_STORAGE_KEYS.map(key => [key, localStorage.getItem(key)]);
+      const previousStartupValues = STARTUP_STATE_STORAGE_KEYS.map(key => [key, localStorage.getItem(key)]);
+      const previousTsoNameValue = localStorage.getItem(TSO_NAME_STORAGE_KEY);
       const previousDataValue = localStorage.getItem(DATA_STORAGE_KEY);
       const previousSessionValue = sessionStorage.getItem("newSelfTestSessionValue");
       try{
-        FRESH_START_STORAGE_KEYS.forEach(key => localStorage.setItem(key, "self-test"));
+        STARTUP_STATE_STORAGE_KEYS.forEach(key => localStorage.setItem(key, "stale"));
+        localStorage.setItem(TSO_NAME_STORAGE_KEY, "Keep Name");
         localStorage.setItem(DATA_STORAGE_KEY, JSON.stringify({ resources:[{ id:"keep-resource" }] }));
-        sessionStorage.setItem("newSelfTestSessionValue", "self-test");
-        runFreshStart();
-        const unclearedKey = FRESH_START_STORAGE_KEYS.find(key => localStorage.getItem(key) !== null);
-        if(unclearedKey) throw new Error(`fresh start did not clear ${unclearedKey}`);
+        sessionStorage.setItem("newSelfTestSessionValue", "stale");
+        runStartupStateReset();
+        const unclearedKey = STARTUP_STATE_STORAGE_KEYS.find(key => localStorage.getItem(key) !== null);
+        if(unclearedKey) throw new Error(`startup reset did not clear ${unclearedKey}`);
+        if(localStorage.getItem(TSO_NAME_STORAGE_KEY) !== "Keep Name"){
+          throw new Error("startup reset should keep TSO name");
+        }
         if(!/keep-resource/.test(localStorage.getItem(DATA_STORAGE_KEY) || "")){
-          throw new Error("fresh start should keep saved resources");
+          throw new Error("startup reset should keep saved resources");
         }
         if(sessionStorage.getItem("newSelfTestSessionValue") !== null){
-          throw new Error("fresh start did not clear sessionStorage");
+          throw new Error("startup reset did not clear sessionStorage");
         }
       }finally{
-        if(previousDataValue === null) localStorage.removeItem(DATA_STORAGE_KEY);
-        else localStorage.setItem(DATA_STORAGE_KEY, previousDataValue);
-        previousValues.forEach(([key, value]) => {
+        previousStartupValues.forEach(([key, value]) => {
           if(value === null) localStorage.removeItem(key);
           else localStorage.setItem(key, value);
         });
+        if(previousTsoNameValue === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+        else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoNameValue);
+        if(previousDataValue === null) localStorage.removeItem(DATA_STORAGE_KEY);
+        else localStorage.setItem(DATA_STORAGE_KEY, previousDataValue);
         if(previousSessionValue === null) sessionStorage.removeItem("newSelfTestSessionValue");
         else sessionStorage.setItem("newSelfTestSessionValue", previousSessionValue);
       }
@@ -2511,7 +2489,7 @@ function runSelfTests(){
   });
 
   tests.push({
-    name: "WELCOME TIP ENTERS ADMIN WITH GUIDE ON",
+    name: "ADMIN GUIDE STARTS BY CHOICE",
     fn: () => {
       const previousData = data;
       const previousView = view;
@@ -2527,27 +2505,40 @@ function runSelfTests(){
         data = { categories:[{ id:"food", label:"Food" }], resources:[], changes:[] };
         view = "categories";
         isAdminVisible = false;
-        adminGuideMode = true;
+        adminGuideMode = false;
         setAdminGuidePhase("setupName");
         adminGuideStep = "setupName";
         adminGuideDismissed = false;
         localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
         localStorage.removeItem(TSO_NAME_STORAGE_KEY);
         render();
-        const welcomeTip = appView.querySelector(".red-tip");
-        if(!welcomeTip || welcomeTip.textContent !== TIP_TEXT.newAdminWelcome){
-          throw new Error("welcome tip should be visible before entering admin");
-        }
         setAdminVisibility(true);
         setView("admin");
         let toolbarButtons = Array.from(document.querySelectorAll("#adminView .admin-toolbar-reference-actions button"));
         const guideButton = toolbarButtons.find(button => button.textContent === "Guide");
         const setupButton = toolbarButtons.find(button => button.textContent === "Change TSO Name");
-        if(!adminGuideMode) throw new Error("entering admin from welcome tip should keep guide mode on");
-        if(adminGuideStep !== "setupName") throw new Error("admin guide should start with TSO name setup");
-        if(!setupButton) throw new Error("Change TSO Name should be visible when guide mode is on");
-        if(!guideButton || !guideButton.classList.contains("primary")){
+        const choiceTip = document.querySelector("#adminView .admin-guide-tip-message");
+        if(adminGuideMode) throw new Error("first Admin entry should leave guide mode off");
+        if(setupButton) throw new Error("Change TSO Name should be hidden before Guide is clicked");
+        if(!guideButton || guideButton.classList.contains("primary")){
+          throw new Error("toolbar Guide button should be available but not active");
+        }
+        if(!choiceTip || choiceTip.textContent !== TIP_TEXT.adminGuideChoice){
+          throw new Error("Admin should invite the user to choose Guide");
+        }
+        guideButton.click();
+        toolbarButtons = Array.from(document.querySelectorAll("#adminView .admin-toolbar-reference-actions button"));
+        const activeGuideButton = toolbarButtons.find(button => button.textContent === "Guide");
+        const activeSetupButton = toolbarButtons.find(button => button.textContent === "Change TSO Name");
+        const setupTip = document.querySelector("#adminView .admin-guide-tip-message");
+        if(!adminGuideMode) throw new Error("clicking Guide should turn guide mode on");
+        if(adminGuideStep !== "setupName") throw new Error("Guide should start with TSO name setup");
+        if(!activeSetupButton) throw new Error("Change TSO Name should be visible after Guide is clicked");
+        if(!activeGuideButton || !activeGuideButton.classList.contains("primary")){
           throw new Error("toolbar Guide button should be blue when guide mode is on");
+        }
+        if(!setupTip || setupTip.textContent !== TIP_TEXT.adminGuideSetupName){
+          throw new Error("Guide should display the first TSO name setup step");
         }
         flashAdminButton();
         if(!tabAdmin.classList.contains("admin-flash")){
@@ -4341,37 +4332,6 @@ if(tabPrintSelection) tabPrintSelection.onclick = ()=>{ startPrintSelectionPrevi
 if(helpButton) helpButton.onclick = ()=>{ showUserHelp(); };
 tabAdmin.onclick = ()=>{ setView("admin"); };
 
-function requestFreshStart(){
-  showFreshStartPrompt();
-}
-
-function reloadFromFreshStart(){
-  const nextParams = new URLSearchParams(location.search);
-  nextParams.set("fresh", Date.now().toString());
-  location.replace(buildUrlWithParams(nextParams));
-}
-
-function showFreshStartPrompt(){
-  const modal = getReferenceModal();
-  modal.innerHTML = `
-    <div class="reference-modal-panel" role="dialog" aria-modal="true" aria-labelledby="freshStartTitle">
-      <div class="reference-modal-header">
-        <div id="freshStartTitle" class="reference-modal-title">Reset app state and keep resources?</div>
-        <div class="reference-modal-actions">
-          <button class="button danger" type="button" id="freshStartYesButton">Yes</button>
-          <button class="button" type="button" id="freshStartNoButton">No</button>
-        </div>
-      </div>
-    </div>
-  `;
-  const yesBtn = document.getElementById("freshStartYesButton");
-  const noBtn = document.getElementById("freshStartNoButton");
-  if(yesBtn) yesBtn.addEventListener("click", reloadFromFreshStart);
-  if(noBtn) noBtn.addEventListener("click", closeReferenceModal);
-  modal.classList.remove("hidden");
-  if(noBtn) noBtn.focus();
-}
-
 function syncSearchPanel(){
   const panel = document.getElementById("searchPanel");
   const input = document.getElementById("searchInput");
@@ -4663,7 +4623,7 @@ function quitForRename(){
 }
 
 function getAdminGuideTipText(){
-  if(!adminGuideMode) return "";
+  if(!adminGuideMode) return TIP_TEXT.adminGuideChoice;
   if(adminGuideStep === "setupName") return TIP_TEXT.adminGuideSetupName;
   if(adminGuideStep === "verifyName") return TIP_TEXT.adminGuideVerifyName;
   if(adminGuideStep === "renameFile") return TIP_TEXT.adminGuideRenameFile;
@@ -8886,17 +8846,6 @@ window.addEventListener("keydown", (e) => {
   setAdminVisibility(shouldShowAdmin);
   safeRender();
   if(shouldShowAdmin) flashAdminButton();
-}, true);
-
-window.addEventListener("keydown", (e) => {
-  const isFreshStartShortcut =
-    e.ctrlKey && e.altKey && !e.shiftKey &&
-    (e.code === "KeyF" || e.key === "F" || e.key === "f");
-  if(!isFreshStartShortcut) return;
-
-  e.preventDefault();
-  e.stopPropagation();
-  requestFreshStart();
 }, true);
 
 /* ---------- Start ---------- */
