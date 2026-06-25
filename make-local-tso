@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+"""Generate a local TSO HTML file from new.html.
+
+Usage:
+  python3 make-local-tso albuquerque
+  python3 make-local-tso salt-lake
+  python3 make-local-tso utah_valley --output albq.html
+
+The script copies new.html, sets the tso-storage-id meta tag, updates the page
+title, and overwrites the destination HTML file if it already exists.
+"""
+from __future__ import annotations
+
+import argparse
+import re
+import sys
+from pathlib import Path
+
+
+def slugify(value: str) -> str:
+    parts = re.findall(r"[A-Za-z0-9]+", value.strip())
+    if not parts:
+        raise SystemExit("TSO name must contain at least one letter or number.")
+    return "-".join(part.lower() for part in parts)
+
+
+def display_name(value: str) -> str:
+    parts = re.findall(r"[A-Za-z0-9]+", value.strip())
+    if not parts:
+        raise SystemExit("TSO name must contain at least one letter or number.")
+    return " ".join(part[:1].upper() + part[1:].lower() for part in parts)
+
+
+def replace_once(pattern: str, replacement: str, text: str, description: str) -> str:
+    updated, count = re.subn(pattern, replacement, text, count=1, flags=re.IGNORECASE)
+    if count != 1:
+        raise SystemExit(f"Could not update {description}; expected exactly one match.")
+    return updated
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Create a local TSO HTML file from new.html.")
+    parser.add_argument("name", help="Local TSO name, such as albuquerque or salt-lake")
+    parser.add_argument("--output", "-o", help="Destination HTML file. Defaults to <name>.html")
+    parser.add_argument("--source", "-s", default="new.html", help="Template HTML file. Defaults to new.html")
+    args = parser.parse_args()
+
+    storage_id = slugify(args.name)
+    title_name = display_name(args.name)
+    source_path = Path(args.source)
+    destination_path = Path(args.output or f"{storage_id}.html")
+
+    if not source_path.exists():
+        raise SystemExit(f"Template not found: {source_path}")
+
+    html = source_path.read_text(encoding="utf-8")
+    html = replace_once(
+        r'<meta\s+name=["\']tso-storage-id["\']\s+content=["\'][^"\']*["\']\s*>',
+        f'<meta name="tso-storage-id" content="{storage_id}">',
+        html,
+        "tso-storage-id meta tag",
+    )
+    html = replace_once(
+        r"<title>.*?</title>",
+        f"<title>{title_name} TSO Resources</title>",
+        html,
+        "page title",
+    )
+
+    destination_path.write_text(html, encoding="utf-8")
+    print(f"Wrote {destination_path} with storage id {storage_id!r} and title {title_name!r}.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
