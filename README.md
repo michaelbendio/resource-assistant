@@ -1,4 +1,4 @@
-# TSO resources
+# Resource Assistant
 
 Single-file HTML resource assistant for Transitional Services offices.
 
