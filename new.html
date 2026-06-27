@@ -1158,8 +1158,16 @@ const STARTUP_STATE_STORAGE_KEYS = [
   UNDO_STORAGE_KEY
 ];
 
-function runStartupStateReset(){
+function shouldResetTemplateStorageOnStartup(fileName = getCurrentHtmlFileName()){
+  return String(fileName || "").toLowerCase() === "new.html";
+}
+
+function runStartupStateReset(fileName = getCurrentHtmlFileName()){
   STARTUP_STATE_STORAGE_KEYS.forEach(key => localStorage.removeItem(key));
+  if(shouldResetTemplateStorageOnStartup(fileName)){
+    localStorage.removeItem(DATA_STORAGE_KEY);
+    localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+  }
   sessionStorage.clear();
 }
 runStartupStateReset();
@@ -1474,7 +1482,7 @@ function runSelfTests(){
         localStorage.setItem(TSO_NAME_STORAGE_KEY, "Keep Name");
         localStorage.setItem(DATA_STORAGE_KEY, JSON.stringify({ resources:[{ id:"keep-resource" }] }));
         sessionStorage.setItem("newSelfTestSessionValue", "stale");
-        runStartupStateReset();
+        runStartupStateReset("provo.html");
         const unclearedKey = STARTUP_STATE_STORAGE_KEYS.find(key => localStorage.getItem(key) !== null);
         if(unclearedKey) throw new Error(`startup reset did not clear ${unclearedKey}`);
         if(localStorage.getItem(TSO_NAME_STORAGE_KEY) !== "Keep Name"){
@@ -1497,6 +1505,30 @@ function runSelfTests(){
         else localStorage.setItem(DATA_STORAGE_KEY, previousDataValue);
         if(previousSessionValue === null) sessionStorage.removeItem("newSelfTestSessionValue");
         else sessionStorage.setItem("newSelfTestSessionValue", previousSessionValue);
+      }
+    }
+  });
+
+  tests.push({
+    name: "NEW TEMPLATE STARTUP CLEARS STALE DATA AND NAME",
+    fn: () => {
+      const previousDataValue = localStorage.getItem(DATA_STORAGE_KEY);
+      const previousTsoNameValue = localStorage.getItem(TSO_NAME_STORAGE_KEY);
+      try{
+        localStorage.setItem(DATA_STORAGE_KEY, JSON.stringify({ resources:[{ id:"stale-resource" }] }));
+        localStorage.setItem(TSO_NAME_STORAGE_KEY, "Stale TSO");
+        runStartupStateReset("new.html");
+        if(localStorage.getItem(DATA_STORAGE_KEY) !== null){
+          throw new Error("new.html startup should clear stale saved resources");
+        }
+        if(localStorage.getItem(TSO_NAME_STORAGE_KEY) !== null){
+          throw new Error("new.html startup should clear stale TSO name");
+        }
+      }finally{
+        if(previousDataValue === null) localStorage.removeItem(DATA_STORAGE_KEY);
+        else localStorage.setItem(DATA_STORAGE_KEY, previousDataValue);
+        if(previousTsoNameValue === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+        else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoNameValue);
       }
     }
   });
