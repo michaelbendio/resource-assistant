@@ -7,7 +7,10 @@
 
 <!-- ===== APP CSS START ===== -->
 <style>
-:root { --page-gutter: clamp(28px, 4vw, 44px); }
+:root {
+  --page-gutter: clamp(28px, 4vw, 44px);
+  --topbar-sticky-offset: 0px;
+}
 body { font-family: -apple-system, sans-serif; margin:0; padding:0; font-size:18px; line-height:1.45; }
 .topbar {
   display:flex;
@@ -100,6 +103,7 @@ textarea {
   opacity:1;
 }
 .red-tip { margin:0 0 12px; padding:10px 12px; border:2px solid #aa0000; border-radius:6px; background:#fff5f5; color:#aa0000; font-size:11px; font-weight:bold; }
+.red-tip.new-admin-tip { font-size:20px; line-height:1.35; }
 .category-print-banner { margin:0 0 12px; padding:9px 12px; border:1px solid #c8d6e6; border-left:4px solid #003366; border-radius:6px; background:#f7fbff; color:#1f2d3d; font-size:16px; line-height:1.35; }
 .print-empty-instruction { color:#aa0000; }
 textarea.big { width:100%; min-height:80px; }
@@ -206,7 +210,7 @@ textarea.information-editor { min-height:320px; resize:vertical; }
 }
 .admin-mode-bar {
   position:sticky;
-  top:49px;
+  top:var(--topbar-sticky-offset);
   z-index:19;
   background:#fff;
   border-bottom:1px solid #ddd;
@@ -274,10 +278,6 @@ textarea.information-editor { min-height:320px; resize:vertical; }
 .resource-info-rendered .resource-info-section + .resource-info-section,
 .resource-info-rendered .resource-info-additional-rendered { margin-top:6px; }
 #res_name { text-align:left; width:100%; box-sizing:border-box; }
-.admin-guide-active .resource-editor-guide-section { display:none; }
-.admin-guide-active .resource-editor-guide-section.admin-guide-current-section { display:block; }
-.admin-guide-active .admin-guide-defer-verified { display:none; }
-.admin-guide-tip-actions { margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
 .verified-warning { color:#aa0000; font-size:13px; margin-top:4px; min-height:1.1em; }
 .reload-resources-wrap { margin-top:16px; text-align:right; }
 .reload-resources-wrap .button { font-size:14px; padding:7px 10px; }
@@ -394,6 +394,16 @@ textarea.information-editor { min-height:320px; resize:vertical; }
 .admin-help-content ol,
 .admin-help-content ul { margin:8px 0 0 22px; padding:0; }
 .admin-help-content li { margin:4px 0; }
+.admin-training-actions { margin:10px 0 12px; }
+.admin-training-sample {
+  white-space:pre-wrap;
+  border:1px solid #dde6ef;
+  border-radius:6px;
+  padding:10px 12px;
+  background:#f7fbff;
+  font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size:15px;
+}
 .admin-setup-panel label { display:block; font-weight:bold; margin-bottom:10px; }
 .admin-setup-panel input { width:100%; box-sizing:border-box; margin-top:4px; }
 .admin-setup-note { color:#555; font-size:16px; margin:6px 0 12px; }
@@ -524,6 +534,18 @@ textarea.information-editor { min-height:320px; resize:vertical; }
   }
 
   .admin-help-setup {
+    display: none !important;
+  }
+
+  .admin-training-actions {
+    display: none !important;
+  }
+
+  body.admin-help-printing .admin-training-section {
+    display: none !important;
+  }
+
+  body.admin-training-printing .admin-help-content > :not(.admin-training-section) {
     display: none !important;
   }
 
@@ -689,7 +711,7 @@ ADMIN EDITORS
 SUBSYSTEMS
 
 PrintWorkflow
-  Guided printing system.
+  Step-by-step printing system.
   Responsible for building the print queue, rendering steps,
   and handling Print / Next / Close actions.
 
@@ -1127,19 +1149,12 @@ const UPDATE_SEEN_STORAGE_KEY = getStorageKey("RecentUpdatesSeen");
 const PRINT_SELECTION_STORAGE_KEY = getStorageKey("PrintSelection");
 const LEGACY_FAVORITES_STORAGE_KEY = getStorageKey("Favorites");
 const TSO_NAME_STORAGE_KEY = getStorageKey("TsoName");
-const ADMIN_GUIDE_DISABLED_STORAGE_KEY = getStorageKey("AdminGuideDisabled");
-const ADMIN_GUIDE_PHASE_STORAGE_KEY = getStorageKey("AdminGuidePhase");
-const ADMIN_GUIDE_COMPLETED_STORAGE_KEY = getStorageKey("AdminGuideCompleted");
-const ADMIN_GUIDE_PRACTICE_RESOURCE_STORAGE_KEY = getStorageKey("AdminGuidePracticeResourceId");
 const UNDO_STORAGE_KEY = getStorageKey("Undo");
+const NEW_ADMIN_TRAINING_PENDING_KEY = "tsoResourcesNewAdminTrainingPending";
 const STARTUP_STATE_STORAGE_KEYS = [
   UPDATE_SEEN_STORAGE_KEY,
   PRINT_SELECTION_STORAGE_KEY,
   LEGACY_FAVORITES_STORAGE_KEY,
-  ADMIN_GUIDE_DISABLED_STORAGE_KEY,
-  ADMIN_GUIDE_PHASE_STORAGE_KEY,
-  ADMIN_GUIDE_COMPLETED_STORAGE_KEY,
-  ADMIN_GUIDE_PRACTICE_RESOURCE_STORAGE_KEY,
   UNDO_STORAGE_KEY
 ];
 
@@ -1150,30 +1165,13 @@ function runStartupStateReset(){
 runStartupStateReset();
 
 // Main persisted app data snapshot (categories/resources + metadata).
-const OPENED_AS_NEW_TEMPLATE = isNewTemplateFile();
 let data = JSON.parse(localStorage.getItem(DATA_STORAGE_KEY) || "null");
 const APP_VERSION = "2.0.0";
 const RESOURCE_PACKAGE_SCHEMA_VERSION = 2;
 const TIP_TEXT = {
   user: "Click on a category to see its resources. Click a resource to see details. Click ⬜ to include it in the printed handout.",
-  newAdminWelcome: "Welcome to your new TSO Resources app. Press Ctrl+Alt+A to add an Admin button to the top blue bar. Then click it.",
-  newAdminMode: "Click Ctrl+Alt+A to hide the Admin button when you're done. Now click Help.",
-  adminGuideChoice: "Click Guide for a guided quick start.",
-  adminGuideCategoryFilters: "Filters are category-specific choices that appear as Specifically buttons for users and as checkboxes under that category in the Resource editor. Select Transportation, click New under Filters, add Bus passes if it is not already listed, then click Done.",
-  adminGuideResources: "Click Resources to enter the Resource editor.",
-  adminGuideNewResource: "Click New to create a practice resource.",
-  adminGuideResourceFields: "Create a dummy temp agency resource. Enter Name: Quick Start Temp Agency. Enter Description: Practice temporary employment agency. Click Next.",
-  adminGuideForGroups: "Check Exiting corrections. \"For\" groups describe who the resource is for across categories. Click Next.",
-  adminGuideCategories: "Check Employment, then check Temp Agencies under Employment. Category filters describe the specific help offered inside that category. Click Next.",
-  adminGuideInformation: "Practice formatting Information. Click Edit and enter: Quick start practice information. * Bring a photo ID * Ask about daily work **This is only a practice resource.** --- Delete this resource when the guide tells you to. Use *[space] for each bullet, then click Preview and Next.",
-  adminGuideUpdate: "Describe this update as Added quick start practice resource, then click Done.",
-  adminGuideSaveResource: "Click Done again to save the practice resource.",
-  adminGuideDeleteResource: "Now delete the practice resource. Select Quick Start Temp Agency if needed, click Delete, confirm, and describe the update as Deleted quick start practice resource.",
-  adminGuideForAdmin: "Use For to manage the governed list of people served across categories. These choices appear in the Resource editor and as For buttons for users.",
-  adminGuideSetupName: "Click Change TSO Name.",
-  adminGuideVerifyName: "Check the blue title bar. It should say your TSO name followed by TSO Resources. If it looks right, click Next.",
-  adminGuideRenameFile: "Click Quit and rename new.html to [new TSO name].html. Then open [new TSO name].html.",
-  renamedFileWelcome: "Press Ctrl+Alt+A, click Admin and follow the red tips to continue guided quick start"
+  newAdminWelcome: "Welcome to you, new admin. Press Ctrl+Alt+A to enter admin mode",
+  newAdminMode: "Click \"Change TSO Name\" to name this TSO Resources. Then close this tab or window and rename new.html to the changed name, keeping the .html extension. Open it and enter admin mode again."
 };
 const DEFAULT_RESOURCE_PACKAGE_FILENAME = "tso-resources.json";
 const CATEGORY_REMINDER_TEXT = "Report bugs or request enhancments to Elder Bendio (michaelbendio@gmail.com)"
@@ -1246,24 +1244,24 @@ function isNewTemplateFile(){
   return getCurrentHtmlFileName().toLowerCase() === "new.html";
 }
 
-function normalizeAdminGuidePhase(phase){
-  // The guide has two startup phases: while still named new.html it teaches setup
-  // and renaming; after rename it resumes with category filters and resources.
-  if(isNewTemplateFile() && phase !== "renameFile") return "setupName";
-  if(phase === "renameFile" && !isNewTemplateFile()) return "createResource";
-  if(phase === "createResource") return "createResource";
-  if(phase === "renameFile") return "renameFile";
-  return isNewTemplateFile() ? "setupName" : "createResource";
+function getTrainingStorageIdFromName(value){
+  return normalizeStorageId(value);
 }
 
-let adminGuidePhase = normalizeAdminGuidePhase(localStorage.getItem(ADMIN_GUIDE_PHASE_STORAGE_KEY));
-localStorage.setItem(ADMIN_GUIDE_PHASE_STORAGE_KEY, adminGuidePhase);
-let adminGuideCompleted = localStorage.getItem(ADMIN_GUIDE_COMPLETED_STORAGE_KEY) === "1";
-let adminGuideDismissed = OPENED_AS_NEW_TEMPLATE ? false : localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY) === "1";
-let adminGuideMode = false;
-let adminGuideStep = adminGuidePhase === "createResource" ? "categoryFilters" : "setupName";
-let adminGuideResourceSection = "basics";
-let adminGuidePracticeResourceId = localStorage.getItem(ADMIN_GUIDE_PRACTICE_RESOURCE_STORAGE_KEY) || "";
+function markRenamedAdminTrainingPending(tsoName){
+  const storageId = getTrainingStorageIdFromName(tsoName);
+  if(storageId) localStorage.setItem(NEW_ADMIN_TRAINING_PENDING_KEY, storageId);
+}
+
+function consumeRenamedAdminTrainingPending(fileName = getCurrentHtmlFileName()){
+  if(String(fileName || "").toLowerCase() === "new.html") return false;
+  const pendingStorageId = localStorage.getItem(NEW_ADMIN_TRAINING_PENDING_KEY);
+  if(!pendingStorageId) return false;
+  if(pendingStorageId !== getStorageKeyPrefix(fileName)) return false;
+  localStorage.removeItem(NEW_ADMIN_TRAINING_PENDING_KEY);
+  return true;
+}
+
 let adminHelpPrintRestoreState = null;
 
 // A new category/resource is inserted immediately so the normal editor can own
@@ -1586,12 +1584,10 @@ function runSelfTests(){
       const previousData = data;
       const previousView = view;
       const previousAdminTab = adminTab;
-      const previousAdminGuideMode = adminGuideMode;
       try{
         data = { categories:[], resources:[], changes:[] };
         view = "admin";
         adminTab = "categories";
-        adminGuideMode = true;
         renderAdmin();
         const packageBar = document.querySelector("#adminView .admin-sticky-bar");
         const modeBar = document.querySelector("#adminView .admin-mode-bar");
@@ -1599,7 +1595,7 @@ function runSelfTests(){
         if(getComputedStyle(packageBar).position !== "sticky") throw new Error("package bar should be sticky");
         if(getComputedStyle(modeBar).position !== "sticky") throw new Error("mode bar should be sticky");
         const packageLabels = Array.from(packageBar.querySelectorAll("button")).map(button => button.textContent.trim());
-        ["Save Resource Package", "Change TSO Name", "Guide", "Help"].forEach(label => {
+        ["Save Resource Package", "Change TSO Name", "Help"].forEach(label => {
           if(!packageLabels.includes(label)) throw new Error(`${label} was not in the package bar`);
         });
         const modeLabels = Array.from(modeBar.querySelectorAll("button")).map(button => button.textContent.trim());
@@ -1610,7 +1606,6 @@ function runSelfTests(){
         data = previousData;
         view = previousView;
         adminTab = previousAdminTab;
-        adminGuideMode = previousAdminGuideMode;
         renderAdmin();
       }
     }
@@ -1732,17 +1727,11 @@ function runSelfTests(){
   tests.push({
     name: "CHANGE TSO NAME BUTTON IS TEMPLATE ONLY",
     fn: () => {
-      const previousAdminGuideMode = adminGuideMode;
-      try{
-        adminGuideMode = true;
-        if(!shouldShowChangeTsoNameButton(true)){
-          throw new Error("new template should show Change TSO Name during guide mode");
-        }
-        if(shouldShowChangeTsoNameButton(false)){
-          throw new Error("renamed file should hide Change TSO Name");
-        }
-      }finally{
-        adminGuideMode = previousAdminGuideMode;
+      if(!shouldShowChangeTsoNameButton(true)){
+        throw new Error("new template should show Change TSO Name");
+      }
+      if(shouldShowChangeTsoNameButton(false)){
+        throw new Error("renamed file should hide Change TSO Name");
       }
     }
   });
@@ -2333,15 +2322,10 @@ function runSelfTests(){
   });
 
   tests.push({
-    name: "USER TIP IS PROMINENT",
+    name: "NEW ADMIN TIP IS PROMINENT",
     fn: () => {
       const previousData = data;
       const previousView = view;
-      const previousAdminGuideMode = adminGuideMode;
-      const previousAdminGuideDismissed = adminGuideDismissed;
-      const previousAdminGuidePhase = adminGuidePhase;
-      const previousAdminGuideStep = adminGuideStep;
-      const previousGuidePhase = localStorage.getItem(ADMIN_GUIDE_PHASE_STORAGE_KEY);
       const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
       try{
         data = {
@@ -2350,33 +2334,23 @@ function runSelfTests(){
           changes:[]
         };
         view = "categories";
-        adminGuideMode = false;
-        adminGuideDismissed = true;
-        setAdminGuidePhase("setupName");
-        adminGuideStep = "setupName";
         localStorage.setItem(TSO_NAME_STORAGE_KEY, "Test");
         render();
         const tip = appView.querySelector(".red-tip");
-        if(!tip) throw new Error("user tip was not rendered");
-        if(tip.textContent !== TIP_TEXT.user){
-          throw new Error("user tip wording changed");
+        if(!tip) throw new Error("new admin tip was not rendered");
+        if(tip.textContent !== TIP_TEXT.newAdminWelcome){
+          throw new Error("new admin tip wording changed");
         }
         const style = getComputedStyle(tip);
         if(style.color !== "rgb(170, 0, 0)"){
-          throw new Error(`user tip should be red, got ${style.color}`);
+          throw new Error(`new admin tip should be red, got ${style.color}`);
         }
         if(Number(style.fontWeight) < 700){
-          throw new Error(`user tip should be bold, got ${style.fontWeight}`);
+          throw new Error(`new admin tip should be bold, got ${style.fontWeight}`);
         }
       }finally{
         data = previousData;
         view = previousView;
-        adminGuideMode = previousAdminGuideMode;
-        adminGuideDismissed = previousAdminGuideDismissed;
-        adminGuidePhase = previousAdminGuidePhase;
-        adminGuideStep = previousAdminGuideStep;
-        if(previousGuidePhase === null) localStorage.removeItem(ADMIN_GUIDE_PHASE_STORAGE_KEY);
-        else localStorage.setItem(ADMIN_GUIDE_PHASE_STORAGE_KEY, previousGuidePhase);
         if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
         else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoName);
       }
@@ -2399,25 +2373,14 @@ function runSelfTests(){
   });
 
   tests.push({
-    name: "NEW ADMIN WELCOME TIP USES ADMIN ONBOARDING TEXT",
+    name: "NEW TEMPLATE SHOWS NEW ADMIN WELCOME TIP",
     fn: () => {
       const previousData = data;
       const previousView = view;
-      const previousAdminGuideMode = adminGuideMode;
-      const previousAdminGuidePhase = adminGuidePhase;
-      const previousAdminGuideStep = adminGuideStep;
-      const previousAdminGuideDismissed = adminGuideDismissed;
-      const previousGuideDisabled = localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
-      const previousGuidePhase = localStorage.getItem(ADMIN_GUIDE_PHASE_STORAGE_KEY);
       const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
       try{
         data = { categories:[{ id:"food", label:"Food" }], resources:[], changes:[] };
         view = "categories";
-        adminGuideMode = true;
-        setAdminGuidePhase("setupName");
-        adminGuideStep = "setupName";
-        adminGuideDismissed = false;
-        localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
         localStorage.removeItem(TSO_NAME_STORAGE_KEY);
         render();
         const tip = appView.querySelector(".red-tip");
@@ -2425,17 +2388,16 @@ function runSelfTests(){
         if(tip.textContent !== TIP_TEXT.newAdminWelcome){
           throw new Error("new admin welcome tip wording changed");
         }
+        if(!tip.classList.contains("new-admin-tip")){
+          throw new Error("new admin welcome tip should use larger styling");
+        }
+        const fontSize = parseFloat(getComputedStyle(tip).fontSize);
+        if(!(fontSize > 11)){
+          throw new Error(`new admin welcome tip should be larger than user tip, got ${fontSize}`);
+        }
       }finally{
         data = previousData;
         view = previousView;
-        adminGuideMode = previousAdminGuideMode;
-        adminGuidePhase = previousAdminGuidePhase;
-        adminGuideStep = previousAdminGuideStep;
-        adminGuideDismissed = previousAdminGuideDismissed;
-        if(previousGuideDisabled === null) localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
-        else localStorage.setItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY, previousGuideDisabled);
-        if(previousGuidePhase === null) localStorage.removeItem(ADMIN_GUIDE_PHASE_STORAGE_KEY);
-        else localStorage.setItem(ADMIN_GUIDE_PHASE_STORAGE_KEY, previousGuidePhase);
         if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
         else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoName);
       }
@@ -2443,244 +2405,103 @@ function runSelfTests(){
   });
 
   tests.push({
-    name: "DISABLED GUIDE SUPPRESSES NEW ADMIN WELCOME TIP",
-    fn: () => {
-      const previousData = data;
-      const previousView = view;
-      const previousAdminGuideMode = adminGuideMode;
-      const previousAdminGuideDismissed = adminGuideDismissed;
-      const previousGuideDisabled = localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
-      const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
-      try{
-        data = { categories:[{ id:"food", label:"Food" }], resources:[], changes:[] };
-        view = "categories";
-        adminGuideMode = false;
-        adminGuideDismissed = true;
-        localStorage.setItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY, "1");
-        localStorage.removeItem(TSO_NAME_STORAGE_KEY);
-        render();
-        const tip = appView.querySelector(".red-tip");
-        if(!tip) throw new Error("fallback user tip was not rendered");
-        if(tip.textContent === TIP_TEXT.newAdminWelcome){
-          throw new Error("disabled guide should not show the new admin welcome tip");
-        }
-        if(tip.textContent !== TIP_TEXT.user){
-          throw new Error("disabled guide should fall back to the user tip");
-        }
-      }finally{
-        data = previousData;
-        view = previousView;
-        adminGuideMode = previousAdminGuideMode;
-        adminGuideDismissed = previousAdminGuideDismissed;
-        if(previousGuideDisabled === null) localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
-        else localStorage.setItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY, previousGuideDisabled);
-        if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
-        else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoName);
-      }
-    }
-  });
-
-  tests.push({
-    name: "NEW ADMIN SETUP TIP POINTS TO TSO NAME",
+    name: "NEW ADMIN SETUP BUTTON POINTS TO TSO NAME",
     fn: () => {
       const previousData = data;
       const previousView = view;
       const previousAdminVisible = isAdminVisible;
-      const previousAdminGuideMode = adminGuideMode;
-      const previousAdminGuideStep = adminGuideStep;
-      const previousAdminGuidePhase = adminGuidePhase;
-      const previousAdminGuideDismissed = adminGuideDismissed;
       const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
+      const previousPendingTraining = localStorage.getItem(NEW_ADMIN_TRAINING_PENDING_KEY);
       try{
         data = { categories:[{ id:"food", label:"Food" }], resources:[], changes:[] };
         view = "admin";
         isAdminVisible = true;
-        adminGuideMode = true;
-        adminGuideStep = "setupName";
-        adminGuideDismissed = false;
         localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+        localStorage.removeItem(NEW_ADMIN_TRAINING_PENDING_KEY);
+        closeReferenceModal();
         render();
+        const toolbarButtons = Array.from(document.querySelectorAll("#adminView .admin-toolbar-reference-actions button"));
+        const setupButton = toolbarButtons.find(button => button.textContent.trim() === "Change TSO Name");
+        if(!setupButton){
+          throw new Error("new template should show Change TSO Name");
+        }
         const tip = document.querySelector("#adminView .red-tip");
         if(!tip) throw new Error("new admin setup tip was not rendered");
-        if(tip.textContent !== TIP_TEXT.adminGuideSetupName){
+        if(tip.textContent !== TIP_TEXT.newAdminMode){
           throw new Error("new admin setup tip wording changed");
         }
-      }finally{
-        data = previousData;
-        view = previousView;
-        isAdminVisible = previousAdminVisible;
-        adminGuideMode = previousAdminGuideMode;
-        adminGuideStep = previousAdminGuideStep;
-        adminGuideDismissed = previousAdminGuideDismissed;
-        if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
-        else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoName);
-      }
-    }
-  });
-
-  tests.push({
-    name: "GUIDE OFF CATEGORIES SHOWS USER TIP",
-    fn: () => {
-      const previousData = data;
-      const previousView = view;
-      const previousAdminGuideMode = adminGuideMode;
-      const previousAdminGuideDismissed = adminGuideDismissed;
-      const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
-      try{
-        data = { categories:[{ id:"food", label:"Food" }], resources:[{ id:"r", name:"Resource", categories:["food"] }], changes:[] };
-        view = "categories";
-        adminGuideMode = false;
-        adminGuideDismissed = true;
-        localStorage.setItem(TSO_NAME_STORAGE_KEY, "Test");
-        render();
-        const tip = appView.querySelector(".red-tip");
-        if(!tip) throw new Error("user tip should show on Categories when guide mode is off");
-        if(tip.textContent !== TIP_TEXT.user){
-          throw new Error("guide-off Categories view should show the user tip");
-        }
-      }finally{
-        data = previousData;
-        view = previousView;
-        adminGuideMode = previousAdminGuideMode;
-        adminGuideDismissed = previousAdminGuideDismissed;
-        if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
-        else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoName);
-      }
-    }
-  });
-
-  tests.push({
-    name: "ADMIN GUIDE STARTS BY CHOICE",
-    fn: () => {
-      const previousData = data;
-      const previousView = view;
-      const previousAdminVisible = isAdminVisible;
-      const previousAdminGuideMode = adminGuideMode;
-      const previousAdminGuideStep = adminGuideStep;
-      const previousAdminGuidePhase = adminGuidePhase;
-      const previousAdminGuideDismissed = adminGuideDismissed;
-      const previousGuideDisabled = localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
-      const previousGuidePhase = localStorage.getItem(ADMIN_GUIDE_PHASE_STORAGE_KEY);
-      const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
-      try{
-        data = { categories:[{ id:"food", label:"Food" }], resources:[], changes:[] };
-        view = "categories";
-        isAdminVisible = false;
-        adminGuideMode = false;
-        setAdminGuidePhase("setupName");
-        adminGuideStep = "setupName";
-        adminGuideDismissed = false;
-        localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
-        localStorage.removeItem(TSO_NAME_STORAGE_KEY);
-        render();
-        setAdminVisibility(true);
-        setView("admin");
-        let toolbarButtons = Array.from(document.querySelectorAll("#adminView .admin-toolbar-reference-actions button"));
-        const guideButton = toolbarButtons.find(button => button.textContent === "Guide");
-        const setupButton = toolbarButtons.find(button => button.textContent === "Change TSO Name");
-        const choiceTip = document.querySelector("#adminView .admin-guide-tip-message");
-        if(adminGuideMode) throw new Error("first Admin entry should leave guide mode off");
-        if(setupButton) throw new Error("Change TSO Name should be hidden before Guide is clicked");
-        if(!guideButton || guideButton.classList.contains("primary")){
-          throw new Error("toolbar Guide button should be available but not active");
-        }
-        if(!choiceTip || choiceTip.textContent !== TIP_TEXT.adminGuideChoice){
-          throw new Error("Admin should invite the user to choose Guide");
-        }
-        guideButton.click();
-        toolbarButtons = Array.from(document.querySelectorAll("#adminView .admin-toolbar-reference-actions button"));
-        const activeGuideButton = toolbarButtons.find(button => button.textContent === "Guide");
-        const activeSetupButton = toolbarButtons.find(button => button.textContent === "Change TSO Name");
-        const setupTip = document.querySelector("#adminView .admin-guide-tip-message");
-        if(!adminGuideMode) throw new Error("clicking Guide should turn guide mode on");
-        if(adminGuideStep !== "setupName") throw new Error("Guide should start with TSO name setup");
-        if(!activeSetupButton) throw new Error("Change TSO Name should be visible after Guide is clicked");
-        if(!activeGuideButton || !activeGuideButton.classList.contains("primary")){
-          throw new Error("toolbar Guide button should be blue when guide mode is on");
-        }
-        if(!setupTip || setupTip.textContent !== TIP_TEXT.adminGuideSetupName){
-          throw new Error("Guide should display the first TSO name setup step");
-        }
-        flashAdminButton();
-        if(!tabAdmin.classList.contains("admin-flash")){
-          throw new Error("Admin button should flash when it is revealed");
-        }
-        tabAdmin.classList.remove("admin-flash");
-        adminGuideMode = false;
-        safeRenderAdmin();
-        toolbarButtons = Array.from(document.querySelectorAll("#adminView .admin-toolbar-reference-actions button"));
-        if(toolbarButtons.some(button => button.textContent === "Change TSO Name")){
-          throw new Error("Change TSO Name should be hidden when guide mode is off");
+        const modal = document.getElementById("referenceModal");
+        if(modal && !modal.classList.contains("hidden")){
+          throw new Error("new.html admin entry should show the red tip without opening Help");
         }
       }finally{
         data = previousData;
         view = previousView;
         isAdminVisible = previousAdminVisible;
-        adminGuideMode = previousAdminGuideMode;
-        adminGuideStep = previousAdminGuideStep;
-        adminGuidePhase = previousAdminGuidePhase;
-        adminGuideDismissed = previousAdminGuideDismissed;
-        if(previousGuideDisabled === null) localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
-        else localStorage.setItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY, previousGuideDisabled);
-        if(previousGuidePhase === null) localStorage.removeItem(ADMIN_GUIDE_PHASE_STORAGE_KEY);
-        else localStorage.setItem(ADMIN_GUIDE_PHASE_STORAGE_KEY, previousGuidePhase);
+        closeReferenceModal();
         if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
         else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoName);
+        if(previousPendingTraining === null) localStorage.removeItem(NEW_ADMIN_TRAINING_PENDING_KEY);
+        else localStorage.setItem(NEW_ADMIN_TRAINING_PENDING_KEY, previousPendingTraining);
       }
     }
   });
 
   tests.push({
-    name: "ADMIN HELP HAS GUIDE PRINT AND QUIT CONFIRMATION",
+    name: "RENAMED ADMIN TRAINING OPENS ONCE",
+    fn: () => {
+      const previousPendingTraining = localStorage.getItem(NEW_ADMIN_TRAINING_PENDING_KEY);
+      try{
+        localStorage.removeItem(NEW_ADMIN_TRAINING_PENDING_KEY);
+        markRenamedAdminTrainingPending("Provo");
+        if(localStorage.getItem(NEW_ADMIN_TRAINING_PENDING_KEY) !== "provo"){
+          throw new Error("renamed training flag should store normalized TSO name");
+        }
+        if(consumeRenamedAdminTrainingPending("new.html")){
+          throw new Error("new.html should not consume the renamed training flag");
+        }
+        if(localStorage.getItem(NEW_ADMIN_TRAINING_PENDING_KEY) !== "provo"){
+          throw new Error("new.html should leave the renamed training flag pending");
+        }
+        if(consumeRenamedAdminTrainingPending("other.html")){
+          throw new Error("unmatched renamed file should not consume the training flag");
+        }
+        if(localStorage.getItem(NEW_ADMIN_TRAINING_PENDING_KEY) !== "provo"){
+          throw new Error("unmatched renamed file should leave the training flag pending");
+        }
+        if(!consumeRenamedAdminTrainingPending("provo.html")){
+          throw new Error("matching renamed file should consume the training flag");
+        }
+        if(localStorage.getItem(NEW_ADMIN_TRAINING_PENDING_KEY) !== null){
+          throw new Error("renamed training flag should be removed after it is consumed");
+        }
+        if(consumeRenamedAdminTrainingPending("provo.html")){
+          throw new Error("renamed training flag should only be consumed once");
+        }
+      }finally{
+        if(previousPendingTraining === null) localStorage.removeItem(NEW_ADMIN_TRAINING_PENDING_KEY);
+        else localStorage.setItem(NEW_ADMIN_TRAINING_PENDING_KEY, previousPendingTraining);
+      }
+    }
+  });
+
+  tests.push({
+    name: "ADMIN HELP HAS PRINT AND TRAINING",
     fn: () => {
       const previousData = data;
-      const previousAdminGuideMode = adminGuideMode;
-      const previousAdminGuideStep = adminGuideStep;
-      const previousAdminGuideResourceSection = adminGuideResourceSection;
-      const previousAdminGuideDismissed = adminGuideDismissed;
-      const previousGuideDisabled = localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
       const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
       try{
         data = { categories:[{ id:"food", label:"Food" }], resources:[], changes:[] };
-        adminGuideMode = true;
-        adminGuideStep = "setupName";
-        adminGuideDismissed = false;
-        localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
         localStorage.removeItem(TSO_NAME_STORAGE_KEY);
         showAdminHelp();
         const modal = document.getElementById("referenceModal");
         if(!modal || modal.classList.contains("hidden")) throw new Error("Admin Help did not open");
-        if(!document.getElementById("adminHelpGuideButton")) throw new Error("Guide button missing");
         if(!document.getElementById("adminHelpPrintButton")) throw new Error("Print button missing");
-        if(!adminGuideMode) throw new Error("new admin help should start guide mode");
-        if(/Set Up This TSO Resources App/.test(modal.textContent || "")) throw new Error("setup section should be removed from Admin Help");
-        if(!document.getElementById("adminHelpGuideButton").classList.contains("primary")){
-          throw new Error("Guide button should be blue when guide mode is on");
-        }
-        document.getElementById("adminHelpGuideButton").click();
-        const prompt = document.getElementById("referenceModal");
-        if(!prompt || !/Do you want to quit the guided quick start\?/.test(prompt.textContent || "")){
-          throw new Error("Guide button should ask before quitting guide mode");
-        }
-        document.getElementById("quitGuideNoButton").click();
-        if(!adminGuideMode) throw new Error("No should keep guide mode on");
-        document.getElementById("adminHelpGuideButton").click();
-        document.getElementById("quitGuideYesButton").click();
-        if(adminGuideMode) throw new Error("Guide button should turn guide mode off");
-        if(localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY) !== "1"){
-          throw new Error("turning guide mode off should be persisted");
-        }
-        showAdminHelp();
-        if(adminGuideMode) throw new Error("dismissed guide should stay off when Admin Help is reopened");
+        if(!document.getElementById("adminTrainingPrintButton")) throw new Error("Training print button missing");
+        if(!/First-Time Admin Training/.test(modal.textContent || "")) throw new Error("training section missing");
       }finally{
         data = previousData;
-        adminGuideMode = previousAdminGuideMode;
-        adminGuideStep = previousAdminGuideStep;
-        adminGuideResourceSection = previousAdminGuideResourceSection;
-        adminGuideDismissed = previousAdminGuideDismissed;
         closeReferenceModal();
-        if(previousGuideDisabled === null) localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
-        else localStorage.setItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY, previousGuideDisabled);
         if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
         else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoName);
       }
@@ -2688,523 +2509,52 @@ function runSelfTests(){
   });
 
   tests.push({
-    name: "SETUP GUIDE SAVES NAME THEN PROMPTS RENAME QUIT",
+    name: "ADMIN SETUP SAVES TSO NAME",
     fn: () => {
       const previousData = data;
       const previousView = view;
       const previousAdminTab = adminTab;
       const previousAdminVisible = isAdminVisible;
-      const previousAdminGuideMode = adminGuideMode;
-      const previousAdminGuideStep = adminGuideStep;
-      const previousAdminGuidePhase = adminGuidePhase;
-      const previousAdminGuideDismissed = adminGuideDismissed;
-      const previousGuideDisabled = localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
-      const previousGuidePhase = localStorage.getItem(ADMIN_GUIDE_PHASE_STORAGE_KEY);
       const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
+      const previousPendingTraining = localStorage.getItem(NEW_ADMIN_TRAINING_PENDING_KEY);
       try{
         data = { categories:[{ id:"food", label:"Food" }], resources:[], changes:[], lastModified:nowISO() };
         view = "admin";
         adminTab = "categories";
         isAdminVisible = true;
-        adminGuideMode = true;
-        setAdminGuidePhase("setupName");
-        adminGuideStep = "setupName";
-        adminGuideDismissed = false;
-        localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
         localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+        localStorage.removeItem(NEW_ADMIN_TRAINING_PENDING_KEY);
         render();
-        let tip = document.querySelector("#adminView .admin-guide-tip");
-        if(!tip || tip.textContent !== TIP_TEXT.adminGuideSetupName){
-          throw new Error("setup guide should start with Change TSO Name");
-        }
         showAdminSetup();
         const nameInput = document.getElementById("adminSetupTsoName");
         const saveBtn = document.getElementById("adminSetupSaveName");
         nameInput.value = "Provo";
         saveBtn.click();
         if(getTsoName() !== "Provo") throw new Error("TSO name was not saved");
-        if(adminGuideStep !== "verifyName"){
-          throw new Error("saving TSO name should advance guide state to title check");
+        if(document.title !== "Provo TSO Resources"){
+          throw new Error("saving TSO name should refresh the page title");
+        }
+        if(localStorage.getItem(NEW_ADMIN_TRAINING_PENDING_KEY) !== "provo"){
+          throw new Error("saving TSO name from new.html should queue one-time renamed training");
         }
         const modal = document.getElementById("referenceModal");
         if(!modal || !(modal.textContent || "").includes("After the blue bar looks right, click Close.")){
           throw new Error("setup modal should tell admin to click Close after the blue bar looks right");
         }
         modal.querySelector(".reference-modal-close").click();
-        tip = document.querySelector("#adminView .admin-guide-tip");
-        if(!tip || tip.textContent.indexOf("Click Quit and rename new.html to provo.html. Then open provo.html.") === -1){
-          throw new Error("Close should advance to rename and Quit tip with TSO filename");
-        }
-        if(localStorage.getItem(ADMIN_GUIDE_PHASE_STORAGE_KEY) !== "renameFile"){
-          throw new Error("rename phase should be persisted");
-        }
-        if(!Array.from(tip.querySelectorAll("button")).some(button => button.textContent === "Quit")){
-          throw new Error("rename tip should include a Quit button");
+        if(!modal.classList.contains("hidden")){
+          throw new Error("setup modal should close");
         }
       }finally{
         data = previousData;
         view = previousView;
         adminTab = previousAdminTab;
         isAdminVisible = previousAdminVisible;
-        adminGuideMode = previousAdminGuideMode;
-        adminGuideStep = previousAdminGuideStep;
-        adminGuidePhase = previousAdminGuidePhase;
-        adminGuideDismissed = previousAdminGuideDismissed;
         closeReferenceModal();
-        if(previousGuideDisabled === null) localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
-        else localStorage.setItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY, previousGuideDisabled);
-        if(previousGuidePhase === null) localStorage.removeItem(ADMIN_GUIDE_PHASE_STORAGE_KEY);
-        else localStorage.setItem(ADMIN_GUIDE_PHASE_STORAGE_KEY, previousGuidePhase);
         if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
         else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoName);
-      }
-    }
-  });
-
-  tests.push({
-    name: "ADMIN GUIDE TIPS ADVANCE THROUGH RESOURCE CREATION",
-    fn: () => {
-      const previousData = data;
-      const previousStoredData = localStorage.getItem(DATA_STORAGE_KEY);
-      const previousView = view;
-      const previousAdminTab = adminTab;
-      const previousAdminVisible = isAdminVisible;
-      const previousAdminGuideMode = adminGuideMode;
-      const previousAdminGuideStep = adminGuideStep;
-      const previousAdminGuidePhase = adminGuidePhase;
-      const previousAdminGuideResourceSection = adminGuideResourceSection;
-      const previousAdminGuideDismissed = adminGuideDismissed;
-      const previousAdminGuideCompleted = adminGuideCompleted;
-      const previousAdminGuidePracticeResourceId = adminGuidePracticeResourceId;
-      const previousAdminResourceEditMode = adminResourceEditMode;
-      const previousSelectedResourceId = selectedResourceId;
-      const previousGuideCompleted = localStorage.getItem(ADMIN_GUIDE_COMPLETED_STORAGE_KEY);
-      const previousGuidePracticeResourceId = localStorage.getItem(ADMIN_GUIDE_PRACTICE_RESOURCE_STORAGE_KEY);
-      const previousConfirm = window.confirm;
-      const previousPrompt = window.prompt;
-      try{
-        data = {
-          categories:[
-            { id:"transportation", label:"Transportation", filters:[] },
-            { id:"employment", label:"Employment", filters:["Temp Agencies"] }
-          ],
-          forGroups:["Exiting corrections"],
-          resources:[],
-          changes:[],
-          lastModified:nowISO()
-        };
-        view = "admin";
-        adminTab = "categories";
-        isAdminVisible = true;
-        adminResourceEditMode = false;
-        selectedResourceId = "";
-        adminGuideCompleted = false;
-        adminGuidePracticeResourceId = "";
-        localStorage.removeItem(ADMIN_GUIDE_COMPLETED_STORAGE_KEY);
-        localStorage.removeItem(ADMIN_GUIDE_PRACTICE_RESOURCE_STORAGE_KEY);
-        startAdminGuide("categoryFilters");
-        render();
-        let tip = document.querySelector("#adminView .admin-guide-tip");
-        if(!tip || tip.textContent !== TIP_TEXT.adminGuideCategoryFilters){
-          throw new Error("guide should start with category filter tip");
-        }
-        const categoryLabel = document.getElementById("cat_label");
-        if(!categoryLabel || categoryLabel.value !== "Transportation"){
-          throw new Error("category filter guide should open Transportation");
-        }
-        document.getElementById("cat_filter_new_btn").click();
-        const filterInput = Array.from(document.querySelectorAll(".catFilterInput")).pop();
-        filterInput.value = "Bus passes";
-        filterInput.dispatchEvent(new Event("input", { bubbles:true }));
-        const categoryUpdate = document.getElementById("cat_update_description");
-        categoryUpdate.value = "Added Bus passes filter";
-        categoryUpdate.dispatchEvent(new Event("input", { bubbles:true }));
-        closeCategoryEditor();
-        if(adminGuideStep !== "resources"){
-          throw new Error("category filter Done should advance guide to Resources step");
-        }
-        tip = document.querySelector("#adminView .admin-guide-tip");
-        if(!tip || tip.textContent !== TIP_TEXT.adminGuideResources){
-          throw new Error("guide should prompt Resources after category filter step");
-        }
-        switchAdminTab("resources");
-        tip = document.querySelector("#adminView .admin-guide-tip");
-        if(!tip || tip.textContent !== TIP_TEXT.adminGuideNewResource){
-          throw new Error("guide should advance to New resource tip");
-        }
-        newResource();
-        tip = document.querySelector("#adminView .admin-guide-tip");
-        if(!tip || !tip.textContent.includes(TIP_TEXT.adminGuideResourceFields)){
-          throw new Error("guide should advance to resource fields tip");
-        }
-        if(!tip.textContent.includes("Quick Start Temp Agency")){
-          throw new Error("resource fields tip should provide the dummy resource name");
-        }
-        if(document.querySelector("#adminView .admin-guide-tip button").textContent !== "Next"){
-          throw new Error("first resource guide section should only show Next");
-        }
-        if(document.getElementById("res_cancel_btn").disabled || !document.getElementById("res_done_btn").disabled){
-          throw new Error("new guided resource should allow Cancel and keep Done disabled until valid");
-        }
-        const nameInput = document.getElementById("res_name");
-        nameInput.value = "Quick Start Temp Agency";
-        nameInput.dispatchEvent(new Event("input", { bubbles:true }));
-        const descriptionInput = document.getElementById("res_description");
-        descriptionInput.value = "Practice temporary employment agency";
-        descriptionInput.dispatchEvent(new Event("input", { bubbles:true }));
-        advanceAdminGuideResourceSection();
-        const guidedResource = data.resources.find(resource => resource.id === selectedResourceId);
-        if(!guidedResource || guidedResource.name !== "Quick Start Temp Agency"){
-          throw new Error("guided Next should preserve the typed resource name");
-        }
-        tip = document.querySelector("#adminView .admin-guide-tip");
-        if(!tip || !tip.textContent.includes(TIP_TEXT.adminGuideForGroups)){
-          throw new Error("guide should advance to For groups section");
-        }
-        if(!document.querySelector('#resEditor [data-guide-section="forGroups"].admin-guide-current-section')){
-          throw new Error("For groups should be the second guide section");
-        }
-        const exitingCorrections = document.querySelector('.resForGroup[value="Exiting corrections"]');
-        if(!exitingCorrections) throw new Error("Exiting corrections For checkbox was missing");
-        exitingCorrections.checked = true;
-        exitingCorrections.dispatchEvent(new Event("change", { bubbles:true }));
-        advanceAdminGuideResourceSection();
-        tip = document.querySelector("#adminView .admin-guide-tip");
-        if(!tip || !tip.textContent.includes(TIP_TEXT.adminGuideCategories)){
-          throw new Error("guide should advance to categories section");
-        }
-        const employment = document.querySelector('.resCat[value="employment"]');
-        if(!employment) throw new Error("Employment category checkbox was missing");
-        employment.checked = true;
-        employment.dispatchEvent(new Event("change", { bubbles:true }));
-        const temporary = document.querySelector('.resCatFilter[data-category-id="employment"][value="Temp Agencies"]');
-        if(!temporary) throw new Error("Temp Agencies filter checkbox was missing");
-        temporary.checked = true;
-        temporary.dispatchEvent(new Event("change", { bubbles:true }));
-        advanceAdminGuideResourceSection();
-        tip = document.querySelector("#adminView .admin-guide-tip");
-        if(!tip || !tip.textContent.includes(TIP_TEXT.adminGuideInformation)){
-          throw new Error("guide should advance to information section");
-        }
-        if(!tip.textContent.includes("Use *[space]")){
-          throw new Error("information guide tip should explain bullet formatting");
-        }
-        document.getElementById("res_information_edit_btn").click();
-        const informationInput = document.getElementById("res_info_additional");
-        informationInput.value = `Quick start practice information.
-* Bring a photo ID
-* Ask about daily work
-**This is only a practice resource.**
----
-Delete this resource when the guide tells you to.`;
-        informationInput.dispatchEvent(new Event("input", { bubbles:true }));
-        document.getElementById("res_information_preview_btn").click();
-        advanceAdminGuideResourceSection();
-        const updateButtons = Array.from(document.querySelectorAll("#adminView .admin-guide-tip button")).map(button => button.textContent);
-        if(JSON.stringify(updateButtons) !== JSON.stringify(["Back"])){
-          throw new Error(`update resource guide section should show Back only, got ${JSON.stringify(updateButtons)}`);
-        }
-        const updateDescription = document.getElementById("res_update_description");
-        updateDescription.value = "Added quick start practice resource";
-        updateDescription.dispatchEvent(new Event("input", { bubbles:true }));
-        closeResourceEditor();
-        tip = document.querySelector("#adminView .admin-guide-tip");
-        if(!adminGuideMode || adminGuideResourceSection !== "save"){
-          throw new Error("first Done on update step should advance to final save tip");
-        }
-        if(!tip || !tip.textContent.includes(TIP_TEXT.adminGuideSaveResource)){
-          throw new Error("guide should show final Done-to-save tip");
-        }
-        closeResourceEditor();
-        if(!adminGuideMode || adminGuideStep !== "deleteResource" || adminResourceEditMode){
-          throw new Error("second Done should save resource and advance to delete step");
-        }
-        tip = document.querySelector("#adminView .admin-guide-tip");
-        if(!tip || !tip.textContent.includes(TIP_TEXT.adminGuideDeleteResource)){
-          throw new Error("guide should show delete-resource tip after save");
-        }
-        const saved = data.resources.find(resource => resource.name === "Quick Start Temp Agency");
-        if(!saved) throw new Error("practice resource was not saved");
-        if(JSON.stringify(saved.categories) !== JSON.stringify(["employment"])){
-          throw new Error(`practice resource categories were wrong: ${JSON.stringify(saved.categories)}`);
-        }
-        if(JSON.stringify(saved.categoryFilters) !== JSON.stringify({ employment:["Temp Agencies"] })){
-          throw new Error(`practice resource filters were wrong: ${JSON.stringify(saved.categoryFilters)}`);
-        }
-        if(JSON.stringify(saved.forGroups) !== JSON.stringify(["Exiting corrections"])){
-          throw new Error(`practice resource For groups were wrong: ${JSON.stringify(saved.forGroups)}`);
-        }
-        if(!saved.informationText.includes("* Bring a photo ID")){
-          throw new Error("practice resource information was not saved");
-        }
-        window.confirm = () => true;
-        window.prompt = () => "Deleted quick start practice resource";
-        const deleteButton = Array.from(document.querySelectorAll("#adminView button"))
-          .find(button => button.textContent.trim() === "Delete");
-        if(!deleteButton) throw new Error("rendered Delete button was missing");
-        deleteButton.click();
-        if(adminGuideMode || !adminGuideCompleted){
-          throw new Error("deleting the practice resource should complete guide mode");
-        }
-        if(localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY) !== "1"){
-          throw new Error("completed guided quick start should persist guide mode off");
-        }
-        if(localStorage.getItem(ADMIN_GUIDE_COMPLETED_STORAGE_KEY) !== "1"){
-          throw new Error("completed guided quick start should be tracked");
-        }
-      }finally{
-        data = previousData;
-        view = previousView;
-        adminTab = previousAdminTab;
-        isAdminVisible = previousAdminVisible;
-        adminGuideMode = previousAdminGuideMode;
-        adminGuideStep = previousAdminGuideStep;
-        adminGuidePhase = previousAdminGuidePhase;
-        adminGuideResourceSection = previousAdminGuideResourceSection;
-        adminGuideDismissed = previousAdminGuideDismissed;
-        adminGuideCompleted = previousAdminGuideCompleted;
-        adminGuidePracticeResourceId = previousAdminGuidePracticeResourceId;
-        adminResourceEditMode = previousAdminResourceEditMode;
-        selectedResourceId = previousSelectedResourceId;
-        window.confirm = previousConfirm;
-        window.prompt = previousPrompt;
-        if(previousStoredData === null) localStorage.removeItem(DATA_STORAGE_KEY);
-        else localStorage.setItem(DATA_STORAGE_KEY, previousStoredData);
-        if(previousGuideCompleted === null) localStorage.removeItem(ADMIN_GUIDE_COMPLETED_STORAGE_KEY);
-        else localStorage.setItem(ADMIN_GUIDE_COMPLETED_STORAGE_KEY, previousGuideCompleted);
-        if(previousGuidePracticeResourceId === null) localStorage.removeItem(ADMIN_GUIDE_PRACTICE_RESOURCE_STORAGE_KEY);
-        else localStorage.setItem(ADMIN_GUIDE_PRACTICE_RESOURCE_STORAGE_KEY, previousGuidePracticeResourceId);
-      }
-    }
-  });
-
-  tests.push({
-    name: "RENAMED FILE GUIDE STARTS RESOURCE QUICK START",
-    fn: () => {
-      if(OPENED_AS_NEW_TEMPLATE) return;
-      const previousData = data;
-      const previousStoredData = localStorage.getItem(DATA_STORAGE_KEY);
-      const previousView = view;
-      const previousAdminTab = adminTab;
-      const previousAdminVisible = isAdminVisible;
-      const previousAdminGuideMode = adminGuideMode;
-      const previousAdminGuideStep = adminGuideStep;
-      const previousAdminGuidePhase = adminGuidePhase;
-      const previousAdminGuideResourceSection = adminGuideResourceSection;
-      const previousAdminGuideDismissed = adminGuideDismissed;
-      const previousAdminResourceEditMode = adminResourceEditMode;
-      const previousSelectedResourceId = selectedResourceId;
-      const previousGuideDisabled = localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
-      const previousGuidePhase = localStorage.getItem(ADMIN_GUIDE_PHASE_STORAGE_KEY);
-      try{
-        data = { categories:[{ id:"food", label:"Food" }], resources:[], changes:[], lastModified:nowISO() };
-        localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
-        setAdminGuidePhase("createResource");
-        view = "categories";
-        adminTab = "categories";
-        isAdminVisible = false;
-        adminResourceEditMode = false;
-        selectedResourceId = "";
-        adminGuideMode = true;
-        adminGuideStep = "categoryFilters";
-        adminGuideDismissed = false;
-        render();
-        let tip = appView.querySelector(".red-tip");
-        if(!tip || tip.textContent !== formatGuideTipText(TIP_TEXT.renamedFileWelcome)){
-          throw new Error("renamed file should tell admin to press Ctrl+Alt+A and click Admin");
-        }
-        setAdminVisibility(true);
-        setView("admin");
-        tip = document.querySelector("#adminView .admin-guide-tip");
-        if(!tip || tip.textContent !== TIP_TEXT.adminGuideCategoryFilters){
-          throw new Error("renamed file admin guide should start with category filter tip");
-        }
-        switchAdminTab("resources");
-        tip = document.querySelector("#adminView .admin-guide-tip");
-        if(!tip || tip.textContent !== TIP_TEXT.adminGuideNewResource){
-          throw new Error("Resources should advance guide to New tip");
-        }
-        newResource();
-        tip = document.querySelector("#adminView .admin-guide-tip");
-        if(!tip || !tip.textContent.includes(TIP_TEXT.adminGuideResourceFields)){
-          throw new Error("New should advance guide to resource fields tip");
-        }
-      }finally{
-        data = previousData;
-        view = previousView;
-        adminTab = previousAdminTab;
-        isAdminVisible = previousAdminVisible;
-        adminGuideMode = previousAdminGuideMode;
-        adminGuideStep = previousAdminGuideStep;
-        adminGuidePhase = previousAdminGuidePhase;
-        adminGuideResourceSection = previousAdminGuideResourceSection;
-        adminGuideDismissed = previousAdminGuideDismissed;
-        adminResourceEditMode = previousAdminResourceEditMode;
-        selectedResourceId = previousSelectedResourceId;
-        closeReferenceModal();
-        if(previousStoredData === null) localStorage.removeItem(DATA_STORAGE_KEY);
-        else localStorage.setItem(DATA_STORAGE_KEY, previousStoredData);
-        if(previousGuideDisabled === null) localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
-        else localStorage.setItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY, previousGuideDisabled);
-        if(previousGuidePhase === null) localStorage.removeItem(ADMIN_GUIDE_PHASE_STORAGE_KEY);
-        else localStorage.setItem(ADMIN_GUIDE_PHASE_STORAGE_KEY, previousGuidePhase);
-      }
-    }
-  });
-
-  tests.push({
-    name: "GUIDE QUIT RESTORES FULL RESOURCE EDITOR AND RESTARTS",
-    fn: () => {
-      if(OPENED_AS_NEW_TEMPLATE) return;
-      const previousData = data;
-      const previousStoredData = localStorage.getItem(DATA_STORAGE_KEY);
-      const previousView = view;
-      const previousAdminTab = adminTab;
-      const previousAdminVisible = isAdminVisible;
-      const previousAdminGuideMode = adminGuideMode;
-      const previousAdminGuideStep = adminGuideStep;
-      const previousAdminGuidePhase = adminGuidePhase;
-      const previousAdminGuideResourceSection = adminGuideResourceSection;
-      const previousAdminGuideDismissed = adminGuideDismissed;
-      const previousAdminResourceEditMode = adminResourceEditMode;
-      const previousSelectedResourceId = selectedResourceId;
-      const previousGuideDisabled = localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
-      const previousGuidePhase = localStorage.getItem(ADMIN_GUIDE_PHASE_STORAGE_KEY);
-      const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
-      try{
-        data = {
-          categories:[{ id:"food", label:"Food" }],
-          resources:[{ id:"food-aid", name:"Food Aid", categories:["food"], informationText:"", lastModified:nowISO() }],
-          changes:[],
-          lastModified:nowISO()
-        };
-        localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
-        setAdminGuidePhase("createResource");
-        localStorage.removeItem(TSO_NAME_STORAGE_KEY);
-        view = "admin";
-        adminTab = "resources";
-        isAdminVisible = true;
-        adminResourceEditMode = true;
-        selectedResourceId = "food-aid";
-        adminGuideMode = true;
-        adminGuideStep = "resourceFields";
-        adminGuideResourceSection = "basics";
-        adminGuideDismissed = false;
-        render();
-        if(!document.querySelector("#adminView .admin-panel.admin-guide-active #resEditor")){
-          throw new Error("resource editor should be in guided section mode before quitting guide");
-        }
-        requestToggleAdminGuide();
-        document.getElementById("quitGuideYesButton").click();
-        if(adminGuideMode) throw new Error("guide should be off after confirming quit");
-        if(document.querySelector("#adminView .admin-panel.admin-guide-active #resEditor")){
-          throw new Error("full resource editor should be available after quitting guide");
-        }
-        if(localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY) !== "1"){
-          throw new Error("guide quit should be persisted");
-        }
-        requestToggleAdminGuide();
-        if(!adminGuideMode) throw new Error("Guide button should turn guide mode back on");
-        if(adminGuideStep !== "categoryFilters") throw new Error("Guide should restart resource quick start at category filters");
-        const restartedTip = document.querySelector("#adminView .admin-guide-tip");
-        if(!restartedTip || restartedTip.textContent !== TIP_TEXT.adminGuideCategoryFilters){
-          throw new Error("restarted resource quick start should show the category filter tip");
-        }
-        if(document.querySelector("#adminView .admin-panel.admin-guide-active #resEditor")){
-          throw new Error("restarted guide should not section the editor before the resource-fields step");
-        }
-      }finally{
-        data = previousData;
-        view = previousView;
-        adminTab = previousAdminTab;
-        isAdminVisible = previousAdminVisible;
-        adminGuideMode = previousAdminGuideMode;
-        adminGuideStep = previousAdminGuideStep;
-        adminGuidePhase = previousAdminGuidePhase;
-        adminGuideResourceSection = previousAdminGuideResourceSection;
-        adminGuideDismissed = previousAdminGuideDismissed;
-        adminResourceEditMode = previousAdminResourceEditMode;
-        selectedResourceId = previousSelectedResourceId;
-        closeReferenceModal();
-        if(previousStoredData === null) localStorage.removeItem(DATA_STORAGE_KEY);
-        else localStorage.setItem(DATA_STORAGE_KEY, previousStoredData);
-        if(previousGuideDisabled === null) localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
-        else localStorage.setItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY, previousGuideDisabled);
-        if(previousGuidePhase === null) localStorage.removeItem(ADMIN_GUIDE_PHASE_STORAGE_KEY);
-        else localStorage.setItem(ADMIN_GUIDE_PHASE_STORAGE_KEY, previousGuidePhase);
-        if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
-        else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoName);
-      }
-    }
-  });
-
-  tests.push({
-    name: "COMPLETED GUIDE RESTARTS AT CURRENT ADMIN CONTEXT",
-    fn: () => {
-      const previousData = data;
-      const previousView = view;
-      const previousAdminTab = adminTab;
-      const previousAdminVisible = isAdminVisible;
-      const previousAdminGuideMode = adminGuideMode;
-      const previousAdminGuideStep = adminGuideStep;
-      const previousAdminGuideCompleted = adminGuideCompleted;
-      const previousAdminResourceEditMode = adminResourceEditMode;
-      const previousSelectedResourceId = selectedResourceId;
-      const previousGuideDisabled = localStorage.getItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
-      const previousGuideCompleted = localStorage.getItem(ADMIN_GUIDE_COMPLETED_STORAGE_KEY);
-      try{
-        data = {
-          categories:[{ id:"employment", label:"Employment", filters:["Temp Agencies"] }],
-          forGroups:["Exiting corrections"],
-          resources:[{ id:"practice", name:"Quick Start Temp Agency", categories:["employment"], categoryFilters:{}, forGroups:[], informationText:"" }],
-          changes:[]
-        };
-        view = "admin";
-        isAdminVisible = true;
-        adminGuideMode = false;
-        adminGuideCompleted = true;
-        localStorage.setItem(ADMIN_GUIDE_COMPLETED_STORAGE_KEY, "1");
-        localStorage.setItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY, "1");
-
-        adminTab = "categories";
-        adminResourceEditMode = false;
-        requestToggleAdminGuide();
-        if(!adminGuideMode || adminGuideStep !== "categoryFilters"){
-          throw new Error("completed guide should restart at category filters from Categories");
-        }
-        requestToggleAdminGuide();
-        document.getElementById("quitGuideYesButton").click();
-
-        adminTab = "forGroups";
-        requestToggleAdminGuide();
-        if(!adminGuideMode || adminGuideStep !== "forGroupsAdmin"){
-          throw new Error("completed guide should restart at For editor from For");
-        }
-        requestToggleAdminGuide();
-        document.getElementById("quitGuideYesButton").click();
-
-        adminTab = "resources";
-        adminResourceEditMode = true;
-        selectedResourceId = "practice";
-        requestToggleAdminGuide();
-        if(!adminGuideMode || adminGuideStep !== "resourceFields"){
-          throw new Error("completed guide should restart at resource fields from an open resource editor");
-        }
-      }finally{
-        data = previousData;
-        view = previousView;
-        adminTab = previousAdminTab;
-        isAdminVisible = previousAdminVisible;
-        adminGuideMode = previousAdminGuideMode;
-        adminGuideStep = previousAdminGuideStep;
-        adminGuideCompleted = previousAdminGuideCompleted;
-        adminResourceEditMode = previousAdminResourceEditMode;
-        selectedResourceId = previousSelectedResourceId;
-        closeReferenceModal();
-        if(previousGuideDisabled === null) localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
-        else localStorage.setItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY, previousGuideDisabled);
-        if(previousGuideCompleted === null) localStorage.removeItem(ADMIN_GUIDE_COMPLETED_STORAGE_KEY);
-        else localStorage.setItem(ADMIN_GUIDE_COMPLETED_STORAGE_KEY, previousGuideCompleted);
+        if(previousPendingTraining === null) localStorage.removeItem(NEW_ADMIN_TRAINING_PENDING_KEY);
+        else localStorage.setItem(NEW_ADMIN_TRAINING_PENDING_KEY, previousPendingTraining);
       }
     }
   });
@@ -3213,10 +2563,6 @@ Delete this resource when the guide tells you to.`;
     name: "ADMIN HELP PRINT EXPANDS AND RESTORES SECTIONS",
     fn: () => {
       const previousData = data;
-      const previousAdminGuideMode = adminGuideMode;
-      const previousAdminGuideStep = adminGuideStep;
-      const previousAdminGuideResourceSection = adminGuideResourceSection;
-      const previousAdminGuideDismissed = adminGuideDismissed;
       const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
       const previousPrint = window.print;
       const previousSetTimeout = window.setTimeout;
@@ -3225,8 +2571,11 @@ Delete this resource when the guide tells you to.`;
         localStorage.setItem(TSO_NAME_STORAGE_KEY, "Test");
         showAdminHelp();
         const modal = document.getElementById("referenceModal");
-        const details = Array.from(modal.querySelectorAll(".admin-help-content details"));
+        const training = modal.querySelector(".admin-training-section");
+        const details = Array.from(modal.querySelectorAll(".admin-help-content details:not(.admin-training-section)"));
+        if(!training) throw new Error("training section missing");
         if(details.length < 2) throw new Error("not enough printable Admin Help sections");
+        training.open = false;
         details[0].open = false;
         details[1].open = true;
         let printCalled = false;
@@ -3234,17 +2583,28 @@ Delete this resource when the guide tells you to.`;
         window.setTimeout = callback => { callback(); return 0; };
         printAdminHelp();
         if(!printCalled) throw new Error("Admin Help print did not call window.print");
+        if(!document.body.classList.contains("admin-help-printing")) throw new Error("Admin Help print did not set print mode");
         if(details.some(detail => !detail.open)) throw new Error("Admin Help print did not expand all details");
+        if(training.open) throw new Error("Admin Help print should not expand training section");
         restoreAdminHelpPrintState();
+        if(document.body.classList.contains("admin-help-printing")) throw new Error("Admin Help print mode was not cleared");
         if(details[0].open !== false || details[1].open !== true){
           throw new Error("Admin Help print did not restore detail state");
         }
+        printCalled = false;
+        training.open = false;
+        printAdminTraining();
+        if(!printCalled) throw new Error("Training print did not call window.print");
+        if(!document.body.classList.contains("admin-training-printing")) throw new Error("Training print did not set print mode");
+        if(!training.open) throw new Error("Training print did not expand training section");
+        if(details[0].open !== false || details[1].open !== true) throw new Error("Training print should not change Admin Help sections");
+        restoreAdminHelpPrintState();
+        if(document.body.classList.contains("admin-training-printing")) throw new Error("Training print mode was not cleared");
+        if(training.open !== false) throw new Error("Training print did not restore training section state");
       }finally{
         data = previousData;
-        adminGuideMode = previousAdminGuideMode;
-        adminGuideStep = previousAdminGuideStep;
-        adminGuideResourceSection = previousAdminGuideResourceSection;
-        adminGuideDismissed = previousAdminGuideDismissed;
+        document.body.classList.remove("admin-help-printing", "admin-training-printing");
+        adminHelpPrintRestoreState = null;
         window.print = previousPrint;
         window.setTimeout = previousSetTimeout;
         closeReferenceModal();
@@ -3841,7 +3201,7 @@ Delete this resource when the guide tells you to.`;
     fn: () => {
       const previousData = data;
       try{
-        const longText = `${"Long resource guide. ".repeat(30)} GED preparation and earn a GED. Captain Your Story - My Story Matters.`;
+        const longText = `${"Long resource directory. ".repeat(30)} GED preparation and earn a GED. Captain Your Story - My Story Matters.`;
         data = {
           categories:[
             { id:"housing", label:"Housing" },
@@ -3859,8 +3219,8 @@ Delete this resource when the guide tells you to.`;
             { id:"aid", name:"Aid", categories:["education"], phone:"555-5555", informationText:"" },
             { id:"story", name:"My Story Matters", categories:["education"], phone:"555-6666", informationText:"" },
             { id:"list-education", name:"Education Lists", categories:["education"], phone:"", website:"", hours:"", informationText:"GED preparation, earn a GED, abridged notes, American Fork resources, vacancy listings, Captain Your Story - My Story Matters, GED." },
-            { id:"long-guide", name:"Long Education Guide", categories:["education"], phone:"", website:"", hours:"", informationText:longText },
-            { id:"short-guide", name:"Short Education Note", categories:["education"], phone:"555-7777", informationText:"GED preparation and My Story Matters" }
+            { id:"long-directory", name:"Long Education Directory", categories:["education"], phone:"", website:"", hours:"", informationText:longText },
+            { id:"short-directory", name:"Short Education Note", categories:["education"], phone:"555-7777", informationText:"GED preparation and My Story Matters" }
           ]
         };
 
@@ -3877,7 +3237,7 @@ Delete this resource when the guide tells you to.`;
 
         const gedMatches = findReferencingLists({ id:"ged", name:"GED" }).map(match => match.listName);
         if(!gedMatches.includes("Education Lists")) throw new Error("GED list reference was not found");
-        if(!gedMatches.includes("Long Education Guide")) throw new Error("long list-style resource was not included");
+        if(!gedMatches.includes("Long Education Directory")) throw new Error("long list-style resource was not included");
         if(gedMatches.includes("Short Education Note")) throw new Error("short non-list resource was included");
         if(gedMatches.filter(name => name === "Education Lists").length !== 1) throw new Error("duplicate GED references were not deduplicated");
 
@@ -3886,7 +3246,7 @@ Delete this resource when the guide tells you to.`;
         if(findReferencingLists({ id:"aid", name:"Aid" }).length) throw new Error("short non-acronym name should be ignored");
         const storyMatches = findReferencingLists({ id:"story", name:"My Story Matters" }).map(match => match.listName);
         if(!storyMatches.includes("Education Lists")) throw new Error("multi-word list reference was not found");
-        if(!storyMatches.includes("Long Education Guide")) throw new Error("multi-word long list-style reference was not found");
+        if(!storyMatches.includes("Long Education Directory")) throw new Error("multi-word long list-style reference was not found");
       }finally{
         data = previousData;
       }
@@ -4349,6 +3709,9 @@ function setView(nextView){
   if(nextView !== "category") expandedSearchResourceId = "";
   view = nextView;
   safeRender();
+  if(nextView === "admin" && consumeRenamedAdminTrainingPending()){
+    showAdminHelp({ expandTraining:true });
+  }
 }
 
 function setAdminVisibility(visible){
@@ -4358,16 +3721,6 @@ function setAdminVisibility(visible){
     if(view === "admin") return;
   }
   isAdminVisible = nextVisible;
-  if(isAdminVisible && adminGuideMode && !adminGuideDismissed){
-    adminGuideMode = true;
-    if(adminGuidePhase === "createResource"){
-      adminGuideStep = "categoryFilters";
-    }else if(adminGuidePhase === "renameFile"){
-      adminGuideStep = "renameFile";
-    }else if(adminGuidePhase === "setupName"){
-      adminGuideStep = "setupName";
-    }
-  }
   tabAdmin.style.display = isAdminVisible ? "" : "none";
   if(!isAdminVisible){
     const adminSection = document.getElementById("adminView");
@@ -4450,6 +3803,15 @@ if(searchInput){
   });
 }
 const appTitle = document.getElementById("appTitle");
+const topbar = document.querySelector(".topbar");
+
+function updateStickyHeaderOffset(){
+  const height = topbar ? topbar.getBoundingClientRect().height : 0;
+  document.documentElement.style.setProperty("--topbar-sticky-offset", `${Math.ceil(height)}px`);
+}
+
+window.addEventListener("resize", updateStickyHeaderOffset);
+
 function getTsoNameFromHtmlFileName(fileName){
   return String(fileName || "")
     .replace(/\.html?$/i, "")
@@ -4475,12 +3837,6 @@ function slugifyFileStem(value, fallback){
   return cleaned || fallback;
 }
 
-function getTsoFileName(){
-  const fallback = "new-name";
-  const name = getTsoName() || fallback;
-  return `${slugifyFileStem(name, fallback)}.html`;
-}
-
 function getResourcePackageFilename(){
   const baseName = getTsoName() || (isNewTemplateFile() ? "tso" : getTsoNameFromHtmlFileName(getCurrentHtmlFileName()));
   const stem = slugifyFileStem(baseName, "tso");
@@ -4496,27 +3852,16 @@ function refreshAppTitle(){
   const titleText = getAppTitleText();
   document.title = titleText;
   if(appTitle) appTitle.textContent = titleText;
+  updateStickyHeaderOffset();
 }
 
 refreshAppTitle();
 
-// Guided quick start is driven by three small state fields:
-// - adminGuidePhase: broad startup phase that survives reload/rename.
-// - adminGuideStep: current admin screen prompt.
-// - adminGuideResourceSection: current section inside the Resource editor.
-// Completed admins can click Guide later; getContextualAdminGuideStep() starts
-// them at the tip that matches the admin tab they are already using.
-function isNewAdminSetupState(){
-  if(!isNewTemplateFile()) return false;
-  return !getTsoName()
-    && !(Array.isArray(data.resources) && data.resources.length);
-}
-
 function createTip(tipId){
-  return createGuideTip(TIP_TEXT[tipId]);
+  return createRedTip(TIP_TEXT[tipId]);
 }
 
-function createGuideTip(tipText){
+function createRedTip(tipText){
   if(!tipText) return null;
   const tip = document.createElement("div");
   tip.className = "red-tip";
@@ -4524,334 +3869,57 @@ function createGuideTip(tipText){
   return tip;
 }
 
-function getFirstAdminGuideStep(){
-  if(adminGuidePhase === "createResource") return "categoryFilters";
-  if(adminGuidePhase === "renameFile") return "renameFile";
-  return "setupName";
-}
-
-function setAdminGuidePhase(phase){
-  adminGuidePhase = normalizeAdminGuidePhase(phase);
-  localStorage.setItem(ADMIN_GUIDE_PHASE_STORAGE_KEY, adminGuidePhase);
-}
-
-function setAdminGuideStep(step){
-  adminGuideStep = step;
-  if(view === "admin") safeRenderAdmin();
-}
-
-function formatGuideTipText(tipText){
-  return String(tipText || "").replace(/\[new TSO name\]\.html/g, getTsoFileName());
+function createNewAdminTip(tipText){
+  const tip = createRedTip(tipText);
+  if(tip) tip.classList.add("new-admin-tip");
+  return tip;
 }
 
 function getCategoryTipId(){
-  if(OPENED_AS_NEW_TEMPLATE && adminGuideMode) return "newAdminWelcome";
-  if(isNewAdminSetupState() && adminGuideMode) return "newAdminWelcome";
-  if(!adminGuideMode) return "user";
-  return "";
-}
-
-function getCategoryGuideTipText(){
-  if(adminGuideMode && adminGuidePhase === "createResource" && view === "categories" && (!isNewTemplateFile() || adminGuideStep === "categoryFilters")){
-    return formatGuideTipText(TIP_TEXT.renamedFileWelcome);
-  }
-  return "";
+  if(isNewTemplateFile()) return "newAdminWelcome";
+  return "user";
 }
 
 function shouldShowChangeTsoNameButton(isTemplateFile = isNewTemplateFile()){
-  return adminGuideMode && !!isTemplateFile;
-}
-
-function startAdminGuide(step = "resources"){
-  adminGuideMode = true;
-  adminGuideStep = step;
-  adminGuideDismissed = false;
-  localStorage.removeItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY);
-  if(step === "resourceFields") adminGuideResourceSection = "basics";
-}
-
-function completeAdminGuide(){
-  adminGuideMode = false;
-  adminGuideStep = getFirstAdminGuideStep();
-  adminGuideResourceSection = "basics";
-  adminGuideDismissed = true;
-  adminGuideCompleted = true;
-  adminGuidePracticeResourceId = "";
-  localStorage.setItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY, "1");
-  localStorage.setItem(ADMIN_GUIDE_COMPLETED_STORAGE_KEY, "1");
-  localStorage.removeItem(ADMIN_GUIDE_PRACTICE_RESOURCE_STORAGE_KEY);
-}
-
-function stopAdminGuide(){
-  adminGuideMode = false;
-  adminGuideStep = getFirstAdminGuideStep();
-  adminGuideResourceSection = "basics";
-  adminGuideDismissed = true;
-  localStorage.setItem(ADMIN_GUIDE_DISABLED_STORAGE_KEY, "1");
-}
-
-function getContextualAdminGuideStep(){
-  if(view === "admin"){
-    if(adminTab === "categories") return "categoryFilters";
-    if(adminTab === "resources"){
-      return adminResourceEditMode ? "resourceFields" : "newResource";
-    }
-    if(adminTab === "forGroups") return "forGroupsAdmin";
-  }
-  return getFirstAdminGuideStep();
-}
-
-function prepareAdminGuideForStep(step){
-  if(step === "categoryFilters"){
-    adminTab = "categories";
-    adminResourceEditMode = false;
-  }else if(step === "newResource" || step === "deleteResource"){
-    adminTab = "resources";
-    adminResourceEditMode = false;
-  }else if(step === "forGroupsAdmin"){
-    adminTab = "forGroups";
-    adminResourceEditMode = false;
-  }
-}
-
-function requestToggleAdminGuide(source = "toolbar"){
-  if(!adminGuideMode){
-    const firstStep = adminGuideCompleted ? getContextualAdminGuideStep() : getFirstAdminGuideStep();
-    prepareAdminGuideForStep(firstStep);
-    startAdminGuide(firstStep);
-    if(view === "admin") safeRenderAdmin();
-    return;
-  }
-  showQuitAdminGuidePrompt(source);
-}
-
-function showQuitAdminGuidePrompt(source = "toolbar"){
-  const modal = getReferenceModal();
-  modal.innerHTML = `
-    <div class="reference-modal-panel" role="dialog" aria-modal="true" aria-labelledby="quitGuideTitle">
-      <div class="reference-modal-header">
-        <div id="quitGuideTitle" class="reference-modal-title">Do you want to quit the guided quick start?</div>
-        <div class="reference-modal-actions">
-          <button class="button danger" type="button" id="quitGuideYesButton">Yes</button>
-          <button class="button" type="button" id="quitGuideNoButton">No</button>
-        </div>
-      </div>
-    </div>
-  `;
-  const yesBtn = document.getElementById("quitGuideYesButton");
-  const noBtn = document.getElementById("quitGuideNoButton");
-  if(yesBtn){
-    yesBtn.addEventListener("click", () => {
-      stopAdminGuide();
-      closeReferenceModal();
-      if(view === "admin") safeRenderAdmin("quit guide");
-    });
-  }
-  if(noBtn){
-    noBtn.addEventListener("click", () => {
-      closeReferenceModal();
-      if(source === "adminHelp") showAdminHelp();
-    });
-  }
-  modal.classList.remove("hidden");
-  if(noBtn) noBtn.focus();
-}
-
-function quitForRename(){
-  setAdminGuidePhase("renameFile");
-  localStorage.setItem(ADMIN_GUIDE_PHASE_STORAGE_KEY, "renameFile");
-  window.close();
-  window.setTimeout(() => {
-    const modal = getReferenceModal();
-    modal.innerHTML = `
-      <div class="reference-modal-panel" role="dialog" aria-modal="true" aria-labelledby="quitFallbackTitle">
-        <div class="reference-modal-header">
-          <div id="quitFallbackTitle" class="reference-modal-title">Close this tab</div>
-          <div class="reference-modal-actions">
-            <button class="button reference-modal-close" type="button">OK</button>
-          </div>
-        </div>
-        <div class="reference-modal-body">
-          <p>Your browser did not allow this page to close itself. Close this tab or window, rename <code>new.html</code> to <code>${escapeHTML(getTsoFileName())}</code>, then open <code>${escapeHTML(getTsoFileName())}</code>.</p>
-        </div>
-      </div>
-    `;
-    const closeBtn = modal.querySelector(".reference-modal-close");
-    if(closeBtn) closeBtn.addEventListener("click", closeReferenceModal);
-    modal.classList.remove("hidden");
-    if(closeBtn) closeBtn.focus();
-  }, 150);
-}
-
-function getAdminGuideTipText(){
-  if(!adminGuideMode) return TIP_TEXT.adminGuideChoice;
-  if(adminGuideStep === "setupName") return TIP_TEXT.adminGuideSetupName;
-  if(adminGuideStep === "verifyName") return TIP_TEXT.adminGuideVerifyName;
-  if(adminGuideStep === "renameFile") return TIP_TEXT.adminGuideRenameFile;
-  if(adminGuideStep === "categoryFilters") return TIP_TEXT.adminGuideCategoryFilters;
-  if(adminGuideStep === "deleteResource") return TIP_TEXT.adminGuideDeleteResource;
-  if(adminGuideStep === "forGroupsAdmin") return TIP_TEXT.adminGuideForAdmin;
-  if(adminGuideStep === "resourceFields" || adminResourceEditMode){
-    if(adminGuideResourceSection === "forGroups") return TIP_TEXT.adminGuideForGroups;
-    if(adminGuideResourceSection === "categories") return TIP_TEXT.adminGuideCategories;
-    if(adminGuideResourceSection === "information") return TIP_TEXT.adminGuideInformation;
-    if(adminGuideResourceSection === "save") return TIP_TEXT.adminGuideSaveResource;
-    if(adminGuideResourceSection === "update") return TIP_TEXT.adminGuideUpdate;
-    return TIP_TEXT.adminGuideResourceFields;
-  }
-  if(adminGuideStep === "newResource" || adminTab === "resources") return TIP_TEXT.adminGuideNewResource;
-  return TIP_TEXT.adminGuideResources;
-}
-
-function getAdminGuideResourceSections(){
-  return ["basics", "forGroups", "categories", "information", "update"];
-}
-
-function saveGuidedResourceEditorProgress(){
-  // The guide advances through the Resource editor one section at a time, but the
-  // editor itself is one form. Save each section into the resource draft before
-  // moving forward so going Back/Next never loses typed practice data.
-  if(!(editing && editing.kind === "resource")) return true;
-  const draft = resourceEditorDraft();
-  if(!draft) return true;
-  const validation = validateResourceName(draft, editing.idx);
-  showResourceNameWarning(validation.message);
-  if(!validation.valid){
-    const nameInput = document.getElementById("res_name");
-    if(nameInput) nameInput.focus();
-    return false;
-  }
-  applyResourceDraft(editing.idx, draft);
-  editorSnapshot = snapshotResourceEditor();
-  return true;
-}
-
-function advanceAdminGuideResourceSection(){
-  const sections = getAdminGuideResourceSections();
-  const index = sections.indexOf(adminGuideResourceSection);
-  if(index === -1 || index >= sections.length - 1) return;
-  if(!saveGuidedResourceEditorProgress()) return;
-  adminGuideResourceSection = sections[index + 1];
-  safeRenderAdmin();
-}
-
-function retreatAdminGuideResourceSection(){
-  const sections = getAdminGuideResourceSections();
-  const index = sections.indexOf(adminGuideResourceSection);
-  if(index <= 0) return;
-  if(!saveGuidedResourceEditorProgress()) return;
-  adminGuideResourceSection = sections[index - 1];
-  safeRenderAdmin();
-}
-
-function isAdminGuideResourceFirstSection(){
-  const sections = getAdminGuideResourceSections();
-  return adminGuideResourceSection === sections[0];
-}
-
-function isAdminGuideResourceLastSection(){
-  const sections = getAdminGuideResourceSections();
-  return adminGuideResourceSection === sections[sections.length - 1];
-}
-
-function shouldDisableResourceEditorExit(){
-  return adminGuideMode
-    && adminGuideStep === "resourceFields"
-    && adminResourceEditMode
-    && adminGuideResourceSection !== "update";
-}
-
-function shouldForceEnableResourceEditorExit(){
-  return adminGuideMode
-    && adminGuideStep === "resourceFields"
-    && adminResourceEditMode
-    && (adminGuideResourceSection === "update" || adminGuideResourceSection === "save");
-}
-
-function renderAdminGuideTip(container){
-  const tipText = formatGuideTipText(getAdminGuideTipText());
-  if(!tipText) return;
-  const tip = document.createElement("div");
-  tip.className = "red-tip admin-guide-tip";
-  const tipMessage = document.createElement("div");
-  tipMessage.className = "admin-guide-tip-message";
-  tipMessage.textContent = tipText;
-  tip.appendChild(tipMessage);
-  if(adminGuideStep === "renameFile"){
-    const actions = document.createElement("div");
-    actions.className = "admin-guide-tip-actions";
-    const backBtn = document.createElement("button");
-    backBtn.className = "button";
-    backBtn.type = "button";
-    backBtn.textContent = "Back";
-    backBtn.onclick = () => {
-      setAdminGuidePhase("setupName");
-      setAdminGuideStep("verifyName");
-    };
-    actions.appendChild(backBtn);
-    const quitBtn = document.createElement("button");
-    quitBtn.className = "button primary";
-    quitBtn.type = "button";
-    quitBtn.textContent = "Quit";
-    quitBtn.onclick = quitForRename;
-    actions.appendChild(quitBtn);
-    tip.appendChild(actions);
-  }else if(adminResourceEditMode && adminGuideResourceSection !== "save" && (!isAdminGuideResourceFirstSection() || !isAdminGuideResourceLastSection())){
-    const actions = document.createElement("div");
-    actions.className = "admin-guide-tip-actions";
-    if(!isAdminGuideResourceFirstSection()){
-      const backBtn = document.createElement("button");
-      backBtn.className = "button";
-      backBtn.type = "button";
-      backBtn.textContent = "Back";
-      backBtn.onclick = retreatAdminGuideResourceSection;
-      actions.appendChild(backBtn);
-    }
-    if(!isAdminGuideResourceLastSection()){
-      const nextBtn = document.createElement("button");
-      nextBtn.className = "button";
-      nextBtn.type = "button";
-      nextBtn.textContent = "Next";
-      nextBtn.onclick = advanceAdminGuideResourceSection;
-      actions.appendChild(nextBtn);
-    }
-    tip.appendChild(actions);
-  }
-  const firstPanel = container.querySelector(".admin-panel");
-  if(firstPanel){
-    container.insertBefore(tip, firstPanel);
-  }else{
-    container.appendChild(tip);
-  }
+  return !!isTemplateFile;
 }
 
 function printAdminHelp(){
   const modal = document.getElementById("referenceModal");
   if(!modal || modal.classList.contains("hidden")) return;
-  const details = Array.from(modal.querySelectorAll(".admin-help-content details"));
-  adminHelpPrintRestoreState = details.map(detail => detail.open);
+  const details = Array.from(modal.querySelectorAll(".admin-help-content details:not(.admin-training-section)"));
+  adminHelpPrintRestoreState = {
+    bodyClass:"admin-help-printing",
+    details,
+    states:details.map(detail => detail.open)
+  };
+  document.body.classList.add(adminHelpPrintRestoreState.bodyClass);
+  details.forEach(detail => { detail.open = true; });
+  window.setTimeout(() => window.print(), 0);
+}
+
+function printAdminTraining(){
+  const modal = document.getElementById("referenceModal");
+  if(!modal || modal.classList.contains("hidden")) return;
+  const details = Array.from(modal.querySelectorAll(".admin-training-section"));
+  adminHelpPrintRestoreState = {
+    bodyClass:"admin-training-printing",
+    details,
+    states:details.map(detail => detail.open)
+  };
+  document.body.classList.add(adminHelpPrintRestoreState.bodyClass);
   details.forEach(detail => { detail.open = true; });
   window.setTimeout(() => window.print(), 0);
 }
 
 function restoreAdminHelpPrintState(){
   if(!adminHelpPrintRestoreState) return;
-  const modal = document.getElementById("referenceModal");
-  const details = modal ? Array.from(modal.querySelectorAll(".admin-help-content details")) : [];
-  details.forEach((detail, index) => {
-    detail.open = !!adminHelpPrintRestoreState[index];
+  const state = adminHelpPrintRestoreState;
+  if(state.bodyClass) document.body.classList.remove(state.bodyClass);
+  state.details.forEach((detail, index) => {
+    detail.open = !!state.states[index];
   });
   adminHelpPrintRestoreState = null;
-}
-
-function syncAdminHelpGuideVisibility(){
-  const setupSection = document.querySelector("#referenceModal .admin-help-setup");
-  if(setupSection) setupSection.classList.toggle("hidden", !adminGuideMode);
-  const guideBtn = document.getElementById("adminHelpGuideButton");
-  if(guideBtn){
-    guideBtn.setAttribute("aria-pressed", adminGuideMode ? "true" : "false");
-    guideBtn.classList.toggle("primary", adminGuideMode);
-  }
 }
 
 function toggleUpdateInfoView(){
@@ -4903,23 +3971,18 @@ function showAdminSetup(){
     const nextName = String(nameInput ? nameInput.value : "").trim();
     if(nextName){
       localStorage.setItem(TSO_NAME_STORAGE_KEY, nextName);
+      if(isNewTemplateFile()) markRenamedAdminTrainingPending(nextName);
     }else{
       localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+      if(isNewTemplateFile()) localStorage.removeItem(NEW_ADMIN_TRAINING_PENDING_KEY);
     }
     refreshAppTitle();
     safeRender();
     showToast("TSO name saved.");
-    if(adminGuideMode && adminGuideStep === "setupName"){
-      adminGuideStep = "verifyName";
-    }
   }
 
   if(closeBtn) closeBtn.addEventListener("click", () => {
     closeReferenceModal();
-    if(adminGuideMode && adminGuideStep === "verifyName"){
-      setAdminGuidePhase("renameFile");
-      setAdminGuideStep("renameFile");
-    }
   });
   if(saveBtn) saveBtn.addEventListener("click", saveName);
   if(nameInput){
@@ -4971,21 +4034,69 @@ function showUserHelp(){
   modal.classList.remove("hidden");
 }
 
-function showAdminHelp(){
+function showAdminHelp(options = {}){
+  const expandTraining = !!(options && options.expandTraining);
   const modal = getReferenceModal();
   const resourcePackageFilename = escapeHTML(getResourcePackageFilename());
+  const adminEntryTipHTML = expandTraining && isNewTemplateFile()
+    ? `<div class="red-tip new-admin-tip">${escapeHTML(TIP_TEXT.newAdminMode)}</div>`
+    : "";
   modal.innerHTML = `
     <div class="reference-modal-panel" role="dialog" aria-modal="true" aria-labelledby="adminHelpTitle">
       <div class="reference-modal-header">
         <div id="adminHelpTitle" class="reference-modal-title">Admin Help</div>
         <div class="reference-modal-actions">
-          <button class="button ${adminGuideMode ? "primary" : ""}" type="button" id="adminHelpGuideButton" aria-pressed="${adminGuideMode ? "true" : "false"}">Guide</button>
           <button class="button" type="button" id="adminHelpPrintButton">Print</button>
           <button class="button reference-modal-close" type="button">Close</button>
         </div>
       </div>
       <div class="reference-modal-body admin-help-content">
+        ${adminEntryTipHTML}
         <p><strong>NOTE:</strong> The <code>Lists</code> category is generated automatically. It is not edited in <code>Categories</code>. A resource appears in <code>Lists</code> when it has no phone, website, or hours, which usually means it is a list such as food pantries, shelters, rooms, or temp agencies.</p>
+
+        <details class="admin-training-section" ${expandTraining ? "open" : ""}>
+          <summary>First-Time Admin Training</summary>
+          <div class="admin-help-section-body">
+            <div class="admin-training-actions">
+              <button class="button" type="button" id="adminTrainingPrintButton">Print Training</button>
+            </div>
+            <p>This walkthrough will help you get up and running. You'll add a practice resource and then see how it looks to a user. You'll learn about the Category, Resource and For editors, filters, For groups, the change log and how to share your newly-added resources with your users.</p>
+            <ol>
+              <li>Press <code>Ctrl+Alt+A</code> to enable admin mode. Click the <code>Admin</code> button in the top blue bar.</li>
+              <li>Change the TSO name. Close the tab or window and rename <code>new.html</code> to <code>[your tso name].html</code> and open it.</li>
+              <li>Click the <code>Education</code> category. It says, <code>No resources in this category</code>.</li>
+              <li>Enter admin mode.</li>
+              <li>We'll discuss <code>Save Resource Package</code> later. <code>Categories</code>, <code>Resources</code> and <code>For</code> are editors.</li>
+              <li>On the left is a list of the standard categories. You can add <code>New</code> categories or <code>Delete</code> existing ones.</li>
+              <li>On the right is the category editor. If you make a change you should describe it. Your description will appear in the change log and will inform the users of what has changed.</li>
+              <li>Click <code>Education</code> in the list of categories.</li>
+              <li>Filters are like specific subcategories and they are different for each category. Education has filters for <code>GED</code>, <code>Evening classes</code> and more. On the right, <code>Resources in this category</code> is empty.</li>
+              <li>Click the <code>For</code> button above the list of categories. An Education resource, for example, might be for Spanish speakers.</li>
+              <li>Click <code>Resources</code>. We'll create a practice resource that will tie all this together.</li>
+              <li>Click <code>New</code>. Name the resource <code>Education Practice</code>. Fill in something for <code>Phone</code>, <code>Address</code>, <code>Website</code> and <code>Hours</code>.</li>
+              <li>In <code>Description</code> enter <code>This is a practice resource for training purposes.</code></li>
+              <li>In <code>Describe this update</code>, enter <code>new</code>.</li>
+              <li>In <code>For</code>, click <code>Spanish speaking</code> and <code>Veterans</code>.</li>
+              <li>In <code>Categories</code>, click <code>Education</code> and then click <code>GED</code> and <code>Evening classes</code>.</li>
+              <li>In the <code>Information</code> section, click <code>Edit</code>.</li>
+              <li>Type the following in the text area:
+                <pre class="admin-training-sample"><code>**Practice formatting for this resource**
+---
+* here's a bullet
+* __this text is underlined__</code></pre>
+                Now click the <code>Preview</code> button.
+              </li>
+              <li>Click the blue <code>Done</code> button, then click the <code>Categories</code> button in the blue bar.</li>
+              <li><code>Education</code> has an <code>Update</code> button. Click it. Then click <code>Categories</code> and click <code>Education</code> again.</li>
+              <li>Click <code>GED</code> or <code>Evening classes</code> or both. They show the practice resource that is specifically GED or Evening classes.</li>
+              <li>Click <code>Spanish speaking</code> or <code>Veterans</code> or both. This practice resource is for them.</li>
+              <li>Enter admin mode again. Click <code>Show change log</code>. Click <code>Save Resource Package</code> and choose the location for the resource package. Remember where you put it.</li>
+              <li>Click <code>Resources</code>, highlight <code>Practice</code> and delete it. Press <code>Ctrl+Alt+A</code> to exit admin mode.</li>
+              <li>Under the category buttons, on the right side, click <code>Merge Resources</code>. Choose the <code>resources.json</code> file you saved. The Practice resource will be back in Education.</li>
+              <li>In the Education category, click the gray square on the left of Practice resource. Use the printer icon in the blue bar to print the Practice resource.</li>
+            </ol>
+          </div>
+        </details>
 
         <details>
           <summary>Before You Edit</summary>
@@ -5108,16 +4219,12 @@ function showAdminHelp(){
     </div>
   `;
   const closeBtn = modal.querySelector(".reference-modal-close");
-  const guideBtn = document.getElementById("adminHelpGuideButton");
   const printBtn = document.getElementById("adminHelpPrintButton");
+  const trainingPrintBtn = document.getElementById("adminTrainingPrintButton");
   if(closeBtn) closeBtn.addEventListener("click", closeReferenceModal);
-  if(guideBtn) guideBtn.addEventListener("click", () => {
-    requestToggleAdminGuide("adminHelp");
-    syncAdminHelpGuideVisibility();
-  });
   if(printBtn) printBtn.addEventListener("click", printAdminHelp);
+  if(trainingPrintBtn) trainingPrintBtn.addEventListener("click", printAdminTraining);
   modal.classList.remove("hidden");
-  syncAdminHelpGuideVisibility();
   if(closeBtn) closeBtn.focus();
 }
 
@@ -5439,17 +4546,12 @@ function renderMergeResourcesButton(){
   appView.appendChild(reloadWrap);
 }
 
-function renderCategoryGuideTip(){
-  const categoryGuideTipText = getCategoryGuideTipText();
-  if(categoryGuideTipText){
-    const tip = createGuideTip(categoryGuideTipText);
-    if(tip) appView.appendChild(tip);
-    return;
-  }
-
+function renderCategoryTip(){
   const categoryTipId = getCategoryTipId();
   if(categoryTipId){
-    const tip = createTip(categoryTipId);
+    const tip = categoryTipId === "newAdminWelcome"
+      ? createNewAdminTip(TIP_TEXT[categoryTipId])
+      : createTip(categoryTipId);
     if(tip) appView.appendChild(tip);
   }
 }
@@ -5512,9 +4614,9 @@ function renderCategoriesGrid(){
 }
 
 function renderCategoriesView(){
-  // Main public landing screen: guide/user tip, update notice, category grid,
+  // Main public landing screen: tip, update notice, category grid,
   // and resource-package merge entry point.
-  renderCategoryGuideTip();
+  renderCategoryTip();
   renderPendingUpdatesNotice();
   renderCategoryReminder();
   renderCategoriesGrid();
@@ -6075,7 +5177,6 @@ function renderAdmin(){
       </div>
       <div class="admin-toolbar-reference-actions admin-sticky-reference-actions">
         ${shouldShowChangeTsoNameButton() ? `<button class="button" onclick="showAdminSetup()">Change TSO Name</button>` : ""}
-        <button class="button ${adminGuideMode ? "primary" : ""}" onclick="requestToggleAdminGuide()" aria-pressed="${adminGuideMode ? "true" : "false"}">Guide</button>
         <button class="button admin-toolbar-help" onclick="showAdminHelp()">Help</button>
       </div>
     </div>
@@ -6102,11 +5203,14 @@ function renderAdmin(){
   `;
 
   clearAdminEditorActions();
+  if(isNewTemplateFile()){
+    const tip = createNewAdminTip(TIP_TEXT.newAdminMode);
+    if(tip) container.appendChild(tip);
+  }
   resetAdminEditorStateForTab(adminTab);
   if(adminTab === "categories") renderAdminCategories(container);
   if(adminTab === "resources") renderAdminResources(container);
   if(adminTab === "forGroups") renderAdminForGroups(container);
-  renderAdminGuideTip(container);
 }
 
 function showChangeLog(){
@@ -7055,7 +6159,6 @@ function getReferenceModal(){
 function closeReferenceModal(){
   const modal = document.getElementById("referenceModal");
   if(modal) modal.classList.add("hidden");
-  if(adminGuideMode && view === "admin") safeRenderAdmin();
 }
 
 function showReferenceModal(resourceName, matches){
@@ -7126,11 +6229,6 @@ function switchAdminTab(nextTab){
   if(!commitPendingEditsIfChanged()) return;
   if(nextTab !== "resources"){
     adminResourceEditMode = false;
-  }
-  if(adminGuideMode){
-    if(nextTab === "categories") adminGuideStep = "categoryFilters";
-    if(nextTab === "resources") adminGuideStep = "newResource";
-    if(nextTab === "forGroups") adminGuideStep = "forGroupsAdmin";
   }
   adminTab = nextTab;
   safeRenderAdmin();
@@ -7361,15 +6459,10 @@ function updateCategoryEditorActionBar(){
 function updateResourceEditorActionBar(validationDisabled = false){
   const currentSnapshot = snapshotResourceEditor();
   const isNewDraft = isCurrentResourceNewDraft();
-  const guideExitDisabled = shouldDisableResourceEditorExit();
   setAdminEditorActions(
     "resource",
-    shouldForceEnableResourceEditorExit() || isNewDraft || (!!currentSnapshot && currentSnapshot !== editorSnapshot)
-      || (guideExitDisabled && isNewDraft),
-    shouldForceEnableResourceEditorExit()
-      ? false
-      : guideExitDisabled || validationDisabled,
-    guideExitDisabled && !isNewDraft
+    isNewDraft || (!!currentSnapshot && currentSnapshot !== editorSnapshot),
+    validationDisabled
   );
 }
 
@@ -7641,11 +6734,6 @@ function commitPendingEditsIfChanged(){
 
 function renderAdminCategories(container){
   // Category management view (alphabetical list, full-width editor, and filters).
-  if(adminGuideMode && adminGuideStep === "categoryFilters"){
-    const transportationIndex = getCategoryIndexById("transportation");
-    if(transportationIndex !== -1) selectedCategoryIndex = String(transportationIndex);
-  }
-
   container.innerHTML += `
     <div class="admin-panel category-admin-panel">
       <div class="category-admin-layout">
@@ -7910,9 +6998,6 @@ function deleteCategory(){
 
 function closeCategoryEditor(){
   if(!commitPendingEditsIfChanged()) return;
-  if(adminGuideMode && adminGuideStep === "categoryFilters"){
-    adminGuideStep = "resources";
-  }
   safeRenderAdmin();
   const sel = document.getElementById("catSelect");
   if(sel) sel.focus();
@@ -8105,7 +7190,7 @@ function renderAdminResources(container){
   }
 
   container.innerHTML += `
-    <div class="admin-panel ${adminGuideMode && adminGuideStep === "resourceFields" ? "admin-guide-active" : ""}">
+    <div class="admin-panel">
       <div class="admin-box">
         <h3 style="margin:0;">Edit Resource</h3>
         <div id="resEditor" style="margin-top:12px;"></div>
@@ -8205,13 +7290,6 @@ function newResource(){
   adminTab = "resources";
   selectedResourceId = resource.id;
   adminResourceEditMode = true;
-  if(adminGuideMode){
-    if(adminGuideStep === "newResource"){
-      adminGuidePracticeResourceId = resourceId;
-      localStorage.setItem(ADMIN_GUIDE_PRACTICE_RESOURCE_STORAGE_KEY, resourceId);
-    }
-    startAdminGuide("resourceFields");
-  }
   safeRenderAdmin();
   focusAndSelectResourceName();
 }
@@ -8273,11 +7351,6 @@ function deleteResource(){
   data.resources.splice(idx,1);
   addChangeEntry(createChangeEntry("resource", "removed", res.id, res.name || "(Unnamed resource)", updateDescription, { categoryIds:res.categories }));
   newResourceIds.delete(res.id);
-  const shouldCompleteGuideAfterDelete = adminGuideMode
-    && adminGuideStep === "deleteResource"
-    && !!adminGuidePracticeResourceId
-    && String(res.id || "") === adminGuidePracticeResourceId;
-
   const remainingIds = getAdminResourceBrowseList().map(r => String(r.id || ""));
   if(!remainingIds.length){
     selectedResourceId = "";
@@ -8288,14 +7361,12 @@ function deleteResource(){
   }
 
   persist();
-  if(shouldCompleteGuideAfterDelete) completeAdminGuide();
   safeRenderAdmin();
 }
 
 function openResourceEditor(){
   if(!selectedResourceId) return;
   adminResourceEditMode = true;
-  if(adminGuideMode) startAdminGuide("resourceFields");
   safeRenderAdmin();
   focusAndSelectResourceName();
 }
@@ -8308,24 +7379,10 @@ function focusAndSelectResourceName(){
 }
 
 function closeResourceEditor(){
-  if(adminGuideMode && adminGuideStep === "resourceFields" && adminResourceEditMode && adminGuideResourceSection === "update"){
-    if(!saveGuidedResourceEditorProgress()) return;
-    adminGuideResourceSection = "save";
-    safeRenderAdmin();
-    return;
-  }
-  const shouldCompleteGuidedQuickStart = adminGuideMode
-    && adminGuideStep === "resourceFields"
-    && adminResourceEditMode
-    && adminGuideResourceSection === "save";
   if(!commitPendingEditsIfChanged()) return;
   adminResourceEditMode = false;
   editing = null;
   editorSnapshot = "";
-  if(shouldCompleteGuidedQuickStart){
-    adminGuideStep = "deleteResource";
-    adminTab = "resources";
-  }
   safeRenderAdmin();
 }
 
@@ -8338,13 +7395,6 @@ function cancelResourceEditor(){
   }
   adminResourceEditMode = false;
   safeRenderAdmin();
-}
-
-function getResourceGuideSectionClass(sectionName){
-  const active = sectionName === "update"
-    ? (adminGuideResourceSection === "update" || adminGuideResourceSection === "save")
-    : adminGuideResourceSection === sectionName;
-  return `resource-editor-guide-section ${active ? "admin-guide-current-section" : ""}`;
 }
 
 function renderResourceForGroupChecks(res){
@@ -8391,7 +7441,7 @@ function renderResourceCategoryChecks(res){
 
 function renderResourceBasicsSection(res, verifiedDisplay){
   return `
-    <div class="${getResourceGuideSectionClass("basics")}" data-guide-section="basics">
+    <div>
       <label>Name<br>
         <input id="res_name" value="${escapeHTML(res.name || "")}">
       </label>
@@ -8411,7 +7461,7 @@ function renderResourceBasicsSection(res, verifiedDisplay){
         <label>Hours<br>
           <input id="res_hours" value="${escapeHTML(res.hours || "")}">
         </label>
-        <div class="admin-guide-defer-verified">
+        <div>
           <strong>Verified</strong>
           <div class="verified-row" style="margin-top:4px;">
             <span id="res_verified_display" class="verified-value">${escapeHTML(verifiedDisplay)}</span>
@@ -8431,7 +7481,7 @@ function renderResourceBasicsSection(res, verifiedDisplay){
 
 function renderResourceUpdateSection(){
   return `
-    <div class="${getResourceGuideSectionClass("update")}" data-guide-section="update">
+    <div>
       <label style="display:block; margin-top:8px;">Describe this update (optional)<br>
         <textarea id="res_update_description" class="big" style="min-height:60px;"></textarea>
       </label><br>
@@ -8441,7 +7491,7 @@ function renderResourceUpdateSection(){
 
 function renderResourceForGroupsSection(forGroupChecks){
   return `
-    <div class="${getResourceGuideSectionClass("forGroups")}" data-guide-section="forGroups">
+    <div>
       <div style="margin-top:8px;">
         <strong>For</strong> <span class="admin-note">(Check only if this resource is specifically intended for this group.)</span>
         <div style="margin-top:4px;">
@@ -8455,7 +7505,7 @@ function renderResourceForGroupsSection(forGroupChecks){
 
 function renderResourceCategoriesSection(catChecks){
   return `
-    <div class="${getResourceGuideSectionClass("categories")}" data-guide-section="categories">
+    <div>
       <div>
         <strong>Categories</strong> <span class="admin-note">(Check applicable subcategories too.)</span><br>
         ${catChecks}
@@ -8466,7 +7516,7 @@ function renderResourceCategoriesSection(catChecks){
 
 function renderResourceInformationSection(informationDraft){
   return `
-    <div class="${getResourceGuideSectionClass("information")}" data-guide-section="information">
+    <div>
       <label style="display:block; font-weight:bold; margin-top:12px;">Information</label>
       <div class="information-control-block">
         <div class="information-control-header">
@@ -8576,9 +7626,7 @@ function validateResourceEditorState(idx){
   const verifiedValidation = validateVerifiedOnInput(draft.verifiedOn);
   showResourceNameWarning(nameValidation.message);
   showResourceVerifiedWarning(verifiedValidation.message);
-  const shouldDisableDone = shouldForceEnableResourceEditorExit()
-    ? false
-    : shouldDisableResourceEditorExit() || !(nameValidation.valid && verifiedValidation.valid);
+  const shouldDisableDone = !(nameValidation.valid && verifiedValidation.valid);
   updateResourceEditorActionBar(shouldDisableDone);
   const doneBtn = document.getElementById("res_done_btn");
   if(doneBtn) doneBtn.disabled = shouldDisableDone;

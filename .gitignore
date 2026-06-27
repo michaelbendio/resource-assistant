@@ -5,3 +5,9 @@ Thumbs.db
 .vscode/
 .idea/
 node_modules/
+
+# Generated local TSO apps
+*.html
+
+# Master template
+!new.html
