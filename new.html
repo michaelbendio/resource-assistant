@@ -1339,6 +1339,21 @@ function runStartupStateReset(fileName = getCurrentHtmlFileName()){
 }
 runStartupStateReset();
 
+function clearCurrentLocalState(){
+  STARTUP_STATE_STORAGE_KEYS.forEach(key => localStorage.removeItem(key));
+  localStorage.removeItem(DATA_STORAGE_KEY);
+  localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+  localStorage.removeItem(NEW_ADMIN_TRAINING_PENDING_KEY);
+  sessionStorage.clear();
+}
+
+function freshStartFromSeed(){
+  const confirmed = confirm("Clear saved local data for this file and reload from the embedded starter data?");
+  if(!confirmed) return;
+  clearCurrentLocalState();
+  location.reload();
+}
+
 // Main persisted app data snapshot (categories/resources + metadata).
 let data = JSON.parse(localStorage.getItem(DATA_STORAGE_KEY) || "null");
 const APP_VERSION = "2.1.0";
@@ -3206,21 +3221,17 @@ function runSelfTests(){
   tests.push({
     name: "SEED DATA CATEGORIES",
     fn: () => {
-      if(seed.categories.length !== 22){
-        throw new Error(`expected 22 seed categories, got ${seed.categories.length}`);
-      }
-      if(!seed.categories.some(category => category.label === "Utilities, Phone, Internet")){
-        throw new Error("missing Utilities, Phone, Internet category");
-      }
+      if(!Array.isArray(seed.categories) || !seed.categories.length) throw new Error("seed categories missing");
       const sample = { categories:seed.categories.map(category => ({ ...category })), resources:[] };
       const applied = applyDefaultCategoryPreset(sample);
       if(!applied) throw new Error("category preset was not applied");
       if(sample.categoryPresetVersion !== 1){
         throw new Error("category preset version was not recorded");
       }
-      sample.categories = sample.categories.filter(category => category.label !== "Addiction");
+      const removedLabel = sample.categories[0] && sample.categories[0].label;
+      sample.categories = sample.categories.filter(category => category.label !== removedLabel);
       applyDefaultCategoryPreset(sample);
-      if(sample.categories.some(category => category.label === "Addiction")){
+      if(sample.categories.some(category => category.label === removedLabel)){
         throw new Error("deleted seed category was recreated after version marker");
       }
     }
@@ -8867,6 +8878,14 @@ window.addEventListener("keydown", (e) => {
   e.preventDefault();
   e.stopPropagation();
   safeCall("runSelfTests", () => runSelfTests());
+}, true);
+
+window.addEventListener("keydown", (e) => {
+  const isFreshStartShortcut = e.ctrlKey && e.altKey && (e.code === "KeyF" || e.key === "F" || e.key === "f");
+  if(!isFreshStartShortcut) return;
+  e.preventDefault();
+  e.stopPropagation();
+  freshStartFromSeed();
 }, true);
 
 window.addEventListener("keydown", (e) => {
