@@ -6555,7 +6555,11 @@ async function exportPackage(){
       }
     }
 
-    const blob = await zip.generateAsync({ type: "blob" });
+    const blob = await zip.generateAsync({
+      type: "blob",
+      compression: "DEFLATE",
+      compressionOptions: { level: 6 }
+    });
     await saveResourcePackageBlob(saveTarget, blob);
     persist();
     showToast(`Resource package saved (${resourceCount} ${resourceCount === 1 ? "resource" : "resources"})`);
