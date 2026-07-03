@@ -2045,9 +2045,15 @@ function runSelfTests(){
         if(isNewTemplateFile() && getResourcePackageFilename() !== "tso-resources.json"){
           throw new Error(`new.html package filename was ${getResourcePackageFilename()}`);
         }
+        if(isNewTemplateFile() && getResourcePackageZipFilename() !== "tso-resource-package.zip"){
+          throw new Error(`new.html package zip filename was ${getResourcePackageZipFilename()}`);
+        }
         localStorage.setItem(TSO_NAME_STORAGE_KEY, "Provo");
         if(getResourcePackageFilename() !== "provo-resources.json"){
           throw new Error(`Provo package filename was ${getResourcePackageFilename()}`);
+        }
+        if(getResourcePackageZipFilename() !== "provo-resource-package.zip"){
+          throw new Error(`Provo package zip filename was ${getResourcePackageZipFilename()}`);
         }
       }finally{
         if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
@@ -4496,6 +4502,12 @@ function getResourcePackageFilename(){
   return stem === "tso" ? DEFAULT_RESOURCE_PACKAGE_FILENAME : `${stem}-resources.json`;
 }
 
+function getResourcePackageZipFilename(){
+  const baseName = getTsoName() || (isNewTemplateFile() ? "tso" : getTsoNameFromHtmlFileName(getCurrentHtmlFileName()));
+  const stem = slugifyFileStem(baseName, "tso");
+  return `${stem}-resource-package.zip`;
+}
+
 function getAppTitleText(){
   const tsoName = getTsoName();
   return `${tsoName || "<New>"} TSO Resources`;
@@ -6449,7 +6461,7 @@ function applyMergedData(mergedData){
 
 async function beginResourcePackageSave(){
   // Request a save target up front so browsers can honor the user gesture.
-  const suggestedName = "tso-resource-package.zip";
+  const suggestedName = getResourcePackageZipFilename();
   if(typeof window.showSaveFilePicker === "function"){
     const handle = await window.showSaveFilePicker({
       id: "tso-resources",
@@ -6468,7 +6480,7 @@ async function beginResourcePackageSave(){
 }
 
 function downloadResourcePackageBlob(fileName, blob){
-  const cleanFileName = fileName || "tso-resource-package.zip";
+  const cleanFileName = fileName || getResourcePackageZipFilename();
   const downloadBlob = blob.type === "application/octet-stream"
     ? blob
     : new Blob([blob], { type:"application/octet-stream" });
@@ -6486,7 +6498,7 @@ function downloadResourcePackageBlob(fileName, blob){
 }
 
 async function saveResourcePackageBlob(target, blob){
-  const fileName = target && target.suggestedName ? target.suggestedName : getResourcePackageFilename();
+  const fileName = target && target.suggestedName ? target.suggestedName : getResourcePackageZipFilename();
   if(target && target.kind === "file-handle" && target.handle){
     const writable = await target.handle.createWritable();
     try{
