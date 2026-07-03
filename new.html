@@ -3874,7 +3874,7 @@ function runSelfTests(){
         const filterResults = buildSearchResults("career training");
         if(filterResults.mode !== "taxonomy") throw new Error("category filter search should use taxonomy mode");
         if(filterResults.groups[0].items[0].resourceId !== "training") throw new Error("category filter search returned wrong resource");
-        if(!/Specifically: Career Training/.test(filterResults.groups[0].items[0].snippet)){
+        if(!/Type: Career Training/.test(filterResults.groups[0].items[0].snippet)){
           throw new Error("category filter search snippet was missing");
         }
 
@@ -3954,7 +3954,7 @@ function runSelfTests(){
         selectedCategoryFilters = {};
         render();
         const text = appView.textContent || "";
-        if(!text.includes("Specifically")) throw new Error("Specifically heading was not rendered");
+        if(!text.includes("Type")) throw new Error("Type heading was not rendered");
         if(!text.includes("For")) throw new Error("For heading was not rendered");
         const buttons = Array.from(appView.querySelectorAll("button")).map(button => button.textContent);
         if(!buttons.includes("Career Training")) throw new Error("category filter button was missing");
@@ -4603,7 +4603,7 @@ function showUserHelp(){
         <h3>Finding Resources</h3>
         <p>Select a category to view available resources.</p>
         <p>The <code>Lists</code> category appears automatically when a resource is a list rather than a normal service record.</p>
-        <p>Some category pages include <code>Specifically</code> and <code>For</code> buttons that narrow the visible resources.</p>
+        <p>Some category pages include <code>Type</code> and <code>For</code> buttons that narrow the visible resources.</p>
         <p>Click a resource to display Information, phone numbers, addresses, websites, hours, and notes.</p>
         <p>Click the resource again to hide the additional information.</p>
         <h3>Search</h3>
@@ -4654,7 +4654,7 @@ function showAdminHelp(options = {}){
             <div class="admin-training-actions">
               <button class="button" type="button" id="adminTrainingPrintButton">Print Training</button>
             </div>
-            <p>This walkthrough will help you get up and running. You'll add a practice resource and then see how it looks to a user. You'll learn about the Category, Resource and For editors, filters, For groups, the change log and how to share your newly-added resources with your users.</p>
+            <p>This walkthrough will help you get up and running. You'll add a practice resource and then see how it looks to a user. You'll learn about the Category, Resource and For editors, types, For groups, the change log and how to share your newly-added resources with your users.</p>
             <ol>
               <li>Press <code>Ctrl+Alt+A</code> to enable admin mode. Click the <code>Admin</code> button in the top blue bar.</li>
               <li>Change the TSO name. Close the tab or window and rename <code>new.html</code> to <code>[your tso name].html</code> and open it.</li>
@@ -4664,7 +4664,7 @@ function showAdminHelp(options = {}){
               <li>On the left is a list of the standard categories. You can add <code>New</code> categories or <code>Delete</code> existing ones.</li>
               <li>On the right is the category editor. If you make a change you should describe it. Your description will appear in the change log and will inform the users of what has changed.</li>
               <li>Click <code>Education</code> in the list of categories.</li>
-              <li>Filters are like specific subcategories and they are different for each category. Education has filters for <code>GED</code>, <code>Evening classes</code> and more. On the right, <code>Resources in this category</code> is empty.</li>
+              <li>Types are like specific subcategories and they are different for each category. Education has types for <code>GED</code>, <code>Evening classes</code> and more. On the right, <code>Resources in this category</code> is empty.</li>
               <li>Click the <code>For</code> button above the list of categories. An Education resource, for example, might be for Spanish speakers.</li>
               <li>Click <code>Resources</code>. We'll create a practice resource that will tie all this together.</li>
               <li>Click <code>New</code>. Name the resource <code>Education Practice</code>. Fill in something for <code>Phone</code>, <code>Address</code>, <code>Website</code> and <code>Hours</code>.</li>
@@ -5328,7 +5328,7 @@ function renderCategoryFilterControls(categoryFilterOptions, activeFilters){
   const filterArea = document.createElement("div");
   filterArea.style.marginBottom = "12px";
 
-  appendCategoryFilterGroup(filterArea, "Specifically", categoryFilterOptions.filter(option => option.kind === "filter"), activeFilters);
+  appendCategoryFilterGroup(filterArea, "Type", categoryFilterOptions.filter(option => option.kind === "filter"), activeFilters);
   appendCategoryFilterGroup(filterArea, "For", categoryFilterOptions.filter(option => option.kind === "for"), activeFilters);
 
   appView.appendChild(filterArea);
@@ -6848,7 +6848,7 @@ function addTaxonomySearchResults(groupMap, groups, cleanQuery, resources){
       categoryResources
         .filter(resource => getResourceCategoryFilterKeys(resource, categoryId).has(makeCategorySpecificFilterKey(filter)))
         .forEach(resource => {
-          addSearchResult(groupMap, groups, searchCategory, resource, { snippet:`Specifically: ${filter}` });
+          addSearchResult(groupMap, groups, searchCategory, resource, { snippet:`Type: ${filter}` });
         });
     });
   });
@@ -7872,8 +7872,8 @@ function editCategory(idx){
     <hr style="margin:18px 0 12px; border:0; border-top:1px solid #ddd;">
     <div class="category-editor-layout">
       <div>
-        <h4 style="margin:0 0 8px;">Filters</h4>
-        <p class="admin-note">Add specific filters for this category.</p>
+        <h4 style="margin:0 0 8px;">Types</h4>
+        <p class="admin-note">Add specific types for this category.</p>
         <div class="admin-action-row" style="margin-bottom:8px;">
           <button class="button" type="button" id="cat_filter_new_btn">New</button>
           <button class="button danger" type="button" id="cat_filter_delete_btn">Delete</button>
