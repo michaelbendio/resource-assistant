@@ -8549,6 +8549,12 @@ function refreshResourceInformationPreview(elements){
   elements.informationPreviewBox.innerHTML = renderInformationHTML(informationText);
 }
 
+function fitResourceInformationTextareas(){
+  Array.from(document.querySelectorAll(".resource-info-input")).forEach(field => {
+    fitTextareaToText(field);
+  });
+}
+
 function setResourceInformationEditorMode(elements, mode){
   if(!elements.informationEditor || !elements.informationPreviewBox || !elements.informationEditBtn || !elements.informationPreviewBtn) return;
   const previewMode = mode === "preview";
@@ -8557,6 +8563,7 @@ function setResourceInformationEditorMode(elements, mode){
   elements.informationEditBtn.classList.toggle("primary", !previewMode);
   elements.informationPreviewBtn.classList.toggle("primary", previewMode);
   if(previewMode) refreshResourceInformationPreview(elements);
+  else fitResourceInformationTextareas();
 }
 
 function syncResourceCategoryFilterVisibility(editor){
@@ -8606,6 +8613,7 @@ function setupResourceInformationControls(elements, validateEditorState){
   if(elements.informationEditBtn && elements.informationPreviewBtn){
     elements.informationEditBtn.onclick = () => setResourceInformationEditorMode(elements, "edit");
     elements.informationPreviewBtn.onclick = () => setResourceInformationEditorMode(elements, "preview");
+    fitResourceInformationTextareas();
     setResourceInformationEditorMode(elements, "preview");
   }
 
