@@ -1339,19 +1339,58 @@ function runStartupStateReset(fileName = getCurrentHtmlFileName()){
 }
 runStartupStateReset();
 
-function clearCurrentLocalState(){
+function clearTemporaryLocalState(){
   STARTUP_STATE_STORAGE_KEYS.forEach(key => localStorage.removeItem(key));
-  localStorage.removeItem(DATA_STORAGE_KEY);
-  localStorage.removeItem(TSO_NAME_STORAGE_KEY);
-  localStorage.removeItem(NEW_ADMIN_TRAINING_PENDING_KEY);
   sessionStorage.clear();
 }
 
+function clearCurrentLocalState(){
+  clearTemporaryLocalState();
+  localStorage.removeItem(DATA_STORAGE_KEY);
+  localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+  localStorage.removeItem(NEW_ADMIN_TRAINING_PENDING_KEY);
+}
+
+function deleteCurrentAssetStorage(){
+  if(typeof indexedDB === "undefined") return Promise.resolve();
+  return new Promise(resolve => {
+    const request = indexedDB.deleteDatabase(`${STORAGE_KEY_PREFIX}Assets`);
+    request.onsuccess = () => resolve();
+    request.onerror = () => resolve();
+    request.onblocked = () => resolve();
+  });
+}
+
 function freshStartFromSeed(){
-  const confirmed = confirm("Clear saved local data for this file and reload from the embedded starter data?");
-  if(!confirmed) return;
-  clearCurrentLocalState();
-  location.reload();
+  const choice = prompt(
+    "Choose local cleanup:\n\n" +
+    "1. Refresh UI state only - keep resources and categories.\n" +
+    "2. Reset to this file's starter data - delete local resources and categories.\n" +
+    "3. Full local cleanup - delete local data and local PDF storage.\n\n" +
+    "Type 1, 2, or 3."
+  );
+  const selected = String(choice || "").trim();
+  if(!selected) return;
+  if(selected === "1"){
+    clearTemporaryLocalState();
+    location.reload();
+    return;
+  }
+  if(selected === "2"){
+    const confirmed = confirm("Delete saved local resources/categories for this file and reload from the embedded starter data?");
+    if(!confirmed) return;
+    clearCurrentLocalState();
+    location.reload();
+    return;
+  }
+  if(selected === "3"){
+    const confirmed = confirm("Delete saved local resources/categories and local PDF storage for this file?");
+    if(!confirmed) return;
+    clearCurrentLocalState();
+    deleteCurrentAssetStorage().then(() => location.reload());
+    return;
+  }
+  alert("No cleanup was run. Type 1, 2, or 3.");
 }
 
 // Main persisted app data snapshot (categories/resources + metadata).
@@ -6485,6 +6524,15 @@ async function exportPackage(){
     packageVersionBumped = true;
 
     const packageData = buildResourcePackageData(data);
+    const resourceCount = Array.isArray(packageData.resources) ? packageData.resources.length : 0;
+    if(resourceCount === 0){
+      const shouldSaveEmpty = confirm("This resource package has no resources. Save it anyway?");
+      if(!shouldSaveEmpty){
+        data.packageVersion = previousPackageVersion;
+        packageVersionBumped = false;
+        return;
+      }
+    }
     zip.file("tso-resources.json", JSON.stringify(packageData, null, 2));
 
     const pdfKeys = collectPDFPathsFromResources(packageData.resources);
@@ -6498,7 +6546,7 @@ async function exportPackage(){
     const blob = await zip.generateAsync({ type: "blob" });
     await saveResourcePackageBlob(saveTarget, blob);
     persist();
-    showToast("Resource package saved");
+    showToast(`Resource package saved (${resourceCount} ${resourceCount === 1 ? "resource" : "resources"})`);
   }catch(err){
     if(err && err.name === "AbortError") return;
     if(packageVersionBumped) data.packageVersion = previousPackageVersion;
