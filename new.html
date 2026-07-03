@@ -747,6 +747,10 @@ AGENT EDITING RULES
 
 function nowISO(){ return new Date().toISOString(); }
 function escapeHTML(str){ return (str||"").replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;" }[m])); }
+function displayContactValue(value){
+  const trimmed = typeof value === "string" ? value.trim() : "";
+  return /^none$/i.test(trimmed) ? "" : trimmed;
+}
 function normalizeWebsiteURL(url){
   const trimmed = typeof url === "string" ? url.trim() : "";
   if(!trimmed) return "";
@@ -3564,6 +3568,25 @@ function runSelfTests(){
   });
 
   tests.push({
+    name: "RESOURCE CARD HIDES NONE CONTACT VALUES",
+    fn: () => {
+      const card = buildResourceCard({
+        id:"hide-none-contact",
+        name:"Hide None Contact",
+        phone:"none",
+        address:"None",
+        website:"NONE",
+        hours:" none ",
+        informationText:""
+      }, { expanded:true, showPrintToggle:false });
+      const text = card.textContent || "";
+      if(text.includes("Phone:") || text.includes("Address:") || text.includes("Website:") || text.includes("Hours:")){
+        throw new Error("resource card rendered contact fields whose value was none");
+      }
+    }
+  });
+
+  tests.push({
     name: "ADMIN FOR GROUP DELETE BULK UPDATE",
     fn: () => {
       const previousData = data;
@@ -4876,11 +4899,15 @@ function buildResourceCard(res,{expanded=false,showDescription=false,showPrintTo
 
   let html="";
   const pdfs = getResourcePDFs(res);
-  const websiteURL = normalizeWebsiteURL(res.website);
-  if(res.phone) html+=`<div><strong>Phone:</strong> <a href="tel:${res.phone}">${res.phone}</a></div>`;
-  if(res.address) html+=`<div><strong>Address:</strong> ${escapeHTML(res.address)}</div>`;
-  if(websiteURL) html+=`<div><strong>Website:</strong> <a href="${websiteURL}" target="_blank">${res.website}</a></div>`;
-  if(res.hours) html+=`<div><strong>Hours:</strong> ${escapeHTML(res.hours)}</div>`;
+  const phone = displayContactValue(res.phone);
+  const address = displayContactValue(res.address);
+  const website = displayContactValue(res.website);
+  const hours = displayContactValue(res.hours);
+  const websiteURL = normalizeWebsiteURL(website);
+  if(phone) html+=`<div><strong>Phone:</strong> <a href="tel:${escapeHTML(phone)}">${escapeHTML(phone)}</a></div>`;
+  if(address) html+=`<div><strong>Address:</strong> ${escapeHTML(address)}</div>`;
+  if(websiteURL) html+=`<div><strong>Website:</strong> <a href="${websiteURL}" target="_blank">${escapeHTML(website)}</a></div>`;
+  if(hours) html+=`<div><strong>Hours:</strong> ${escapeHTML(hours)}</div>`;
   if(pdfs.length === 1){
     const label = pdfs[0].name && pdfs[0].name !== "PDF" ? pdfs[0].name : "Open PDF";
     html+=`<div><button type="button" class="button resource-pdf-button" data-pdf-index="0">${escapeHTML(label)}</button></div>`;
