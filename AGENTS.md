@@ -14,6 +14,9 @@ Run:
 python3 make-local-tso albuquerque
 ```
 
+The helper rebuilds `new.html` from the modular sources before copying it. Edit
+files under `src/`, `tests/`, or `vendor/`; do not edit generated `new.html`.
+
 This creates or overwrites `albuquerque.html`, sets:
 
 ```html

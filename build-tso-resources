@@ -1,0 +1,150 @@
+#!/usr/bin/env python3
+"""Assemble the single-file TSO Resources deliverable from modular sources."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import tempfile
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parent
+APP_JS_SOURCES = [
+    "src/js/00-index.js",
+    "src/js/10-utilities.js",
+    "src/js/20-normalization.js",
+    "src/js/30-state.js",
+    "src/js/40-safety.js",
+    "src/js/50-rendering.js",
+    "src/js/60-undo-and-views.js",
+    "src/js/70-print.js",
+    "src/js/80-admin-shell.js",
+    "src/js/90-persistence-and-packages.js",
+    "src/js/100-admin-editors.js",
+    "src/js/110-shortcuts.js",
+    "src/js/120-startup.js",
+]
+PLACEHOLDERS = [
+    "{{APP_CSS}}",
+    "{{TEST_UI}}",
+    "{{SEED_DATA}}",
+    "{{VENDOR_JS}}",
+    "{{APP_JS}}",
+    "{{TEST_JS}}",
+]
+
+
+def read(relative_path: str) -> str:
+    path = ROOT / relative_path
+    if not path.is_file():
+        raise SystemExit(f"Missing build source: {relative_path}")
+    return path.read_text(encoding="utf-8").rstrip()
+
+
+def join_javascript(relative_paths: list[str]) -> str:
+    sections = []
+    for relative_path in relative_paths:
+        sections.append(f"// Source: {relative_path}\n{read(relative_path)}")
+    return "\n\n".join(sections)
+
+
+def replace_placeholder(document: str, placeholder: str, value: str) -> str:
+    count = document.count(placeholder)
+    if count != 1:
+        raise SystemExit(f"Expected one {placeholder} placeholder; found {count}")
+    return document.replace(placeholder, value, 1)
+
+
+def build_document(include_tests: bool) -> str:
+    shell = read("src/app-shell.html")
+    for placeholder in PLACEHOLDERS:
+        if shell.count(placeholder) != 1:
+            raise SystemExit(f"Expected one {placeholder} placeholder in src/app-shell.html")
+
+    seed_text = read("src/seed-data.json")
+    try:
+        json.loads(seed_text)
+    except json.JSONDecodeError as error:
+        raise SystemExit(f"Invalid src/seed-data.json: {error}") from error
+    if re.search(r"</script", seed_text, flags=re.IGNORECASE):
+        raise SystemExit("src/seed-data.json must not contain a closing script tag")
+
+    replacements = {
+        "{{APP_CSS}}": read("src/styles.css"),
+        "{{TEST_UI}}": read("tests/self-test-panel.html") if include_tests else "",
+        "{{SEED_DATA}}": seed_text,
+        "{{VENDOR_JS}}": read("vendor/jszip.min.js"),
+        "{{APP_JS}}": join_javascript(APP_JS_SOURCES),
+        "{{TEST_JS}}": (
+            "// Source: tests/self-tests.js\n" + read("tests/self-tests.js")
+            if include_tests
+            else ""
+        ),
+    }
+    output = shell
+    for placeholder, value in replacements.items():
+        output = replace_placeholder(output, placeholder, value)
+
+    unresolved = re.findall(r"{{[A-Z0-9_]+}}", output)
+    if unresolved:
+        raise SystemExit(f"Unresolved build placeholders: {', '.join(sorted(set(unresolved)))}")
+    if not include_tests:
+        forbidden = ["function runSelfTests", 'id="selfTestPanel"', "isSelfTestShortcut"]
+        found = [token for token in forbidden if token in output]
+        if found:
+            raise SystemExit(f"Production build contains self-test code: {', '.join(found)}")
+    return output.rstrip() + "\n"
+
+
+def write_atomic(destination: Path, content: str) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        dir=destination.parent,
+        prefix=f".{destination.name}.",
+        delete=False,
+    ) as temporary:
+        temporary.write(content)
+        temporary_path = Path(temporary.name)
+    os.replace(temporary_path, destination)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--with-tests",
+        action="store_true",
+        help="Include the browser self-test panel and Ctrl+Shift+T test harness",
+    )
+    parser.add_argument("--output", "-o", help="Output HTML path")
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Verify that the requested output is current without rewriting it",
+    )
+    args = parser.parse_args()
+
+    default_output = "build/tso-resources-debug.html" if args.with_tests else "new.html"
+    destination = Path(args.output or default_output)
+    if not destination.is_absolute():
+        destination = ROOT / destination
+    content = build_document(args.with_tests)
+
+    if args.check:
+        if not destination.is_file() or destination.read_text(encoding="utf-8") != content:
+            raise SystemExit(f"Generated output is not current: {destination}")
+        print(f"Build output is current: {destination}")
+        return 0
+
+    write_atomic(destination, content)
+    build_kind = "debug" if args.with_tests else "production"
+    print(f"Wrote {build_kind} TSO Resources deliverable: {destination}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

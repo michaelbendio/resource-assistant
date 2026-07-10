@@ -1,0 +1,36 @@
+{
+  "categories": [
+    { "id": "addiction", "label": "Addiction", "active": true, "filters": ["In-patient", "Out-patient", "Sober Living"] },
+    { "id": "children-pregnancy", "label": "Children/Pregnancy", "active": true, "filters": ["Obstetric care", "Pregnancy Education"] },
+    { "id": "clothing-household", "label": "Clothing/Household", "active": true },
+    { "id": "disability", "label": "Disability", "active": true },
+    { "id": "domestic-violence", "label": "Domestic Violence", "active": true },
+    { "id": "education", "label": "Education", "active": true, "filters": ["GED", "Evening classes", "Scholarships", "Trades", "Career", "Guidance", "Certification", "Degree"] },
+    { "id": "employment", "label": "Employment", "active": true, "filters": ["Temp Agencies", "Apps", "Résumé assistance", "Job application assistance"] },
+    { "id": "financial-assistance", "label": "Financial Assistance", "active": true, "filters": ["Rent Assistance", "Utilities assistance"] },
+    { "id": "reentry-support", "label": "Reentry Support", "active": true },
+    { "id": "food", "label": "Food", "active": true, "filters": ["Pantry", "Meals"] },
+    { "id": "medical-dental-vision", "label": "Medical, Dental, Vision", "active": true, "filters": ["No Insurance", "Lab"] },
+    { "id": "homeless-services", "label": "Homeless Services", "active": true, "filters": ["Shelters", "Showers", "Laundry", "Haircuts", "Meals", "Mailing address", "Storage", "Computers", "Phones", "Hygiene kits", "Clothing", "Benefit enrollment", "Medical", "Dental", "Vision"] },
+    { "id": "housing", "label": "Housing", "active": true, "filters": ["Houses", "Apartments", "Rooms", "Subsidized"] },
+    { "id": "id-recovery", "label": "ID Recovery", "active": true },
+    { "id": "immigration", "label": "Immigration", "active": true },
+    { "id": "legal", "label": "Legal", "active": true, "filters": ["Pro bono", "Immigration"] },
+    { "id": "mental-health", "label": "Mental Health", "active": true },
+    { "id": "miscellaneous", "label": "Miscellaneous", "active": true },
+    { "id": "seniors", "label": "Seniors", "active": true },
+    { "id": "transportation", "label": "Transportation", "active": true, "filters": ["Bus passes", "One-way tickets", "Gas cards", "Car repairs"] },
+    { "id": "utilities-phone-internet", "label": "Utilities, Phone, Internet", "active": true, "filters": ["Low-cost phones", "Low-cost internet"] },
+    { "id": "veterans", "label": "Veterans", "active": true, "filters": ["Government benefits", "Coaching"] }
+  ],
+  "forGroups": [
+    "Veterans",
+    "Families with children",
+    "Women",
+    "Spanish speaking",
+    "Exiting corrections",
+    "Medically vulnerable",
+    "Seniors"
+  ],
+  "resources": []
+}

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -50,8 +51,14 @@ def main() -> int:
     source_path = Path(args.source)
     destination_path = Path(args.output or f"{storage_id}.html")
 
+    if args.source == "new.html":
+        builder = Path(__file__).resolve().parent / "build-tso-resources"
+        subprocess.run([sys.executable, str(builder)], check=True)
+
     if not source_path.exists():
         raise SystemExit(f"Template not found: {source_path}")
+    if source_path.resolve() == destination_path.resolve():
+        raise SystemExit("Refusing to overwrite the master template with a local TSO file.")
 
     html = source_path.read_text(encoding="utf-8")
     html = replace_once(

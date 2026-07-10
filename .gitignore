@@ -5,9 +5,16 @@ Thumbs.db
 .vscode/
 .idea/
 node_modules/
+build/
+__pycache__/
+*.pyc
 
 # Generated local TSO apps
 *.html
 
 # Master template
 !new.html
+
+# Build sources and browser-test fixtures
+!src/*.html
+!tests/*.html
