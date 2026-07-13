@@ -44,6 +44,17 @@ Create an office-specific HTML file:
 python3 make-local-tso albuquerque
 ```
 
+On a Mac with iCloud Drive enabled, this also copies `albuquerque.html` to
+`iCloud Drive/Documents/TSO`. To keep the `TSO` folder available offline on an
+iPhone or iPad, open Files, locate the folder in iCloud Drive, touch and hold it,
+and choose **Keep Downloaded** on each device.
+
+To create only the repository copy:
+
+```bash
+python3 make-local-tso albuquerque --no-icloud-copy
+```
+
 This first rebuilds `new.html`, then creates `albuquerque.html` with the correct
 storage ID and the title `Albuquerque TSO Resources`.
 

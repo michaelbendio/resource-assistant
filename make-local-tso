@@ -7,15 +7,20 @@ Usage:
   python3 make-local-tso utah_valley --output albq.html
 
 The script copies new.html, sets the tso-storage-id meta tag, updates the page
-title, and overwrites the destination HTML file if it already exists.
+title, overwrites the destination HTML file if it already exists, and copies the
+finished file to iCloud Drive/Documents/TSO when that iCloud Drive is available.
 """
 from __future__ import annotations
 
 import argparse
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+
+DEFAULT_ICLOUD_DOCUMENTS_DIR = Path.home() / "Library/Mobile Documents/com~apple~CloudDocs/Documents"
 
 
 def slugify(value: str) -> str:
@@ -39,11 +44,29 @@ def replace_once(pattern: str, replacement: str, text: str, description: str) ->
     return updated
 
 
+def copy_to_icloud(destination_path: Path, icloud_tso_dir: Path) -> Path:
+    icloud_tso_dir.mkdir(parents=True, exist_ok=True)
+    icloud_destination = icloud_tso_dir / destination_path.name
+    if destination_path.resolve() != icloud_destination.resolve():
+        shutil.copy2(destination_path, icloud_destination)
+    return icloud_destination
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Create a local TSO HTML file from new.html.")
     parser.add_argument("name", help="Local TSO name, such as albuquerque or salt-lake")
     parser.add_argument("--output", "-o", help="Destination HTML file. Defaults to <name>.html")
     parser.add_argument("--source", "-s", default="new.html", help="Template HTML file. Defaults to new.html")
+    parser.add_argument(
+        "--icloud-dir",
+        type=Path,
+        help="iCloud destination directory. Defaults to iCloud Drive/Documents/TSO on macOS.",
+    )
+    parser.add_argument(
+        "--no-icloud-copy",
+        action="store_true",
+        help="Create the local HTML file without copying it to iCloud Drive.",
+    )
     args = parser.parse_args()
 
     storage_id = slugify(args.name)
@@ -76,6 +99,19 @@ def main() -> int:
 
     destination_path.write_text(html, encoding="utf-8")
     print(f"Wrote {destination_path} with storage id {storage_id!r} and title {title_name!r}.")
+
+    if not args.no_icloud_copy:
+        icloud_tso_dir = args.icloud_dir.expanduser() if args.icloud_dir else DEFAULT_ICLOUD_DOCUMENTS_DIR / "TSO"
+        icloud_documents_available = args.icloud_dir is not None or DEFAULT_ICLOUD_DOCUMENTS_DIR.exists()
+        if icloud_documents_available:
+            icloud_destination = copy_to_icloud(destination_path, icloud_tso_dir)
+            print(f"Copied {destination_path.name} to iCloud Drive: {icloud_destination}")
+        else:
+            print(
+                "iCloud Drive Documents was not found; skipped the iCloud copy. "
+                "Use --icloud-dir to choose another synced directory.",
+                file=sys.stderr,
+            )
     return 0
 
 

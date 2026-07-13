@@ -29,6 +29,10 @@ and changes the page title to:
 <title>Albuquerque TSO Resources</title>
 ```
 
+On macOS, the helper also copies the finished office-specific HTML file to
+`iCloud Drive/Documents/TSO` when iCloud Drive Documents is available. Use
+`--no-icloud-copy` only when the user does not want that synced copy.
+
 The JavaScript localStorage keys are not edited one by one. They are derived at runtime from the `tso-storage-id` value, so setting the meta tag changes the effective keys to `albuquerqueData`, `albuquerquePrintSelection`, `albuquerqueTsoName`, and the other generated keys.
 
 For a different output filename, use `--output`, for example:

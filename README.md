@@ -40,7 +40,11 @@ python3 make-local-tso albuquerque
 
 The helper first rebuilds `new.html`, then creates `albuquerque.html`, sets the
 local storage id to `albuquerque`, and sets the page title to
-`Albuquerque TSO Resources`. It refuses to overwrite the master template.
+`Albuquerque TSO Resources`. It refuses to overwrite the master template. On a
+Mac with iCloud Drive enabled, it also copies the finished file to
+`iCloud Drive/Documents/TSO` so it appears in Files on synced iPhones and iPads.
+Use `--no-icloud-copy` to skip that copy or `--icloud-dir PATH` to select another
+synced directory.
 
 ## Local admin quick start
 
