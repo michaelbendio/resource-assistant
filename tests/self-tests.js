@@ -20,6 +20,59 @@ function runSelfTests(){
   });
 
   tests.push({
+    name: "CHANGE LOG DESCRIPTION FALLBACK",
+    fn: () => {
+      const html = formatChangeEntryHTML({
+        targetName:"Shelter",
+        type:"resource",
+        action:"updated",
+        timestamp:"2026-01-02T03:04:05.000Z",
+        description:""
+      });
+      if(!html.includes("No description provided")){
+        throw new Error("descriptionless change should show the fallback text");
+      }
+    }
+  });
+
+  tests.push({
+    name: "CATEGORY UPDATE SEEN KEYS ARE SCOPED",
+    fn: () => {
+      const previousData = data;
+      const previousSeen = localStorage.getItem(UPDATE_SEEN_STORAGE_KEY);
+      try{
+        data = {
+          categories:[{ id:"housing", label:"Housing" }, { id:"food", label:"Food" }],
+          resources:[{ id:"shared", name:"Shared", categories:["housing", "food"] }],
+          changes:[{
+            id:"change-1",
+            type:"resource",
+            action:"updated",
+            targetId:"shared",
+            targetName:"Shared",
+            description:"",
+            timestamp:"2026-01-02T03:04:05.000Z",
+            categoryIds:["housing", "food"]
+          }]
+        };
+        localStorage.removeItem(UPDATE_SEEN_STORAGE_KEY);
+        let updates = getCategoryUpdateMap();
+        if(!updates.has("housing") || !updates.has("food")){
+          throw new Error("shared change should appear on both categories");
+        }
+        markChangesViewed([getCategoryChangeSeenKey("change-1", "housing")]);
+        updates = getCategoryUpdateMap();
+        if(updates.has("housing")) throw new Error("viewed category badge should be cleared");
+        if(!updates.has("food")) throw new Error("viewing one category should not clear another category badge");
+      }finally{
+        data = previousData;
+        if(previousSeen === null) localStorage.removeItem(UPDATE_SEEN_STORAGE_KEY);
+        else localStorage.setItem(UPDATE_SEEN_STORAGE_KEY, previousSeen);
+      }
+    }
+  });
+
+  tests.push({
     name: "PACKAGE VERSION FALLBACK",
     fn: () => {
       if(normalizePackageVersionValue(undefined) !== "Unknown") throw new Error("missing packageVersion should fallback");

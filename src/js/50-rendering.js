@@ -612,8 +612,10 @@ function getUnseenUpdates(){
 
 function getCategoryUpdateMap(){
   const map = new Map();
-  getUnseenUpdates().forEach(entry => {
+  const seen = getSeenUpdateIds();
+  getRecentChanges().forEach(entry => {
     getCategoryIdsForChange(entry).forEach(catId => {
+      if(seen.has(String(entry.id)) || seen.has(getCategoryChangeSeenKey(entry.id, catId))) return;
       if(!map.has(catId)) map.set(catId, []);
       map.get(catId).push(entry);
     });

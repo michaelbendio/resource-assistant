@@ -306,6 +306,10 @@ function markChangesViewed(changeIds){
   saveSeenUpdateIds(seen);
 }
 
+function getCategoryChangeSeenKey(changeId, categoryId){
+  return `${String(changeId || "")}@category:${String(categoryId || "")}`;
+}
+
 function getChangesForResource(resourceId, { unseenOnly = false } = {}){
   const seen = getSeenUpdateIds();
   return getRecentChanges().filter(entry => {
@@ -327,7 +331,18 @@ function formatChangeEntryHTML(entry){
   const dateText = formatDateOnly(entry && entry.timestamp);
   const detail = `${entry && entry.type ? entry.type : ""} ${entry && entry.action ? entry.action : ""}`.trim();
   const description = String(entry && entry.description || "").trim();
-  return `<strong>${escapeHTML(entry.targetName || "(Unnamed)")}</strong><div>${escapeHTML(dateText)}: ${escapeHTML(detail)}</div>${description ? `<div>${escapeHTML(description)}</div>` : ""}`;
+  return `<strong>${escapeHTML(entry.targetName || "(Unnamed)")}</strong><div>${escapeHTML(dateText)}: ${escapeHTML(detail)}</div><div>${escapeHTML(description || "No description provided")}</div>`;
+}
+
+function editChangeDescription(changeId){
+  normalizeChanges(data);
+  const entry = data.changes.find(change => String(change.id) === String(changeId));
+  if(!entry) return;
+  const description = prompt("Describe this update (optional):", entry.description || "");
+  if(description === null) return false;
+  entry.description = String(description).trim();
+  persist();
+  return true;
 }
 
 function formatPackageChangeSummary(entry){

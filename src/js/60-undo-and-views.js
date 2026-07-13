@@ -110,11 +110,13 @@ function getCategoryCardsForRender(){
     .sort((a,b)=>String(a.label || "").localeCompare(String(b.label || ""), undefined, { sensitivity:"base" }));
 }
 
-function openRecentUpdates(entries){
+function openRecentUpdates(entries, viewedKeys = null){
   // Opening a badge marks only those changes as viewed, then lets the
   // recent-updates screen render the details.
   recentUpdateDetail = entries;
-  markChangesViewed(entries.map(entry => entry.id));
+  showUpdateInfo = false;
+  showRecentChangeLog = true;
+  markChangesViewed(Array.isArray(viewedKeys) ? viewedKeys : entries.map(entry => entry.id));
   view = "recent-updates";
   safeRender();
 }
@@ -141,7 +143,7 @@ function renderCategoriesGrid(){
     if(updateBadge){
       updateBadge.onclick = e => {
         e.stopPropagation();
-        openRecentUpdates(updates);
+        openRecentUpdates(updates, updates.map(entry => getCategoryChangeSeenKey(entry.id, cat.id)));
       };
     }
     card.onclick = () => openCategoryFromCard(cat.id);
@@ -339,6 +341,18 @@ function renderRecentChangeLog(entries){
     const card = document.createElement("div");
     card.className = "resource-card";
     card.innerHTML = formatChangeEntryHTML(entry);
+    if(isAdminVisible){
+      const editDescription = document.createElement("button");
+      editDescription.type = "button";
+      editDescription.className = "button secondary";
+      editDescription.textContent = entry.description ? "Edit description" : "Add description";
+      editDescription.onclick = () => {
+        if(!editChangeDescription(entry.id)) return;
+        recentUpdateDetail = entries;
+        safeRender();
+      };
+      card.appendChild(editDescription);
+    }
     appView.appendChild(card);
   });
 }
