@@ -52,6 +52,7 @@ const PRINT_SELECTION_STORAGE_KEY = getStorageKey("PrintSelection");
 const LEGACY_FAVORITES_STORAGE_KEY = getStorageKey("Favorites");
 const TSO_NAME_STORAGE_KEY = getStorageKey("TsoName");
 const UNDO_STORAGE_KEY = getStorageKey("Undo");
+const DISMISSED_TIPS_STORAGE_KEY = getStorageKey("DismissedTips");
 const NEW_ADMIN_TRAINING_PENDING_KEY = "tsoResourcesNewAdminTrainingPending";
 const STARTUP_STATE_STORAGE_KEYS = [
   UPDATE_SEEN_STORAGE_KEY,
@@ -83,6 +84,7 @@ function clearCurrentLocalState(){
   clearTemporaryLocalState();
   localStorage.removeItem(DATA_STORAGE_KEY);
   localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+  localStorage.removeItem(DISMISSED_TIPS_STORAGE_KEY);
   localStorage.removeItem(NEW_ADMIN_TRAINING_PENDING_KEY);
 }
 
@@ -176,6 +178,21 @@ let searchQuery = "";
 let searchResults = null;
 let expandedSearchResourceId = "";
 let selectedCategoryFilters = {}; // categoryId -> transient selected category/For filters
+let dismissedTipIds = (() => {
+  try{
+    const stored = JSON.parse(localStorage.getItem(DISMISSED_TIPS_STORAGE_KEY) || "[]");
+    return new Set(Array.isArray(stored) ? stored.map(value => String(value)) : []);
+  }catch(_err){
+    return new Set();
+  }
+})();
+
+function dismissTip(tipId){
+  const id = String(tipId || "");
+  if(!id) return;
+  dismissedTipIds.add(id);
+  localStorage.setItem(DISMISSED_TIPS_STORAGE_KEY, JSON.stringify(Array.from(dismissedTipIds)));
+}
 
 // Admin navigation/editor state. `editing` and `editorSnapshot` are the dirty
 // checking pair used by commitPendingEditsIfChanged().

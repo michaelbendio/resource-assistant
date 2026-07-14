@@ -64,7 +64,7 @@ function renderAdmin(){
 
   clearAdminEditorActions();
   if(isNewTemplateFile()){
-    const tip = createNewAdminTip(TIP_TEXT.newAdminMode);
+    const tip = createNewAdminTip("newAdminMode");
     if(tip) container.appendChild(tip);
   }
   resetAdminEditorStateForTab(adminTab);

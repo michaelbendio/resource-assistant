@@ -221,19 +221,34 @@ function refreshAppTitle(){
 refreshAppTitle();
 
 function createTip(tipId){
-  return createRedTip(TIP_TEXT[tipId]);
+  return createRedTip(TIP_TEXT[tipId], tipId);
 }
 
-function createRedTip(tipText){
-  if(!tipText) return null;
+function createRedTip(tipText, tipId){
+  if(!tipText || dismissedTipIds.has(String(tipId || ""))) return null;
   const tip = document.createElement("div");
   tip.className = "red-tip";
-  tip.textContent = tipText;
+
+  const text = document.createElement("span");
+  text.className = "red-tip-text";
+  text.textContent = tipText;
+  tip.appendChild(text);
+
+  const dismiss = document.createElement("button");
+  dismiss.type = "button";
+  dismiss.className = "red-tip-dismiss";
+  dismiss.setAttribute("aria-label", "Dismiss this tip");
+  dismiss.textContent = "×";
+  dismiss.onclick = () => {
+    dismissTip(tipId);
+    tip.remove();
+  };
+  tip.appendChild(dismiss);
   return tip;
 }
 
-function createNewAdminTip(tipText){
-  const tip = createRedTip(tipText);
+function createNewAdminTip(tipId){
+  const tip = createRedTip(TIP_TEXT[tipId], tipId);
   if(tip) tip.classList.add("new-admin-tip");
   return tip;
 }

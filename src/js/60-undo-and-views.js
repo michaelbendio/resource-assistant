@@ -88,7 +88,7 @@ function renderCategoryTip(){
   const categoryTipId = getCategoryTipId();
   if(categoryTipId){
     const tip = categoryTipId === "newAdminWelcome"
-      ? createNewAdminTip(TIP_TEXT[categoryTipId])
+      ? createNewAdminTip(categoryTipId)
       : createTip(categoryTipId);
     if(tip) appView.appendChild(tip);
   }
@@ -129,6 +129,40 @@ function openCategoryFromCard(categoryId){
   safeRender();
 }
 
+function renderLandingSearch(){
+  const section = document.createElement("section");
+  section.className = "landing-search";
+  section.setAttribute("role", "search");
+  section.setAttribute("aria-label", "Search resources");
+
+  const controls = document.createElement("div");
+  controls.className = "landing-search-controls";
+
+  const input = document.createElement("input");
+  input.type = "search";
+  input.className = "landing-search-input";
+  input.placeholder = "Search resources";
+  input.setAttribute("aria-label", "Search resources");
+
+  const search = document.createElement("button");
+  search.type = "button";
+  search.className = "button primary";
+  search.textContent = "Search";
+
+  const runSearch = () => performSearch(input.value);
+  search.onclick = runSearch;
+  input.addEventListener("keydown", event => {
+    if(event.key !== "Enter") return;
+    event.preventDefault();
+    runSearch();
+  });
+
+  controls.appendChild(input);
+  controls.appendChild(search);
+  section.appendChild(controls);
+  appView.appendChild(section);
+}
+
 function renderCategoriesGrid(){
   const grid = document.createElement("div");
   grid.className = "grid";
@@ -136,9 +170,36 @@ function renderCategoriesGrid(){
 
   getCategoryCardsForRender().forEach(cat => {
     const card = document.createElement("div");
-    card.className = "category-card";
+    card.className = "category-card category-card-interactive";
     const updates = cat.id === LISTS_CATEGORY_ID ? [] : (updatesByCategory.get(cat.id) || []);
-    card.innerHTML = `<strong>${cat.label}</strong>${updates.length ? `<div><button type="button" class="button secondary category-update-badge">Updates: ${updates.length}</button></div>` : ""}`;
+
+    const openButton = document.createElement("button");
+    openButton.type = "button";
+    openButton.className = "category-card-open";
+    openButton.setAttribute("aria-label", `View ${cat.label} resources`);
+
+    const label = document.createElement("strong");
+    label.textContent = cat.label;
+    openButton.appendChild(label);
+
+    const chevron = document.createElement("span");
+    chevron.className = "category-card-chevron";
+    chevron.setAttribute("aria-hidden", "true");
+    chevron.textContent = "›";
+    openButton.appendChild(chevron);
+    openButton.onclick = () => openCategoryFromCard(cat.id);
+    card.appendChild(openButton);
+
+    if(updates.length){
+      const updateWrap = document.createElement("div");
+      const updateBadge = document.createElement("button");
+      updateBadge.type = "button";
+      updateBadge.className = "button secondary category-update-badge";
+      updateBadge.textContent = `Updates: ${updates.length}`;
+      updateWrap.appendChild(updateBadge);
+      card.appendChild(updateWrap);
+    }
+
     const updateBadge = card.querySelector(".category-update-badge");
     if(updateBadge){
       updateBadge.onclick = e => {
@@ -146,7 +207,6 @@ function renderCategoriesGrid(){
         openRecentUpdates(updates, updates.map(entry => getCategoryChangeSeenKey(entry.id, cat.id)));
       };
     }
-    card.onclick = () => openCategoryFromCard(cat.id);
     grid.appendChild(card);
   });
 
@@ -158,6 +218,7 @@ function renderCategoriesView(){
   // and resource-package merge entry point.
   renderCategoryTip();
   renderPendingUpdatesNotice();
+  renderLandingSearch();
   renderCategoryReminder();
   renderCategoriesGrid();
   renderMergeResourcesButton();
@@ -266,6 +327,15 @@ function renderCategoryPrintInstruction(){
 function renderCategoryResourceCard(res){
   let expanded = String(res && res.id || "") === String(expandedSearchResourceId || "");
   const card = buildResourceCard(res, { expanded, showDescription:true });
+  card.classList.add("resource-card-interactive");
+
+  const expandToggle = document.createElement("button");
+  expandToggle.type = "button";
+  expandToggle.className = "resource-expand-toggle";
+  expandToggle.textContent = "⌄";
+  expandToggle.setAttribute("aria-label", `${expanded ? "Hide" : "View"} details for ${res.name}`);
+  expandToggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+  card.appendChild(expandToggle);
   const resourceUpdates = getChangesForResource(res.id, { unseenOnly:true });
   if(resourceUpdates.length){
     const badge = document.createElement("button");
@@ -277,11 +347,18 @@ function renderCategoryResourceCard(res){
     };
     card.prepend(badge);
   }
-  card.onclick = () => {
+  const toggleExpanded = () => {
     expanded = !expanded;
     const details = card.querySelector(".resource-details");
     details.classList.toggle("collapsed", !expanded);
     details.classList.toggle("expanded", expanded);
+    expandToggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+    expandToggle.setAttribute("aria-label", `${expanded ? "Hide" : "View"} details for ${res.name}`);
+  };
+  card.onclick = toggleExpanded;
+  expandToggle.onclick = event => {
+    event.stopPropagation();
+    toggleExpanded();
   };
   appView.appendChild(card);
 }

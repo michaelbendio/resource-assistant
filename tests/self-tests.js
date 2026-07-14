@@ -1266,7 +1266,8 @@ function runSelfTests(){
         render();
         const tip = appView.querySelector(".red-tip");
         if(!tip) throw new Error("new admin tip was not rendered");
-        if(tip.textContent !== TIP_TEXT.newAdminWelcome){
+        const tipText = tip.querySelector(".red-tip-text");
+        if(!tipText || tipText.textContent !== TIP_TEXT.newAdminWelcome){
           throw new Error("new admin tip wording changed");
         }
         const style = getComputedStyle(tip);
@@ -1281,6 +1282,34 @@ function runSelfTests(){
         view = previousView;
         if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
         else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoName);
+      }
+    }
+  });
+
+  tests.push({
+    name: "RED TIPS CAN BE DISMISSED",
+    fn: () => {
+      const previousStoredTips = localStorage.getItem(DISMISSED_TIPS_STORAGE_KEY);
+      const previousDismissedTips = dismissedTipIds;
+      try{
+        dismissedTipIds = new Set();
+        localStorage.removeItem(DISMISSED_TIPS_STORAGE_KEY);
+        const tip = createNewAdminTip("newAdminWelcome");
+        if(!tip) throw new Error("dismissible tip was not created");
+        const dismiss = tip.querySelector(".red-tip-dismiss");
+        if(!dismiss || dismiss.getAttribute("aria-label") !== "Dismiss this tip"){
+          throw new Error("dismissible tip did not include an accessible close button");
+        }
+        const host = document.createElement("div");
+        host.appendChild(tip);
+        dismiss.click();
+        if(host.querySelector(".red-tip")) throw new Error("dismissed tip remained visible");
+        if(!dismissedTipIds.has("newAdminWelcome")) throw new Error("dismissed tip was not remembered");
+        if(createNewAdminTip("newAdminWelcome") !== null) throw new Error("dismissed tip rendered again");
+      }finally{
+        dismissedTipIds = previousDismissedTips;
+        if(previousStoredTips === null) localStorage.removeItem(DISMISSED_TIPS_STORAGE_KEY);
+        else localStorage.setItem(DISMISSED_TIPS_STORAGE_KEY, previousStoredTips);
       }
     }
   });
@@ -1313,7 +1342,8 @@ function runSelfTests(){
         render();
         const tip = appView.querySelector(".red-tip");
         if(!tip) throw new Error("new admin welcome tip was not rendered");
-        if(tip.textContent !== TIP_TEXT.newAdminWelcome){
+        const tipText = tip.querySelector(".red-tip-text");
+        if(!tipText || tipText.textContent !== TIP_TEXT.newAdminWelcome){
           throw new Error("new admin welcome tip wording changed");
         }
         if(!tip.classList.contains("new-admin-tip")){
@@ -1355,7 +1385,8 @@ function runSelfTests(){
         }
         const tip = document.querySelector("#adminView .red-tip");
         if(!tip) throw new Error("new admin setup tip was not rendered");
-        if(tip.textContent !== TIP_TEXT.newAdminMode){
+        const tipText = tip.querySelector(".red-tip-text");
+        if(!tipText || tipText.textContent !== TIP_TEXT.newAdminMode){
           throw new Error("new admin setup tip wording changed");
         }
         const modal = document.getElementById("referenceModal");
@@ -2472,6 +2503,71 @@ function runSelfTests(){
         view = previousView;
         currentCategory = previousCategory;
         selectedCategoryFilters = previousFilters;
+      }
+    }
+  });
+
+  tests.push({
+    name: "LANDING SEARCH AND CARD INTERACTION CUES",
+    fn: () => {
+      const previousData = data;
+      const previousView = view;
+      const previousCategory = currentCategory;
+      const previousSearchQuery = searchQuery;
+      const previousSearchResults = searchResults;
+      try{
+        data = {
+          categories:[{ id:"food", label:"Food" }],
+          forGroups:[],
+          resources:[{
+            id:"pantry",
+            name:"Community Pantry",
+            description:"Food assistance",
+            categories:["food"],
+            categoryFilters:{},
+            forGroups:[],
+            informationText:"Pantry details"
+          }],
+          changes:[]
+        };
+
+        view = "categories";
+        currentCategory = null;
+        render();
+        const landingInput = appView.querySelector(".landing-search-input");
+        const landingButton = appView.querySelector(".landing-search .button.primary");
+        const categoryButton = appView.querySelector(".category-card-open");
+        if(!landingInput || !landingButton) throw new Error("landing search controls were not rendered");
+        if(appView.querySelector(".landing-search-title")) throw new Error("landing search title should not be rendered");
+        if((appView.textContent || "").includes("Browse by category")) throw new Error("removed category heading was rendered");
+        if(document.getElementById("tabSearch")) throw new Error("top-bar search icon should not be rendered");
+        if(!categoryButton || categoryButton.getAttribute("aria-label") !== "View Food resources"){
+          throw new Error("category card did not expose its navigation cue");
+        }
+
+        landingInput.value = "pantry";
+        landingButton.click();
+        if(view !== "search-results" || searchQuery !== "pantry"){
+          throw new Error("landing search did not open search results");
+        }
+
+        view = "category";
+        currentCategory = "food";
+        render();
+        const expandButton = appView.querySelector(".resource-expand-toggle");
+        if(!expandButton || expandButton.getAttribute("aria-expanded") !== "false"){
+          throw new Error("resource expansion cue was not rendered collapsed");
+        }
+        expandButton.click();
+        if(expandButton.getAttribute("aria-expanded") !== "true"){
+          throw new Error("resource expansion cue did not update");
+        }
+      }finally{
+        data = previousData;
+        view = previousView;
+        currentCategory = previousCategory;
+        searchQuery = previousSearchQuery;
+        searchResults = previousSearchResults;
       }
     }
   });

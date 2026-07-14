@@ -9,10 +9,25 @@
 <!-- ===== APP CSS START ===== -->
 <style>
 :root {
-  --page-gutter: clamp(28px, 4vw, 44px);
+  --page-gutter: clamp(20px, 2.5vw, 36px);
   --topbar-sticky-offset: 0px;
+  --content-max-width: 1440px;
+  --text-color: #17212b;
+  --muted-text-color: #52606d;
+  --surface-color: #ffffff;
+  --page-color: #f5f7fa;
+  --border-color: #d9e0e7;
+  --focus-color: #2f6fab;
 }
-body { font-family: -apple-system, sans-serif; margin:0; padding:0; font-size:18px; line-height:1.45; }
+body {
+  font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  margin:0;
+  padding:0;
+  background:var(--page-color);
+  color:var(--text-color);
+  font-size:18px;
+  line-height:1.5;
+}
 .topbar {
   display:flex;
   justify-content:space-between;
@@ -58,8 +73,14 @@ body { font-family: -apple-system, sans-serif; margin:0; padding:0; font-size:18
 }
 .search-panel.hidden { display:none; }
 #appView, #adminView {
+  width:100%;
+  max-width:var(--content-max-width);
+  margin:0 auto;
+  padding-top:20px;
+  padding-bottom:44px;
   padding-left:var(--page-gutter);
   padding-right:var(--page-gutter);
+  box-sizing:border-box;
 }
 .search-panel input { flex:1; min-width:220px; max-width:520px; box-sizing:border-box; }
 .search-results-title { font-weight:bold; margin:0 0 12px; }
@@ -78,23 +99,137 @@ body { font-family: -apple-system, sans-serif; margin:0; padding:0; font-size:18
 }
 .search-result-button:hover { text-decoration:underline; }
 .search-result-snippet { color:#555; font-size:14px; margin-top:2px; }
-.grid { display:grid; gap:12px; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); }
-.category-card, .resource-card { border:1px solid #ddd; padding:12px; border-radius:6px; background:white; }
+.landing-search {
+  margin:0 0 20px;
+  padding:16px;
+  border:1px solid #cbd9e7;
+  border-radius:12px;
+  background:#eef5fb;
+}
+.landing-search-controls { display:flex; gap:10px; align-items:stretch; }
+.landing-search-input {
+  flex:1;
+  min-width:0;
+  padding:12px 14px;
+  border:1px solid #9eafbf;
+  border-radius:8px;
+  background:#fff;
+  color:var(--text-color);
+}
+.grid { display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); }
+.category-card, .resource-card {
+  border:1px solid var(--border-color);
+  padding:15px 16px;
+  border-radius:10px;
+  background:var(--surface-color);
+  box-shadow:0 1px 2px rgba(23,33,43,.05);
+}
+.category-card-interactive {
+  position:relative;
+  min-height:58px;
+  box-sizing:border-box;
+  transition:border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+.category-card-interactive:hover {
+  border-color:#9bb7d1;
+  box-shadow:0 5px 14px rgba(23,59,99,.11);
+  transform:translateY(-1px);
+}
+.resource-card-interactive:focus-visible {
+  outline:3px solid rgba(47,111,171,.35);
+  outline-offset:2px;
+  border-color:var(--focus-color);
+}
+.category-card-open {
+  width:100%;
+  min-height:28px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  padding:0;
+  border:0;
+  background:transparent;
+  color:var(--text-color);
+  font:inherit;
+  text-align:left;
+  cursor:pointer;
+}
+.category-card-open:focus-visible {
+  outline:3px solid rgba(47,111,171,.35);
+  outline-offset:4px;
+  border-radius:4px;
+}
+.category-card-chevron {
+  flex:0 0 auto;
+  color:#52708d;
+  font-size:24px;
+  line-height:1;
+}
 .resource-card { position:relative; }
+.resource-card-interactive {
+  padding-right:44px;
+  cursor:pointer;
+  transition:border-color .15s ease, box-shadow .15s ease;
+}
+.resource-card-interactive:hover {
+  border-color:#9bb7d1;
+  box-shadow:0 4px 12px rgba(23,59,99,.09);
+}
+.resource-expand-toggle {
+  position:absolute;
+  top:9px;
+  right:10px;
+  width:34px;
+  height:34px;
+  padding:0;
+  border:0;
+  border-radius:50%;
+  background:transparent;
+  color:#52708d;
+  font-size:22px;
+  line-height:1;
+  cursor:pointer;
+  transition:background-color .15s ease, transform .15s ease;
+}
+.resource-expand-toggle:hover { background:#eef5fb; }
+.resource-expand-toggle:focus-visible {
+  outline:3px solid rgba(47,111,171,.35);
+  outline-offset:1px;
+}
+.resource-expand-toggle[aria-expanded="true"] { transform:rotate(180deg); }
 .print-selection-toggle { position:absolute; left:8px; top:8px; cursor:pointer; font-size:18px; border:0; background:transparent; padding:0; line-height:1; }
 .resource-main { margin-left:24px; }
 .resource-details.collapsed { display:none; }
 .resource-info-separator { border:0; border-top:1px solid #ccc; margin:10px 0; }
 .pdf-attachments-list { margin:6px 0 8px; display:grid; gap:6px; }
 .pdf-attachment-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-.button { padding:10px 14px; margin:4px 0; cursor:pointer; }
+.button {
+  padding:10px 14px;
+  margin:4px 0;
+  border:1px solid #aeb9c4;
+  border-radius:8px;
+  background:#fff;
+  color:var(--text-color);
+  cursor:pointer;
+  transition:background-color .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+.button:hover { border-color:#7f93a6; background:#f5f8fb; }
+.button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline:3px solid rgba(47,111,171,.35);
+  outline-offset:2px;
+}
 button,
 input,
 select,
 textarea {
   font-size: 18px;
 }
-.button.primary { background:#003366; color:white; }
+.button.primary { background:#003366; color:white; border-color:#003366; }
+.button.primary:hover { background:#0b477f; border-color:#0b477f; }
 .button.secondary { background:#f7f7f7; color:#333; border:1px solid #bbb; }
 .button.danger { background:#aa0000; color:white; }
 .topbar .help-button { color:white; border:0; outline:0; border-radius:4px; background:transparent; padding:2px 8px; font:inherit; }
@@ -105,8 +240,27 @@ textarea {
   padding:2px 8px;
   opacity:1;
 }
-.red-tip { margin:0 0 12px; padding:10px 12px; border:2px solid #aa0000; border-radius:6px; background:#fff5f5; color:#aa0000; font-size:11px; font-weight:bold; }
+.red-tip { position:relative; margin:0 0 12px; padding:10px 44px 10px 12px; border:2px solid #aa0000; border-radius:6px; background:#fff5f5; color:#aa0000; font-size:11px; font-weight:bold; }
 .red-tip.new-admin-tip { font-size:20px; line-height:1.35; }
+.red-tip-dismiss {
+  position:absolute;
+  top:50%;
+  right:8px;
+  width:30px;
+  height:30px;
+  padding:0;
+  border:0;
+  border-radius:50%;
+  background:transparent;
+  color:#aa0000;
+  font:inherit;
+  font-size:22px;
+  line-height:1;
+  cursor:pointer;
+  transform:translateY(-50%);
+}
+.red-tip-dismiss:hover { background:#f4dada; }
+.red-tip-dismiss:focus-visible { outline:3px solid rgba(170,0,0,.28); outline-offset:1px; }
 .category-print-banner { margin:0 0 12px; padding:9px 12px; border:1px solid #c8d6e6; border-left:4px solid #003366; border-radius:6px; background:#f7fbff; color:#1f2d3d; font-size:16px; line-height:1.35; }
 .print-empty-instruction { color:#aa0000; }
 textarea.big { width:100%; min-height:80px; }
@@ -284,6 +438,12 @@ textarea.information-editor { min-height:320px; resize:vertical; }
 .verified-warning { color:#aa0000; font-size:13px; margin-top:4px; min-height:1.1em; }
 .reload-resources-wrap { margin-top:16px; text-align:right; }
 .reload-resources-wrap .button { font-size:14px; padding:7px 10px; }
+
+@media (max-width: 560px) {
+  .landing-search-controls { flex-direction:column; }
+  .landing-search-controls .button { width:100%; }
+  .grid { grid-template-columns:1fr; }
+}
 .app-toast {
   position:fixed;
   right:18px;
@@ -612,7 +772,6 @@ textarea.information-editor { min-height:320px; resize:vertical; }
 <div class="topbar">
   <div class="title" id="appTitle">&lt;New&gt; TSO Resources</div>
   <div class="tabs">
-    <span id="tabSearch" role="button" aria-label="Search" title="Search">&#128269;</span>
     <span id="tabCategories">Categories</span>
     <span id="tabPrintSelection" role="button" aria-label="Print Preview">🖨️ (0)</span>
     <button id="helpButton" class="help-button" type="button">Help</button>
@@ -683,7 +842,7 @@ textarea.information-editor { min-height:320px; resize:vertical; }
 
 <script id="app-release-data" type="application/json">
 {
-  "version": "2.1.3",
+  "version": "2.1.4",
   "changes": [
     {
       "date": "2026-07-13",
@@ -1344,6 +1503,7 @@ const PRINT_SELECTION_STORAGE_KEY = getStorageKey("PrintSelection");
 const LEGACY_FAVORITES_STORAGE_KEY = getStorageKey("Favorites");
 const TSO_NAME_STORAGE_KEY = getStorageKey("TsoName");
 const UNDO_STORAGE_KEY = getStorageKey("Undo");
+const DISMISSED_TIPS_STORAGE_KEY = getStorageKey("DismissedTips");
 const NEW_ADMIN_TRAINING_PENDING_KEY = "tsoResourcesNewAdminTrainingPending";
 const STARTUP_STATE_STORAGE_KEYS = [
   UPDATE_SEEN_STORAGE_KEY,
@@ -1375,6 +1535,7 @@ function clearCurrentLocalState(){
   clearTemporaryLocalState();
   localStorage.removeItem(DATA_STORAGE_KEY);
   localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+  localStorage.removeItem(DISMISSED_TIPS_STORAGE_KEY);
   localStorage.removeItem(NEW_ADMIN_TRAINING_PENDING_KEY);
 }
 
@@ -1468,6 +1629,21 @@ let searchQuery = "";
 let searchResults = null;
 let expandedSearchResourceId = "";
 let selectedCategoryFilters = {}; // categoryId -> transient selected category/For filters
+let dismissedTipIds = (() => {
+  try{
+    const stored = JSON.parse(localStorage.getItem(DISMISSED_TIPS_STORAGE_KEY) || "[]");
+    return new Set(Array.isArray(stored) ? stored.map(value => String(value)) : []);
+  }catch(_err){
+    return new Set();
+  }
+})();
+
+function dismissTip(tipId){
+  const id = String(tipId || "");
+  if(!id) return;
+  dismissedTipIds.add(id);
+  localStorage.setItem(DISMISSED_TIPS_STORAGE_KEY, JSON.stringify(Array.from(dismissedTipIds)));
+}
 
 // Admin navigation/editor state. `editing` and `editorSnapshot` are the dirty
 // checking pair used by commitPendingEditsIfChanged().
@@ -1885,19 +2061,34 @@ function refreshAppTitle(){
 refreshAppTitle();
 
 function createTip(tipId){
-  return createRedTip(TIP_TEXT[tipId]);
+  return createRedTip(TIP_TEXT[tipId], tipId);
 }
 
-function createRedTip(tipText){
-  if(!tipText) return null;
+function createRedTip(tipText, tipId){
+  if(!tipText || dismissedTipIds.has(String(tipId || ""))) return null;
   const tip = document.createElement("div");
   tip.className = "red-tip";
-  tip.textContent = tipText;
+
+  const text = document.createElement("span");
+  text.className = "red-tip-text";
+  text.textContent = tipText;
+  tip.appendChild(text);
+
+  const dismiss = document.createElement("button");
+  dismiss.type = "button";
+  dismiss.className = "red-tip-dismiss";
+  dismiss.setAttribute("aria-label", "Dismiss this tip");
+  dismiss.textContent = "×";
+  dismiss.onclick = () => {
+    dismissTip(tipId);
+    tip.remove();
+  };
+  tip.appendChild(dismiss);
   return tip;
 }
 
-function createNewAdminTip(tipText){
-  const tip = createRedTip(tipText);
+function createNewAdminTip(tipId){
+  const tip = createRedTip(TIP_TEXT[tipId], tipId);
   if(tip) tip.classList.add("new-admin-tip");
   return tip;
 }
@@ -2622,7 +2813,7 @@ function renderCategoryTip(){
   const categoryTipId = getCategoryTipId();
   if(categoryTipId){
     const tip = categoryTipId === "newAdminWelcome"
-      ? createNewAdminTip(TIP_TEXT[categoryTipId])
+      ? createNewAdminTip(categoryTipId)
       : createTip(categoryTipId);
     if(tip) appView.appendChild(tip);
   }
@@ -2663,6 +2854,40 @@ function openCategoryFromCard(categoryId){
   safeRender();
 }
 
+function renderLandingSearch(){
+  const section = document.createElement("section");
+  section.className = "landing-search";
+  section.setAttribute("role", "search");
+  section.setAttribute("aria-label", "Search resources");
+
+  const controls = document.createElement("div");
+  controls.className = "landing-search-controls";
+
+  const input = document.createElement("input");
+  input.type = "search";
+  input.className = "landing-search-input";
+  input.placeholder = "Search resources";
+  input.setAttribute("aria-label", "Search resources");
+
+  const search = document.createElement("button");
+  search.type = "button";
+  search.className = "button primary";
+  search.textContent = "Search";
+
+  const runSearch = () => performSearch(input.value);
+  search.onclick = runSearch;
+  input.addEventListener("keydown", event => {
+    if(event.key !== "Enter") return;
+    event.preventDefault();
+    runSearch();
+  });
+
+  controls.appendChild(input);
+  controls.appendChild(search);
+  section.appendChild(controls);
+  appView.appendChild(section);
+}
+
 function renderCategoriesGrid(){
   const grid = document.createElement("div");
   grid.className = "grid";
@@ -2670,9 +2895,36 @@ function renderCategoriesGrid(){
 
   getCategoryCardsForRender().forEach(cat => {
     const card = document.createElement("div");
-    card.className = "category-card";
+    card.className = "category-card category-card-interactive";
     const updates = cat.id === LISTS_CATEGORY_ID ? [] : (updatesByCategory.get(cat.id) || []);
-    card.innerHTML = `<strong>${cat.label}</strong>${updates.length ? `<div><button type="button" class="button secondary category-update-badge">Updates: ${updates.length}</button></div>` : ""}`;
+
+    const openButton = document.createElement("button");
+    openButton.type = "button";
+    openButton.className = "category-card-open";
+    openButton.setAttribute("aria-label", `View ${cat.label} resources`);
+
+    const label = document.createElement("strong");
+    label.textContent = cat.label;
+    openButton.appendChild(label);
+
+    const chevron = document.createElement("span");
+    chevron.className = "category-card-chevron";
+    chevron.setAttribute("aria-hidden", "true");
+    chevron.textContent = "›";
+    openButton.appendChild(chevron);
+    openButton.onclick = () => openCategoryFromCard(cat.id);
+    card.appendChild(openButton);
+
+    if(updates.length){
+      const updateWrap = document.createElement("div");
+      const updateBadge = document.createElement("button");
+      updateBadge.type = "button";
+      updateBadge.className = "button secondary category-update-badge";
+      updateBadge.textContent = `Updates: ${updates.length}`;
+      updateWrap.appendChild(updateBadge);
+      card.appendChild(updateWrap);
+    }
+
     const updateBadge = card.querySelector(".category-update-badge");
     if(updateBadge){
       updateBadge.onclick = e => {
@@ -2680,7 +2932,6 @@ function renderCategoriesGrid(){
         openRecentUpdates(updates, updates.map(entry => getCategoryChangeSeenKey(entry.id, cat.id)));
       };
     }
-    card.onclick = () => openCategoryFromCard(cat.id);
     grid.appendChild(card);
   });
 
@@ -2692,6 +2943,7 @@ function renderCategoriesView(){
   // and resource-package merge entry point.
   renderCategoryTip();
   renderPendingUpdatesNotice();
+  renderLandingSearch();
   renderCategoryReminder();
   renderCategoriesGrid();
   renderMergeResourcesButton();
@@ -2800,6 +3052,15 @@ function renderCategoryPrintInstruction(){
 function renderCategoryResourceCard(res){
   let expanded = String(res && res.id || "") === String(expandedSearchResourceId || "");
   const card = buildResourceCard(res, { expanded, showDescription:true });
+  card.classList.add("resource-card-interactive");
+
+  const expandToggle = document.createElement("button");
+  expandToggle.type = "button";
+  expandToggle.className = "resource-expand-toggle";
+  expandToggle.textContent = "⌄";
+  expandToggle.setAttribute("aria-label", `${expanded ? "Hide" : "View"} details for ${res.name}`);
+  expandToggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+  card.appendChild(expandToggle);
   const resourceUpdates = getChangesForResource(res.id, { unseenOnly:true });
   if(resourceUpdates.length){
     const badge = document.createElement("button");
@@ -2811,11 +3072,18 @@ function renderCategoryResourceCard(res){
     };
     card.prepend(badge);
   }
-  card.onclick = () => {
+  const toggleExpanded = () => {
     expanded = !expanded;
     const details = card.querySelector(".resource-details");
     details.classList.toggle("collapsed", !expanded);
     details.classList.toggle("expanded", expanded);
+    expandToggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+    expandToggle.setAttribute("aria-label", `${expanded ? "Hide" : "View"} details for ${res.name}`);
+  };
+  card.onclick = toggleExpanded;
+  expandToggle.onclick = event => {
+    event.stopPropagation();
+    toggleExpanded();
   };
   appView.appendChild(card);
 }
@@ -3293,7 +3561,7 @@ function renderAdmin(){
 
   clearAdminEditorActions();
   if(isNewTemplateFile()){
-    const tip = createNewAdminTip(TIP_TEXT.newAdminMode);
+    const tip = createNewAdminTip("newAdminMode");
     if(tip) container.appendChild(tip);
   }
   resetAdminEditorStateForTab(adminTab);
