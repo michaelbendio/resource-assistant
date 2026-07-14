@@ -93,3 +93,15 @@ py -3 make-local-tso provo
 
 Make future application changes in `src/`, `tests/`, or `vendor/`. Do not edit the
 generated `new.html` directly.
+
+Every commit is also an app release. Before committing, update `src/release.json`
+with the proposed version, current date, and the exact commit subject, then rebuild
+both outputs. `includedCommits` contains the full Git IDs selected for the visible
+14-day app change log; entries older than 14 days are automatically omitted. Use
+the next patch version by default and ask for approval with:
+
+```text
+Commit as version X.Y.Z? Reply y or provide a version number.
+```
+
+Do not commit or push until that approval is received.

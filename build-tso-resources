@@ -4,9 +4,11 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timedelta, timezone
 import json
 import os
 import re
+import subprocess
 import tempfile
 from pathlib import Path
 
@@ -31,10 +33,103 @@ PLACEHOLDERS = [
     "{{APP_CSS}}",
     "{{TEST_UI}}",
     "{{SEED_DATA}}",
+    "{{APP_RELEASE_DATA}}",
     "{{VENDOR_JS}}",
     "{{APP_JS}}",
     "{{TEST_JS}}",
 ]
+
+
+def load_release() -> dict[str, object]:
+    try:
+        release = json.loads(read("src/release.json"))
+    except json.JSONDecodeError as error:
+        raise SystemExit(f"Invalid src/release.json: {error}") from error
+    if not isinstance(release, dict):
+        raise SystemExit("src/release.json must contain one JSON object")
+    normalized = {
+        "version": str(release.get("version", "")).strip(),
+        "date": str(release.get("date", "")).strip(),
+        "message": str(release.get("message", "")).strip(),
+        "includedCommits": [
+            str(commit_hash).strip()
+            for commit_hash in release.get("includedCommits", [])
+        ] if isinstance(release.get("includedCommits", []), list) else [],
+    }
+    if not re.fullmatch(r"\d+\.\d+\.\d+", normalized["version"]):
+        raise SystemExit("src/release.json version must use major.minor.patch format")
+    try:
+        datetime.strptime(normalized["date"], "%Y-%m-%d")
+    except ValueError as error:
+        raise SystemExit("src/release.json date must use YYYY-MM-DD format") from error
+    if not normalized["message"]:
+        raise SystemExit("src/release.json message must not be blank")
+    if any(not re.fullmatch(r"[0-9a-f]{40}", commit_hash) for commit_hash in normalized["includedCommits"]):
+        raise SystemExit("src/release.json includedCommits must contain full lowercase Git commit IDs")
+    return normalized
+
+
+def read_recent_git_commits() -> list[dict[str, str]]:
+    result = subprocess.run(
+        ["git", "log", "--format=%H%x00%cI%x00%s", "--since=15.days.ago"],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return []
+    commits = []
+    for line in result.stdout.splitlines():
+        parts = line.split("\0", 2)
+        if len(parts) != 3:
+            continue
+        commit_hash, timestamp, message = parts
+        if not message.strip():
+            continue
+        try:
+            committed_at = datetime.fromisoformat(timestamp).astimezone(timezone.utc)
+        except ValueError:
+            continue
+        commits.append({
+            "hash": commit_hash,
+            "timestamp": committed_at.isoformat(),
+            "message": message.strip(),
+        })
+    return commits
+
+
+def merge_app_changes(
+    release: dict[str, object],
+    commits: list[dict[str, str]],
+    now: datetime | None = None,
+) -> list[dict[str, str]]:
+    current_time = now or datetime.now(timezone.utc)
+    if current_time.tzinfo is None:
+        current_time = current_time.replace(tzinfo=timezone.utc)
+    cutoff = current_time.astimezone(timezone.utc) - timedelta(days=14)
+    included_commits = set(release.get("includedCommits", []))
+    changes = []
+    for commit in commits:
+        commit_hash = str(commit.get("hash", "")).strip()
+        message = str(commit.get("message", "")).strip()
+        try:
+            committed_at = datetime.fromisoformat(str(commit.get("timestamp", ""))).astimezone(timezone.utc)
+        except ValueError:
+            continue
+        if committed_at < cutoff or not message or commit_hash not in included_commits:
+            continue
+        changes.append({"date": committed_at.date().isoformat(), "message": message})
+    return changes
+
+
+def build_app_release_data() -> str:
+    release = load_release()
+    payload = {
+        "version": release["version"],
+        "changes": merge_app_changes(release, read_recent_git_commits()),
+    }
+    return json.dumps(payload, indent=2).replace("</", "<\\/")
 
 
 def read(relative_path: str) -> str:
@@ -76,6 +171,7 @@ def build_document(include_tests: bool) -> str:
         "{{APP_CSS}}": read("src/styles.css"),
         "{{TEST_UI}}": read("tests/self-test-panel.html") if include_tests else "",
         "{{SEED_DATA}}": seed_text,
+        "{{APP_RELEASE_DATA}}": build_app_release_data(),
         "{{VENDOR_JS}}": read("vendor/jszip.min.js"),
         "{{APP_JS}}": join_javascript(APP_JS_SOURCES),
         "{{TEST_JS}}": (

@@ -455,6 +455,7 @@ function buildResourcePackageData(sourceData){
   return {
     resourcePackageSchemaVersion: RESOURCE_PACKAGE_SCHEMA_VERSION,
     appVersion: APP_VERSION,
+    appChanges: APP_CHANGE_LOG.map(change => ({ ...change })),
     packageVersion: source.packageVersion,
     lastModified: source.lastModified || nowISO(),
     categories: source.categories,
@@ -670,6 +671,10 @@ function validateImportData(imported){
 
   if(!Array.isArray(imported.resources)){
     errors.push("Missing or invalid 'resources' array");
+  }
+
+  if(imported.appChanges != null && !Array.isArray(imported.appChanges)){
+    errors.push("Invalid 'appChanges' array");
   }
 
   if(imported.resourcePackageSchemaVersion != null && imported.resourcePackageSchemaVersion !== RESOURCE_PACKAGE_SCHEMA_VERSION){

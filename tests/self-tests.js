@@ -357,6 +357,12 @@ function runSelfTests(){
         recentUpdateDetail = [];
         pendingRecentUpdates = [];
         render();
+        if(!/App Changes — Last 14 Days:/.test(appView.textContent || "")){
+          throw new Error("app change log heading was missing");
+        }
+        if(!APP_CHANGE_LOG.length || !appView.textContent.includes(APP_CHANGE_LOG[0].message)){
+          throw new Error("app change log entries were missing");
+        }
         if(!/No resource package updates loaded\./.test(appView.textContent || "")){
           throw new Error("missing no-package-loaded message");
         }
@@ -1719,6 +1725,9 @@ function runSelfTests(){
       });
       if(packageData.resourcePackageSchemaVersion !== RESOURCE_PACKAGE_SCHEMA_VERSION){
         throw new Error("resource package schema version was not exported");
+      }
+      if(JSON.stringify(packageData.appChanges) !== JSON.stringify(APP_CHANGE_LOG)){
+        throw new Error("app change log was not exported");
       }
       if("lastLoadedPackageInfo" in packageData){
         throw new Error("local loaded-package state should not be exported");

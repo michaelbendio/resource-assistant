@@ -8,6 +8,9 @@
 // 4) Load persisted print selections, then initialize transient UI state.
 
 const seed = JSON.parse(document.getElementById("seed-data").textContent);
+const APP_RELEASE = JSON.parse(document.getElementById("app-release-data").textContent);
+const APP_VERSION = String(APP_RELEASE.version || "Unknown");
+const APP_CHANGE_LOG = Array.isArray(APP_RELEASE.changes) ? APP_RELEASE.changes : [];
 const URL_PARAMS = new URLSearchParams(location.search);
 const DEBUG = URL_PARAMS.has("debug");
 
@@ -127,7 +130,6 @@ function freshStartFromSeed(){
 
 // Main persisted app data snapshot (categories/resources + metadata).
 let data = JSON.parse(localStorage.getItem(DATA_STORAGE_KEY) || "null");
-const APP_VERSION = "2.1.2";
 const RESOURCE_PACKAGE_SCHEMA_VERSION = 2;
 const TIP_TEXT = {
   user: "Click on a category to see its resources. Click a resource to see details. Click ⬜ to include it in the printed handout.",

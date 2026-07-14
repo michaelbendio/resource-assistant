@@ -46,6 +46,11 @@ Mac with iCloud Drive enabled, it also copies the finished file to
 Use `--no-icloud-copy` to skip that copy or `--icloud-dir PATH` to select another
 synced directory.
 
+Click the TSO Resources title in an office-specific file to see the app's Git
+selected commit dates and messages from the last 14 days alongside the latest
+resource package summary. Exported resource packages include the same curated
+app change log.
+
 ## Local admin quick start
 
 Open the local `.html` file directly in a browser. The file starts with the standard categories and no resources.

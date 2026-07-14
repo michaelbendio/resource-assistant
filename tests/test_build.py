@@ -25,6 +25,8 @@ class BuildTests(unittest.TestCase):
 
     def test_production_omits_self_tests(self) -> None:
         production = (ROOT / "new.html").read_text(encoding="utf-8")
+        self.assertIn('id="app-release-data"', production)
+        self.assertIn('"changes": [', production)
         self.assertNotIn("function runSelfTests", production)
         self.assertNotIn('id="selfTestPanel"', production)
         self.assertNotIn("isSelfTestShortcut", production)

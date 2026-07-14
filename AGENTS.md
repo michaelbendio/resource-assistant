@@ -42,3 +42,16 @@ python3 make-local-tso albuquerque --output albq.html
 ```
 
 Do not modify `new.html` when making a local TSO file.
+
+## Commit and version workflow
+
+Every commit must bump the app version. Use the next patch version by default,
+unless the user provides another version. Before committing:
+
+1. Update `src/release.json` with the proposed version, current date, and exact
+   planned commit subject. Preserve `includedCommits` unless the user selects a
+   different set for the visible 14-day app change log.
+2. Rebuild and test the generated outputs.
+3. Ask: `Commit as version X.Y.Z? Reply y or provide a version number.`
+
+Do not commit or push until the user replies `y` or supplies the version to use.
