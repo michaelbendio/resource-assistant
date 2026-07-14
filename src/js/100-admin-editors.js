@@ -75,6 +75,30 @@ function textContainsTokenPhrase(text, phrase){
   return false;
 }
 
+function getSearchTokenForms(value){
+  const token = String(value || "");
+  const forms = new Set(token ? [token] : []);
+  if(!/^[a-z]+$/.test(token) || token.length < 4) return forms;
+
+  if(token.endsWith("ies") && token.length > 4) forms.add(`${token.slice(0, -3)}y`);
+  if(token.endsWith("s") && !token.endsWith("ss")) forms.add(token.slice(0, -1));
+  if(/(?:ses|xes|zes|ches|shes)$/.test(token)) forms.add(token.slice(0, -2));
+  if(token === "housing") forms.add("house");
+  if(token === "rental" || token === "rentals") forms.add("rent");
+  return forms;
+}
+
+function searchTokensMatch(left, right){
+  const leftForms = getSearchTokenForms(left);
+  const rightForms = getSearchTokenForms(right);
+  return Array.from(leftForms).some(form => rightForms.has(form));
+}
+
+function searchTextMatchesAllTokens(text, queryTokens){
+  const textTokens = getReferenceTokens(text);
+  return queryTokens.every(queryToken => textTokens.some(textToken => searchTokensMatch(textToken, queryToken)));
+}
+
 function isReferenceNameSearchable(resourceName){
   const rawName = String(resourceName || "").trim();
   if(!rawName) return false;
@@ -154,107 +178,102 @@ function addSearchResult(groupMap, groups, category, resource, options = {}){
   group.items.push({
     resourceId,
     resourceName:String(resource.name || "(Unnamed resource)"),
-    snippet:String(options.snippet || "")
+    snippet:String(options.snippet || ""),
+    rank:Number.isFinite(options.rank) ? options.rank : 9999
   });
 }
 
-function addTaxonomySearchResults(groupMap, groups, cleanQuery, resources){
-  const queryHasTokens = !!getReferenceTokens(cleanQuery).length;
-  if(!queryHasTokens) return;
+function getSearchFieldSnippet(field){
+  if(field.kind === "name") return "Name match";
+  if(field.kind === "category") return `Category: ${field.text}`;
+  if(field.kind === "type") return `Type: ${field.text}`;
+  if(field.kind === "for") return `For: ${field.text}`;
+  if(field.kind === "list") return "Category: Lists";
 
-  const resourceList = Array.isArray(resources) ? resources : [];
-  const categoryEntries = (Array.isArray(data.categories) ? data.categories : [])
-    .slice()
-    .sort(compareCategoriesByLabel)
-    .map((category, order) => ({ category, order }));
-  if(getListsResources().length){
-    categoryEntries.push({ category:{ id:LISTS_CATEGORY_ID, label:"Lists", filters:[] }, order:9998 });
-  }
+  const text = String(field.text || "").replace(/\s+/g, " ").trim();
+  const shortened = text.length > 170 ? `${text.slice(0, 167)}...` : text;
+  return shortened ? `${field.label}: ${shortened}` : `${field.label} match`;
+}
 
-  categoryEntries.forEach(({ category:sourceCategory, order }) => {
-    const categoryId = String(sourceCategory && sourceCategory.id || "");
-    if(!categoryId) return;
-    const categoryLabel = String(sourceCategory && sourceCategory.label || categoryId);
-    const searchCategory = { id:categoryId, label:categoryLabel, order };
-    const categoryResources = isListsCategory(categoryId)
-      ? resourceList.filter(resourceMatchesListsHeuristic)
-      : resourceList.filter(resource => Array.isArray(resource && resource.categories) && resource.categories.includes(categoryId));
+function getResourceSearchFields(resource){
+  const fields = [{ kind:"name", label:"Name", text:String(resource && resource.name || ""), rank:0 }];
+  const categoriesById = new Map((Array.isArray(data.categories) ? data.categories : [])
+    .map(category => [String(category && category.id || ""), category]));
 
-    if(textContainsTokenPhrase(categoryLabel, cleanQuery)){
-      categoryResources.forEach(resource => {
-        addSearchResult(groupMap, groups, searchCategory, resource, { snippet:`Category: ${categoryLabel}` });
-      });
-    }
-
-    normalizeCategoryFilters(sourceCategory && sourceCategory.filters).forEach(filter => {
-      if(!textContainsTokenPhrase(filter, cleanQuery)) return;
-      categoryResources
-        .filter(resource => getResourceCategoryFilterKeys(resource, categoryId).has(makeCategorySpecificFilterKey(filter)))
-        .forEach(resource => {
-          addSearchResult(groupMap, groups, searchCategory, resource, { snippet:`Type: ${filter}` });
-        });
+  (Array.isArray(resource && resource.categories) ? resource.categories : []).forEach(categoryId => {
+    const id = String(categoryId || "");
+    const category = categoriesById.get(id);
+    fields.push({ kind:"category", label:"Category", text:String(category && category.label || id), rank:1 });
+    normalizeCategoryFilters(resource && resource.categoryFilters && resource.categoryFilters[id]).forEach(filter => {
+      fields.push({ kind:"type", label:"Type", text:filter, rank:1 });
     });
   });
-
-  normalizeTaxonomyLabels(data.forGroups).forEach(group => {
-    if(!textContainsTokenPhrase(group, cleanQuery)) return;
-    const groupKey = makeForGroupFilterKey(group);
-    resourceList
-      .filter(resource => getResourceForGroupFilterKeys(resource).has(groupKey))
-      .forEach(resource => {
-        getResourceCategoryEntriesForSearch(resource).forEach(category => {
-          addSearchResult(groupMap, groups, category, resource, { snippet:`For: ${group}` });
-        });
-      });
+  if(resourceMatchesListsHeuristic(resource)) fields.push({ kind:"list", label:"Category", text:"Lists", rank:1 });
+  normalizeTaxonomyLabels(resource && resource.forGroups).forEach(group => {
+    fields.push({ kind:"for", label:"For", text:group, rank:1 });
   });
+
+  fields.push(
+    { kind:"description", label:"Description", text:String(resource && resource.description || ""), rank:2 },
+    { kind:"information", label:"Information", text:String(resource && resource.informationText || ""), rank:3 },
+    { kind:"phone", label:"Phone", text:String(resource && resource.phone || ""), rank:4 },
+    { kind:"address", label:"Address", text:String(resource && resource.address || ""), rank:4 },
+    { kind:"website", label:"Website", text:String(resource && resource.website || ""), rank:4 },
+    { kind:"hours", label:"Hours", text:String(resource && resource.hours || ""), rank:4 }
+  );
+  getResourcePDFs(resource).forEach(pdf => {
+    fields.push({ kind:"pdf", label:"PDF", text:String(pdf && pdf.name || ""), rank:5 });
+  });
+  return fields.filter(field => getReferenceTokens(field.text).length);
+}
+
+function getResourceSearchMatch(resource, queryTokens){
+  const fields = getResourceSearchFields(resource);
+  const combinedText = fields.map(field => field.text).join(" ");
+  if(!searchTextMatchesAllTokens(combinedText, queryTokens)) return null;
+
+  const completeField = fields.find(field => searchTextMatchesAllTokens(field.text, queryTokens));
+  if(completeField){
+    return { rank:completeField.rank, snippet:getSearchFieldSnippet(completeField) };
+  }
+
+  const matchingFields = fields.filter(field =>
+    queryTokens.some(queryToken => searchTextMatchesAllTokens(field.text, [queryToken]))
+  );
+  const labels = Array.from(new Set(matchingFields.map(field => field.label)));
+  const bestRank = matchingFields.reduce((rank, field) => Math.min(rank, field.rank), 9);
+  return { rank:10 + bestRank, snippet:`Matches across: ${labels.join(", ")}` };
 }
 
 function buildSearchResults(query){
   const cleanQuery = String(query || "").trim();
   const empty = { query:cleanQuery, mode:"none", groups:[] };
-  if(!getReferenceTokens(cleanQuery).length) return empty;
+  const queryTokens = getReferenceTokens(cleanQuery);
+  if(!queryTokens.length) return empty;
 
   const resources = Array.isArray(data.resources) ? data.resources : [];
-  let groups = [];
-  let groupMap = new Map();
+  const groups = [];
+  const groupMap = new Map();
 
   resources.forEach(resource => {
-    if(!textContainsTokenPhrase(resource && resource.name, cleanQuery)) return;
+    const match = getResourceSearchMatch(resource, queryTokens);
+    if(!match) return;
     getResourceCategoryEntriesForSearch(resource).forEach(category => {
-      addSearchResult(groupMap, groups, category, resource);
+      addSearchResult(groupMap, groups, category, resource, match);
     });
   });
 
-  if(groups.length){
-    return { query:cleanQuery, mode:"name", groups:sortSearchResultGroups(groups) };
-  }
-
-  groups = [];
-  groupMap = new Map();
-  addTaxonomySearchResults(groupMap, groups, cleanQuery, resources);
-  if(groups.length){
-    return { query:cleanQuery, mode:"taxonomy", groups:sortSearchResultGroups(groups) };
-  }
-
-  groups = [];
-  groupMap = new Map();
-  resources.forEach(resource => {
-    if(!textContainsTokenPhrase(resource && resource.informationText, cleanQuery)) return;
-    getResourceCategoryEntriesForSearch(resource).forEach(category => {
-      addSearchResult(groupMap, groups, category, resource, {
-        snippet:getReferenceSnippet(resource && resource.informationText, cleanQuery)
-      });
-    });
-  });
-
-  return { query:cleanQuery, mode:groups.length ? "information" : "none", groups:sortSearchResultGroups(groups) };
+  return { query:cleanQuery, mode:groups.length ? "results" : "none", groups:sortSearchResultGroups(groups) };
 }
 
 function sortSearchResultGroups(groups){
   return (Array.isArray(groups) ? groups : [])
     .map(group => ({
       ...group,
-      items:group.items.slice().sort((a,b)=>a.resourceName.localeCompare(b.resourceName, undefined, { sensitivity:"base" }))
+      items:group.items.slice().sort((a,b)=>{
+        if(a.rank !== b.rank) return a.rank - b.rank;
+        return a.resourceName.localeCompare(b.resourceName, undefined, { sensitivity:"base" });
+      })
     }))
     .sort((a, b) => {
       if(a.categoryOrder !== b.categoryOrder) return a.categoryOrder - b.categoryOrder;

@@ -405,7 +405,7 @@ function showUserHelp(){
         <p>Click a resource to display Information, phone numbers, addresses, websites, hours, and notes.</p>
         <p>Click the resource again to hide the additional information.</p>
         <h3>Search</h3>
-        <p>Use Search to find resources by name, category filters, For groups, Lists, and text in the resource information.</p>
+        <p>Use Search to find resources by name, description, category, Type, For group, Lists, contact details, website, hours, PDF name, and text in the resource information. You can enter words in any order.</p>
         <h3>Selecting Resources for Printing</h3>
         <p>⬜ Resource is not selected for printing.</p>
         <p>🖨️ Resource is selected for printing.</p>
