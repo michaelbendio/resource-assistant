@@ -599,6 +599,72 @@ function runSelfTests(){
   });
 
   tests.push({
+    name: "PACKAGE MERGE RESTORES INCOMING PDF ATTACHMENTS",
+    fn: () => {
+      const local = {
+        categories:[],
+        resources:[{
+          id:"housing",
+          name:"Housing",
+          description:"Newer local text",
+          pdfs:[],
+          lastModified:"2026-03-01T00:00:00.000Z"
+        }],
+        changes:[]
+      };
+      const incoming = {
+        categories:[],
+        resources:[{
+          id:"housing",
+          name:"Housing",
+          description:"Older package text",
+          pdfs:[{ id:"guide", name:"Housing Guide", path:"pdfs/housing/guide.pdf" }],
+          lastModified:"2026-02-01T00:00:00.000Z"
+        }],
+        changes:[]
+      };
+      const { mergedData } = mergeResourcePackages(local, incoming);
+      const resource = mergedData.resources[0];
+      if(resource.description !== "Newer local text"){
+        throw new Error("newer local resource text was overwritten");
+      }
+      if(resource.pdfs.length !== 1 || resource.pdfs[0].path !== "pdfs/housing/guide.pdf"){
+        throw new Error("incoming PDF attachment was not restored onto the newer local resource");
+      }
+    }
+  });
+
+  tests.push({
+    name: "PACKAGE MERGE HONORS NEWER INCOMING PDF REMOVAL",
+    fn: () => {
+      const local = {
+        categories:[],
+        resources:[{
+          id:"housing",
+          name:"Housing",
+          pdfs:[{ id:"old", name:"Old Guide", path:"pdfs/housing/old.pdf" }],
+          lastModified:"2026-01-01T00:00:00.000Z"
+        }],
+        changes:[]
+      };
+      const incoming = {
+        categories:[],
+        resources:[{
+          id:"housing",
+          name:"Housing",
+          pdfs:[],
+          lastModified:"2026-02-01T00:00:00.000Z"
+        }],
+        changes:[]
+      };
+      const { mergedData } = mergeResourcePackages(local, incoming);
+      if(mergedData.resources[0].pdfs.length){
+        throw new Error("newer incoming PDF removal was not preserved");
+      }
+    }
+  });
+
+  tests.push({
     name: "CATEGORY MIGRATIONS CONSOLIDATE LEGACY DATA",
     fn: () => {
       const local = {

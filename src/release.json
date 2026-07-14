@@ -1,7 +1,7 @@
 {
   "version": "2.2.0",
   "date": "2026-07-13",
-  "message": "Clean up Provo categories",
+  "message": "Preserve imported PDF attachments",
   "includedCommits": [
     "892fff953ef4a5f29df69138a1c3619d8171620a",
     "443bffd34ef86f2fdf7ed07f0eeb4d4b4c653055",

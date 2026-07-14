@@ -508,6 +508,28 @@ function mergeItemsById(localItems, incomingItems, options = {}){
   return { merged, added, updated, addedNames, updatedNames };
 }
 
+function mergeIncomingResourcePDFs(mergedResources, incomingResources){
+  const incomingById = new Map((Array.isArray(incomingResources) ? incomingResources : [])
+    .map(resource => [String(resource && resource.id || ""), resource])
+    .filter(([id]) => id));
+
+  (Array.isArray(mergedResources) ? mergedResources : []).forEach(resource => {
+    const incomingResource = incomingById.get(String(resource && resource.id || ""));
+    if(!incomingResource) return;
+    const attachments = [];
+    const seenPaths = new Set();
+    [resource, incomingResource].forEach(source => {
+      getResourcePDFs(source).forEach(pdf => {
+        const path = String(pdf && pdf.path || "").trim();
+        if(!path || seenPaths.has(path)) return;
+        seenPaths.add(path);
+        attachments.push(cloneDataObject(pdf));
+      });
+    });
+    resource.pdfs = attachments;
+  });
+}
+
 function normalizePackageData(nextData){
   if(!nextData || typeof nextData !== "object") nextData = {};
   nextData.resourcePackageSchemaVersion = RESOURCE_PACKAGE_SCHEMA_VERSION;
@@ -563,6 +585,10 @@ function mergeResourcePackages(localData, incomingData){
   applyCategoryMigrations(incoming, categoryMigrations);
   const categoryMerge = mergeItemsById(local.categories, incoming.categories, { kind:"categories" });
   const resourceMerge = mergeItemsById(local.resources, incoming.resources, { kind:"resources" });
+  // Resource text still follows the timestamp winner, but PDF attachments from
+  // the incoming package are additive. This lets a package restore attachments
+  // when the browser has an equal/newer copy of the resource with no PDF metadata.
+  mergeIncomingResourcePDFs(resourceMerge.merged, incoming.resources);
   const mergedData = {
     ...local,
     ...incoming,
