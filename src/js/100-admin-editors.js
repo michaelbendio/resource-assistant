@@ -163,36 +163,82 @@ function getResourceCategoryEntriesForSearch(resource){
   return entries;
 }
 
-function addSearchResult(groupMap, groups, category, resource, options = {}){
-  if(!category || !category.id || !resource) return;
-  const groupKey = String(category.id);
-  if(!groupMap.has(groupKey)){
-    const group = { categoryId:category.id, categoryLabel:category.label, categoryOrder:category.order, items:[], seen:new Set() };
-    groupMap.set(groupKey, group);
-    groups.push(group);
+function getSearchTextTokenEntries(value){
+  const text = String(value || "");
+  const entries = [];
+  const expression = /[A-Za-z0-9\u00c0-\u024f]+/g;
+  let match;
+  while((match = expression.exec(text))){
+    const tokens = getReferenceTokens(match[0]);
+    if(!tokens.length) continue;
+    entries.push({ token:tokens[0], index:match.index, end:match.index + match[0].length });
   }
-  const group = groupMap.get(groupKey);
-  const resourceId = String(resource.id || "");
-  if(group.seen.has(resourceId)) return;
-  group.seen.add(resourceId);
-  group.items.push({
-    resourceId,
-    resourceName:String(resource.name || "(Unnamed resource)"),
-    snippet:String(options.snippet || ""),
-    rank:Number.isFinite(options.rank) ? options.rank : 9999
-  });
+  return entries;
 }
 
-function getSearchFieldSnippet(field){
+function findSearchTextMatch(text, queryTokens){
+  const entries = getSearchTextTokenEntries(text);
+  for(const queryToken of queryTokens){
+    const entry = entries.find(candidate => searchTokensMatch(candidate.token, queryToken));
+    if(entry) return entry;
+  }
+  return null;
+}
+
+function getCenteredSearchText(text, queryTokens){
+  const compact = String(text || "").replace(/\s+/g, " ").trim();
+  if(!compact) return "";
+  const match = findSearchTextMatch(compact, queryTokens);
+  if(!match) return compact.length > 190 ? `${compact.slice(0, 187)}...` : compact;
+
+  let start = Math.max(0, match.index - 75);
+  let end = Math.min(compact.length, match.end + 110);
+  if(start > 0){
+    const nextSpace = compact.indexOf(" ", start);
+    if(nextSpace >= 0 && nextSpace < match.index) start = nextSpace + 1;
+  }
+  if(end < compact.length){
+    const previousSpace = compact.lastIndexOf(" ", end);
+    if(previousSpace > match.end) end = previousSpace;
+  }
+  return `${start > 0 ? "..." : ""}${compact.slice(start, end)}${end < compact.length ? "..." : ""}`;
+}
+
+function getInformationSearchSectionLabel(informationText, queryTokens){
+  const text = String(informationText || "").replace(/\r\n?/g, "\n");
+  const match = findSearchTextMatch(text, queryTokens);
+  if(!match) return "";
+
+  let offset = 0;
+  let sectionLabel = "";
+  for(const line of text.split("\n")){
+    if(offset > match.index) break;
+    const trimmed = line.trim();
+    if(trimmed === "---"){
+      sectionLabel = "";
+    }else{
+      const heading = trimmed.match(/^\*\*\s*(.*?)\s*\*\*$/);
+      if(heading && heading[1]){
+        const label = heading[1].trim();
+        const normalizedLabel = normalizeReferenceSearchText(label);
+        const structuralHeading = /^(eligibility|services?|services offered|population served|contact|hours|languages?|note)(\b|$)/.test(normalizedLabel);
+        if(!structuralHeading) sectionLabel = label;
+      }
+    }
+    offset += line.length + 1;
+  }
+  return sectionLabel;
+}
+
+function getSearchFieldSnippet(field, queryTokens){
   if(field.kind === "name") return "Name match";
   if(field.kind === "category") return `Category: ${field.text}`;
   if(field.kind === "type") return `Type: ${field.text}`;
   if(field.kind === "for") return `For: ${field.text}`;
   if(field.kind === "list") return "Category: Lists";
 
-  const text = String(field.text || "").replace(/\s+/g, " ").trim();
-  const shortened = text.length > 170 ? `${text.slice(0, 167)}...` : text;
-  return shortened ? `${field.label}: ${shortened}` : `${field.label} match`;
+  const centered = getCenteredSearchText(field.text, queryTokens);
+  return centered ? `${field.label}: ${centered}` : `${field.label} match`;
 }
 
 function getResourceSearchFields(resource){
@@ -234,7 +280,15 @@ function getResourceSearchMatch(resource, queryTokens){
 
   const completeField = fields.find(field => searchTextMatchesAllTokens(field.text, queryTokens));
   if(completeField){
-    return { rank:completeField.rank, snippet:getSearchFieldSnippet(completeField) };
+    const sectionLabel = completeField.kind === "information" && resourceMatchesListsHeuristic(resource)
+      ? getInformationSearchSectionLabel(completeField.text, queryTokens)
+      : "";
+    return {
+      rank:completeField.rank,
+      snippet:getSearchFieldSnippet(completeField, queryTokens),
+      sectionLabel,
+      fieldLabel:completeField.label
+    };
   }
 
   const matchingFields = fields.filter(field =>
@@ -242,55 +296,61 @@ function getResourceSearchMatch(resource, queryTokens){
   );
   const labels = Array.from(new Set(matchingFields.map(field => field.label)));
   const bestRank = matchingFields.reduce((rank, field) => Math.min(rank, field.rank), 9);
-  return { rank:10 + bestRank, snippet:`Matches across: ${labels.join(", ")}` };
+  return { rank:10 + bestRank, snippet:`Matches across: ${labels.join(", ")}`, sectionLabel:"", fieldLabel:"Multiple fields" };
 }
 
 function buildSearchResults(query){
   const cleanQuery = String(query || "").trim();
-  const empty = { query:cleanQuery, mode:"none", groups:[] };
+  const empty = { query:cleanQuery, mode:"none", items:[] };
   const queryTokens = getReferenceTokens(cleanQuery);
   if(!queryTokens.length) return empty;
 
   const resources = Array.isArray(data.resources) ? data.resources : [];
-  const groups = [];
-  const groupMap = new Map();
-
-  resources.forEach(resource => {
+  const items = resources.map(resource => {
     const match = getResourceSearchMatch(resource, queryTokens);
-    if(!match) return;
-    getResourceCategoryEntriesForSearch(resource).forEach(category => {
-      addSearchResult(groupMap, groups, category, resource, match);
-    });
+    if(!match) return null;
+    return {
+      resourceId:String(resource && resource.id || ""),
+      resourceName:String(resource && resource.name || "(Unnamed resource)"),
+      categories:getResourceCategoryEntriesForSearch(resource),
+      ...match
+    };
+  }).filter(Boolean).sort((a, b) => {
+    if(a.rank !== b.rank) return a.rank - b.rank;
+    return a.resourceName.localeCompare(b.resourceName, undefined, { sensitivity:"base" });
   });
 
-  return { query:cleanQuery, mode:groups.length ? "results" : "none", groups:sortSearchResultGroups(groups) };
+  return { query:cleanQuery, mode:items.length ? "results" : "none", items };
 }
 
-function sortSearchResultGroups(groups){
-  return (Array.isArray(groups) ? groups : [])
-    .map(group => ({
-      ...group,
-      items:group.items.slice().sort((a,b)=>{
-        if(a.rank !== b.rank) return a.rank - b.rank;
-        return a.resourceName.localeCompare(b.resourceName, undefined, { sensitivity:"base" });
-      })
-    }))
-    .sort((a, b) => {
-      if(a.categoryOrder !== b.categoryOrder) return a.categoryOrder - b.categoryOrder;
-      return a.categoryLabel.localeCompare(b.categoryLabel, undefined, { sensitivity:"base" });
-    });
+function openSearchResult(resourceId){
+  const nextResource = String(resourceId || "");
+  if(!nextResource) return;
+  searchDetailResourceId = nextResource;
+  searchResultReturnResourceId = nextResource;
+  isSearchOpen = false;
+  view = "search-detail";
+  safeRender();
 }
 
-function openSearchResult(categoryId, resourceId){
+function openSearchResultInCategory(categoryId, resourceId){
   const nextCategory = String(categoryId || "");
   const nextResource = String(resourceId || "");
   if(!nextCategory || !nextResource) return;
   currentCategory = nextCategory;
   setSelectedCategoryFilters(currentCategory, []);
   expandedSearchResourceId = nextResource;
+  searchDetailResourceId = "";
   isSearchOpen = false;
   view = "category";
   safeRender();
+  window.setTimeout(() => {
+    const card = Array.from(document.querySelectorAll(".resource-card[data-resource-id]"))
+      .find(candidate => candidate.dataset.resourceId === nextResource);
+    if(!card) return;
+    if(typeof card.scrollIntoView === "function") card.scrollIntoView({ block:"center" });
+    if(typeof card.focus === "function") card.focus({ preventScroll:true });
+  }, 0);
 }
 
 function resourceIsListStyle(resource){

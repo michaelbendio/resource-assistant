@@ -74,21 +74,29 @@ body {
 }
 .search-panel input { flex:1; min-width:220px; max-width:520px; box-sizing:border-box; }
 .search-results-title { font-weight:bold; margin:0 0 12px; }
-.search-result-group { margin:0 0 16px; }
-.search-result-group-title { font-weight:bold; margin-bottom:4px; }
-.search-result-list { margin:0; padding-left:22px; }
-.search-result-item { margin:0 0 6px; }
+.search-result-list { list-style:none; margin:0; padding:0; display:grid; gap:12px; }
+.search-result-item { margin:0; padding:14px 16px; border:1px solid #d5dbe3; border-radius:8px; background:#fff; }
 .search-result-button {
   border:0;
   padding:0;
   background:transparent;
   color:#003366;
   font:inherit;
+  font-size:20px;
+  font-weight:600;
   text-align:left;
   cursor:pointer;
 }
 .search-result-button:hover { text-decoration:underline; }
 .search-result-snippet { color:#555; font-size:14px; margin-top:2px; }
+.search-result-section { color:#293846; font-size:14px; font-weight:600; margin-top:6px; }
+.search-result-categories { color:#68737f; font-size:13px; margin-top:7px; }
+.search-detail-back { margin-bottom:12px; }
+.search-detail-title { margin:0 0 8px; }
+.search-detail-context { color:#293846; font-weight:600; margin-bottom:10px; }
+.search-detail-controls { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 14px; }
+.search-detail-card { margin-top:4px; }
+.search-match-highlight { background:#fff1a8; color:inherit; padding:0 0.08em; border-radius:2px; }
 .landing-search {
   margin:0 0 20px;
   padding:16px;

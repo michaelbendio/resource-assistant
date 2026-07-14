@@ -328,6 +328,8 @@ function renderCategoryResourceCard(res){
   let expanded = String(res && res.id || "") === String(expandedSearchResourceId || "");
   const card = buildResourceCard(res, { expanded, showDescription:true });
   card.classList.add("resource-card-interactive");
+  card.dataset.resourceId = String(res && res.id || "");
+  card.tabIndex = -1;
 
   const expandToggle = document.createElement("button");
   expandToggle.type = "button";
@@ -492,6 +494,10 @@ function render(){
 
   if(view==="search-results"){
     renderSearchResultsView();
+  }
+
+  if(view==="search-detail"){
+    renderSearchDetailView();
   }
 
   if(view==="recent-updates"){

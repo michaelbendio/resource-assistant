@@ -2494,7 +2494,7 @@ function runSelfTests(){
   });
 
   tests.push({
-    name: "SEARCH NAME MATCH GROUPING",
+    name: "SEARCH RESULTS ARE UNIQUE WITH CATEGORY METADATA",
     fn: () => {
       const previousData = data;
       try{
@@ -2510,11 +2510,12 @@ function runSelfTests(){
         };
         const results = buildSearchResults("plasma");
         if(results.mode !== "results") throw new Error(`expected results mode, got ${results.mode}`);
-        const employment = results.groups.find(group => group.categoryId === "employment");
-        const health = results.groups.find(group => group.categoryId === "health");
-        if(!employment || !health) throw new Error("expected category groups were missing");
-        if(employment.items.length !== 2) throw new Error("employment group did not include both resources");
-        if(health.items.length !== 1 || health.items[0].resourceId !== "bio") throw new Error("health group was incorrect");
+        if(results.items.length !== 2) throw new Error("resources were duplicated across categories");
+        const bio = results.items.find(item => item.resourceId === "bio");
+        if(!bio) throw new Error("multi-category resource was missing");
+        if(bio.categories.map(category => category.id).join(",") !== "employment,health"){
+          throw new Error("result category metadata was incorrect or duplicated");
+        }
       }finally{
         data = previousData;
       }
@@ -2535,20 +2536,51 @@ function runSelfTests(){
         };
         const rentResults = buildSearchResults("rent");
         if(rentResults.mode !== "results") throw new Error("rent should match rental");
-        if(rentResults.groups[0].items.length !== 1 || rentResults.groups[0].items[0].resourceId !== "uca"){
+        if(rentResults.items.length !== 1 || rentResults.items[0].resourceId !== "uca"){
           throw new Error("rent should match rental without matching parent");
         }
         const emergencyResults = buildSearchResults("emergency");
         if(emergencyResults.mode !== "results") throw new Error(`expected results mode, got ${emergencyResults.mode}`);
-        if(emergencyResults.groups[0].items[0].resourceId !== "uca") throw new Error("information result resource was incorrect");
-        if(!emergencyResults.groups[0].items[0].snippet) throw new Error("information result snippet was missing");
+        if(emergencyResults.items[0].resourceId !== "uca") throw new Error("information result resource was incorrect");
+        if(!emergencyResults.items[0].snippet) throw new Error("information result snippet was missing");
 
         data.resources.push({ id:"emergency-name", name:"Emergency Center", categories:["housing"], categoryFilters:{}, forGroups:[], informationText:"" });
         const nameResults = buildSearchResults("emergency");
         if(nameResults.mode !== "results") throw new Error("unified search did not return results mode");
-        if(nameResults.groups[0].items.map(item => item.resourceId).join(",") !== "emergency-name,uca"){
+        if(nameResults.items.map(item => item.resourceId).join(",") !== "emergency-name,uca"){
           throw new Error("name match was not ranked ahead of the retained information match");
         }
+      }finally{
+        data = previousData;
+      }
+    }
+  });
+
+  tests.push({
+    name: "SEARCH INFORMATION CONTEXT IDENTIFIES LIST SUBSECTION",
+    fn: () => {
+      const previousData = data;
+      try{
+        data = {
+          categories:[{ id:"disability", label:"Disability" }, { id:"legal", label:"Legal" }],
+          resources:[{
+            id:"legal-list",
+            name:"Legal Resources",
+            categories:["disability", "legal"],
+            categoryFilters:{},
+            forGroups:[],
+            phone:"",
+            website:"",
+            hours:"",
+            informationText:"**Timpanogos Legal Center**\nPhone: 801-649-8895\n\n**Utah Legal Services**\n* Housing Eviction Basics\n* Tenant help"
+          }]
+        };
+        const results = buildSearchResults("eviction");
+        const item = results.items[0];
+        if(!item || item.resourceId !== "legal-list") throw new Error("list-style information match was missing");
+        if(item.sectionLabel !== "Utah Legal Services") throw new Error("nearest list subsection was not identified");
+        if(!/eviction/i.test(item.snippet)) throw new Error("snippet was not centered on the matching word");
+        if(/Timpanogos/.test(item.snippet)) throw new Error("snippet still started at the beginning of the list");
       }finally{
         data = previousData;
       }
@@ -2575,31 +2607,30 @@ function runSelfTests(){
         };
         const categoryResults = buildSearchResults("housing");
         if(categoryResults.mode !== "results") throw new Error(`expected results mode, got ${categoryResults.mode}`);
-        const housing = categoryResults.groups.find(group => group.categoryId === "housing");
-        if(!housing || housing.items.length !== 3) throw new Error("category search did not include housing resources");
+        if(categoryResults.items.length !== 3) throw new Error("category search did not include housing resources");
 
         const filterResults = buildSearchResults("career training");
         if(filterResults.mode !== "results") throw new Error("category filter search should return results");
-        if(filterResults.groups[0].items[0].resourceId !== "training") throw new Error("category filter search returned wrong resource");
-        if(!/Type: Career Training/.test(filterResults.groups[0].items[0].snippet)){
+        if(filterResults.items[0].resourceId !== "training") throw new Error("category filter search returned wrong resource");
+        if(!/Type: Career Training/.test(filterResults.items[0].snippet)){
           throw new Error("category filter search snippet was missing");
         }
 
         const forResults = buildSearchResults("seniors");
         if(forResults.mode !== "results") throw new Error("For group search should return results");
-        if(forResults.groups[0].items[0].resourceId !== "senior") throw new Error("For group search returned wrong resource");
-        if(!/For: Seniors/.test(forResults.groups[0].items[0].snippet)){
+        if(forResults.items[0].resourceId !== "senior") throw new Error("For group search returned wrong resource");
+        if(!/For: Seniors/.test(forResults.items[0].snippet)){
           throw new Error("For group search snippet was missing");
         }
         const veteranResults = buildSearchResults("veterans");
         if(veteranResults.mode !== "results") throw new Error("Veterans For group search should return results");
-        const veteranCategories = veteranResults.groups.map(group => group.categoryId).sort();
+        const veteranCategories = veteranResults.items[0].categories.map(category => category.id).sort();
         if(veteranCategories.join(",") !== "employment,housing"){
           throw new Error("For group search did not include each resource category");
         }
         const forOnlyResults = buildSearchResults("shared rooms");
         if(forOnlyResults.mode !== "results") throw new Error("second category filter search should return results");
-        if(forOnlyResults.groups.length !== 1 || forOnlyResults.groups[0].categoryId !== "housing" || forOnlyResults.groups[0].items[0].resourceId !== "room"){
+        if(forOnlyResults.items.length !== 1 || forOnlyResults.items[0].resourceId !== "room"){
           throw new Error("category filter search returned resources without the selected filter");
         }
       }finally{
@@ -2644,13 +2675,13 @@ function runSelfTests(){
           ["prevention eviction", "Information"]
         ].forEach(([query, expectedLabel]) => {
           const results = buildSearchResults(query);
-          const item = results.groups[0] && results.groups[0].items[0];
+          const item = results.items[0];
           if(!item || item.resourceId !== "complete") throw new Error(`${expectedLabel} was not searchable`);
           if(!item.snippet.startsWith(`${expectedLabel}:`)) throw new Error(`${expectedLabel} match reason was missing`);
         });
 
         const crossField = buildSearchResults("support veterans housing");
-        const crossFieldItem = crossField.groups[0] && crossField.groups[0].items[0];
+        const crossFieldItem = crossField.items[0];
         if(!crossFieldItem || !/^Matches across:/.test(crossFieldItem.snippet)){
           throw new Error("query terms did not match across resource fields");
         }
@@ -2669,14 +2700,38 @@ function runSelfTests(){
       const previousExpanded = expandedSearchResourceId;
       const previousFilters = selectedCategoryFilters;
       const previousSearchOpen = isSearchOpen;
+      const previousSearchQuery = searchQuery;
+      const previousSearchResults = searchResults;
+      const previousSearchDetail = searchDetailResourceId;
+      const previousReturnResource = searchResultReturnResourceId;
       try{
         data = {
-          categories:[{ id:"housing", label:"Housing" }],
-          resources:[{ id:"uca", name:"Utah Community Action", categories:["housing"], categoryFilters:{}, forGroups:[], informationText:"" }]
+          categories:[{ id:"housing", label:"Housing" }, { id:"employment", label:"Employment" }],
+          resources:[{
+            id:"uca",
+            name:"Utah Community Action",
+            categories:["housing", "employment"],
+            categoryFilters:{},
+            forGroups:[],
+            informationText:"Eviction mediation"
+          }],
+          changes:[]
         };
+        searchQuery = "eviction";
+        searchResults = buildSearchResults(searchQuery);
         selectedCategoryFilters = { housing:["Shelter"] };
-        openSearchResult("housing", "uca");
-        if(view !== "category") throw new Error("search result did not switch to category view");
+        openSearchResult("uca");
+        if(view !== "search-detail") throw new Error("search result did not open its detail view");
+        if(searchDetailResourceId !== "uca") throw new Error("search detail resource was not selected");
+        if(!appView.querySelector(".search-detail-card")) throw new Error("expanded search detail card was not rendered");
+        if(!appView.querySelector(".search-match-highlight")) throw new Error("matching information was not highlighted");
+        const categoryButtons = Array.from(appView.querySelectorAll(".search-detail-category")).map(button => button.textContent);
+        if(!categoryButtons.includes("View in Housing") || !categoryButtons.includes("View in Employment")){
+          throw new Error("search detail category actions were missing");
+        }
+
+        openSearchResultInCategory("housing", "uca");
+        if(view !== "category") throw new Error("category action did not switch to category view");
         if(currentCategory !== "housing") throw new Error("search result did not set category");
         if(expandedSearchResourceId !== "uca") throw new Error("search result did not mark resource for expansion");
         if(getSelectedCategoryFilters("housing").length) throw new Error("category filters were not cleared");
@@ -2687,6 +2742,10 @@ function runSelfTests(){
         expandedSearchResourceId = previousExpanded;
         selectedCategoryFilters = previousFilters;
         isSearchOpen = previousSearchOpen;
+        searchQuery = previousSearchQuery;
+        searchResults = previousSearchResults;
+        searchDetailResourceId = previousSearchDetail;
+        searchResultReturnResourceId = previousReturnResource;
       }
     }
   });
@@ -2839,8 +2898,10 @@ function runSelfTests(){
 
         const results = buildSearchResults("lists");
         if(results.mode !== "results") throw new Error("Lists search should return results");
-        const listsGroup = results.groups.find(group => group.categoryId === LISTS_CATEGORY_ID);
-        if(!listsGroup || listsGroup.items[0].resourceId !== "list") throw new Error("Lists search returned wrong resources");
+        const listResult = results.items.find(item => item.resourceId === "list");
+        if(!listResult || !listResult.categories.some(category => category.id === LISTS_CATEGORY_ID)){
+          throw new Error("Lists search returned wrong resources");
+        }
       }finally{
         data = previousData;
         view = previousView;

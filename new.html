@@ -84,21 +84,29 @@ body {
 }
 .search-panel input { flex:1; min-width:220px; max-width:520px; box-sizing:border-box; }
 .search-results-title { font-weight:bold; margin:0 0 12px; }
-.search-result-group { margin:0 0 16px; }
-.search-result-group-title { font-weight:bold; margin-bottom:4px; }
-.search-result-list { margin:0; padding-left:22px; }
-.search-result-item { margin:0 0 6px; }
+.search-result-list { list-style:none; margin:0; padding:0; display:grid; gap:12px; }
+.search-result-item { margin:0; padding:14px 16px; border:1px solid #d5dbe3; border-radius:8px; background:#fff; }
 .search-result-button {
   border:0;
   padding:0;
   background:transparent;
   color:#003366;
   font:inherit;
+  font-size:20px;
+  font-weight:600;
   text-align:left;
   cursor:pointer;
 }
 .search-result-button:hover { text-decoration:underline; }
 .search-result-snippet { color:#555; font-size:14px; margin-top:2px; }
+.search-result-section { color:#293846; font-size:14px; font-weight:600; margin-top:6px; }
+.search-result-categories { color:#68737f; font-size:13px; margin-top:7px; }
+.search-detail-back { margin-bottom:12px; }
+.search-detail-title { margin:0 0 8px; }
+.search-detail-context { color:#293846; font-weight:600; margin-bottom:10px; }
+.search-detail-controls { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 14px; }
+.search-detail-card { margin-top:4px; }
+.search-match-highlight { background:#fff1a8; color:inherit; padding:0 0.08em; border-radius:2px; }
 .landing-search {
   margin:0 0 20px;
   padding:16px;
@@ -842,7 +850,7 @@ textarea.information-editor { min-height:320px; resize:vertical; }
 
 <script id="app-release-data" type="application/json">
 {
-  "version": "2.2.0",
+  "version": "2.2.1",
   "changes": [
     {
       "date": "2026-07-14",
@@ -1653,6 +1661,8 @@ let isSearchOpen = false;
 let searchQuery = "";
 let searchResults = null;
 let expandedSearchResourceId = "";
+let searchDetailResourceId = "";
+let searchResultReturnResourceId = "";
 let selectedCategoryFilters = {}; // categoryId -> transient selected category/For filters
 let dismissedTipIds = (() => {
   try{
@@ -1949,6 +1959,8 @@ function performSearch(query){
   searchQuery = String(query || "").trim();
   searchResults = buildSearchResults(searchQuery);
   expandedSearchResourceId = "";
+  searchDetailResourceId = "";
+  searchResultReturnResourceId = "";
   view = "search-results";
   safeRender();
 }
@@ -2270,7 +2282,7 @@ function showUserHelp(){
         <p>Click a resource to display Information, phone numbers, addresses, websites, hours, and notes.</p>
         <p>Click the resource again to hide the additional information.</p>
         <h3>Search</h3>
-        <p>Use Search to find resources by name, description, category, Type, For group, Lists, contact details, website, hours, PDF name, and text in the resource information. You can enter words in any order.</p>
+        <p>Use Search to find resources by name, description, category, Type, For group, Lists, contact details, website, hours, PDF name, and text in the resource information. You can enter words in any order. Each resource appears once. Open a result to see the full resource with matching words highlighted, or use a category button to find and expand its card in that category.</p>
         <h3>Selecting Resources for Printing</h3>
         <p>⬜ Resource is not selected for printing.</p>
         <p>🖨️ Resource is selected for printing.</p>
@@ -2577,6 +2589,44 @@ function buildResourceCard(res,{expanded=false,showDescription=false,showPrintTo
   return card;
 }
 
+function highlightSearchMatches(root, queryTokens){
+  if(!root || !queryTokens.length) return [];
+  const textNodes = [];
+  const collectTextNodes = node => {
+    Array.from(node && node.childNodes || []).forEach(child => {
+      if(child.nodeType === 3){
+        textNodes.push(child);
+      }else if(child.nodeType === 1 && String(child.tagName || "").toLowerCase() !== "mark"){
+        collectTextNodes(child);
+      }
+    });
+  };
+  collectTextNodes(root);
+
+  const highlights = [];
+  textNodes.forEach(node => {
+    const text = String(node.nodeValue || "");
+    const matches = getSearchTextTokenEntries(text)
+      .filter(entry => queryTokens.some(queryToken => searchTokensMatch(entry.token, queryToken)));
+    if(!matches.length || !node.parentNode) return;
+
+    const fragment = document.createDocumentFragment();
+    let offset = 0;
+    matches.forEach(match => {
+      if(match.index > offset) fragment.appendChild(document.createTextNode(text.slice(offset, match.index)));
+      const mark = document.createElement("mark");
+      mark.className = "search-match-highlight";
+      mark.textContent = text.slice(match.index, match.end);
+      fragment.appendChild(mark);
+      highlights.push(mark);
+      offset = match.end;
+    });
+    if(offset < text.length) fragment.appendChild(document.createTextNode(text.slice(offset)));
+    node.parentNode.replaceChild(fragment, node);
+  });
+  return highlights;
+}
+
 // ============================================================
 // RENDERING — CATEGORIES
 // ============================================================
@@ -2704,47 +2754,122 @@ function renderSearchResultsView(){
   title.textContent = `Search results for: ${results.query || ""}`;
   appView.appendChild(title);
 
-  if(!results.groups.length){
+  if(!results.items.length){
     const empty = document.createElement("p");
     empty.textContent = results.query ? "No matching resources." : "Enter a search term.";
     appView.appendChild(empty);
     return;
   }
 
-  results.groups.forEach(group => {
-    const section = document.createElement("div");
-    section.className = "search-result-group";
+  const list = document.createElement("ul");
+  list.className = "search-result-list";
+  results.items.forEach(item => {
+    const row = document.createElement("li");
+    row.className = "search-result-item";
 
-    const heading = document.createElement("div");
-    heading.className = "search-result-group-title";
-    heading.textContent = group.categoryLabel;
-    section.appendChild(heading);
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "search-result-button";
+    btn.dataset.searchResourceId = item.resourceId;
+    btn.textContent = item.resourceName;
+    btn.onclick = () => openSearchResult(item.resourceId);
+    row.appendChild(btn);
 
-    const list = document.createElement("ul");
-    list.className = "search-result-list";
-    group.items.forEach(item => {
-      const row = document.createElement("li");
-      row.className = "search-result-item";
+    if(item.sectionLabel){
+      const section = document.createElement("div");
+      section.className = "search-result-section";
+      section.textContent = `Found under: ${item.sectionLabel}`;
+      row.appendChild(section);
+    }
 
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "search-result-button";
-      btn.textContent = item.resourceName;
-      btn.onclick = () => openSearchResult(group.categoryId, item.resourceId);
-      row.appendChild(btn);
+    if(item.snippet){
+      const snippet = document.createElement("div");
+      snippet.className = "search-result-snippet";
+      snippet.textContent = item.snippet;
+      row.appendChild(snippet);
+    }
 
-      if(item.snippet){
-        const snippet = document.createElement("div");
-        snippet.className = "search-result-snippet";
-        snippet.textContent = item.snippet;
-        row.appendChild(snippet);
-      }
-
-      list.appendChild(row);
-    });
-    section.appendChild(list);
-    appView.appendChild(section);
+    if(item.categories.length){
+      const categories = document.createElement("div");
+      categories.className = "search-result-categories";
+      categories.textContent = `Categories: ${item.categories.map(category => category.label).join(" · ")}`;
+      row.appendChild(categories);
+    }
+    list.appendChild(row);
   });
+  appView.appendChild(list);
+}
+
+function getCurrentSearchResultItem(resourceId){
+  const results = searchResults || buildSearchResults(searchQuery);
+  return results.items.find(item => item.resourceId === String(resourceId || "")) || null;
+}
+
+function returnToSearchResults(){
+  const returnResourceId = searchResultReturnResourceId;
+  searchDetailResourceId = "";
+  view = "search-results";
+  safeRender();
+  window.setTimeout(() => {
+    const button = Array.from(document.querySelectorAll(".search-result-button[data-search-resource-id]"))
+      .find(candidate => candidate.dataset.searchResourceId === returnResourceId);
+    if(button && typeof button.focus === "function") button.focus();
+  }, 0);
+}
+
+function renderSearchDetailView(){
+  const resourceId = String(searchDetailResourceId || "");
+  const resource = (Array.isArray(data.resources) ? data.resources : [])
+    .find(candidate => String(candidate && candidate.id || "") === resourceId);
+  const resultItem = getCurrentSearchResultItem(resourceId);
+  if(!resource || !resultItem){
+    returnToSearchResults();
+    return;
+  }
+
+  const back = document.createElement("button");
+  back.type = "button";
+  back.className = "button secondary search-detail-back";
+  back.textContent = "Back to search results";
+  back.onclick = returnToSearchResults;
+  appView.appendChild(back);
+
+  const heading = document.createElement("h2");
+  heading.className = "search-detail-title";
+  heading.textContent = `Search match for: ${searchQuery}`;
+  appView.appendChild(heading);
+
+  if(resultItem.sectionLabel){
+    const context = document.createElement("div");
+    context.className = "search-detail-context";
+    context.textContent = `Found under: ${resultItem.sectionLabel}`;
+    appView.appendChild(context);
+  }
+
+  if(resultItem.categories.length){
+    const controls = document.createElement("div");
+    controls.className = "search-detail-controls";
+    resultItem.categories.forEach(category => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "button secondary search-detail-category";
+      button.textContent = `View in ${category.label}`;
+      button.onclick = () => openSearchResultInCategory(category.id, resourceId);
+      controls.appendChild(button);
+    });
+    appView.appendChild(controls);
+  }
+
+  const card = buildResourceCard(resource, { expanded:true, showDescription:true });
+  card.classList.add("search-detail-card");
+  card.tabIndex = -1;
+  appView.appendChild(card);
+  const highlights = highlightSearchMatches(card, getReferenceTokens(searchQuery));
+  window.setTimeout(() => {
+    const target = highlights[0] || card;
+    if(typeof target.scrollIntoView === "function") target.scrollIntoView({ block:"center" });
+    if(typeof card.focus === "function") card.focus({ preventScroll:true });
+  }, 0);
 }
 
 // Source: src/js/60-undo-and-views.js
@@ -3078,6 +3203,8 @@ function renderCategoryResourceCard(res){
   let expanded = String(res && res.id || "") === String(expandedSearchResourceId || "");
   const card = buildResourceCard(res, { expanded, showDescription:true });
   card.classList.add("resource-card-interactive");
+  card.dataset.resourceId = String(res && res.id || "");
+  card.tabIndex = -1;
 
   const expandToggle = document.createElement("button");
   expandToggle.type = "button";
@@ -3242,6 +3369,10 @@ function render(){
 
   if(view==="search-results"){
     renderSearchResultsView();
+  }
+
+  if(view==="search-detail"){
+    renderSearchDetailView();
   }
 
   if(view==="recent-updates"){
@@ -4749,36 +4880,82 @@ function getResourceCategoryEntriesForSearch(resource){
   return entries;
 }
 
-function addSearchResult(groupMap, groups, category, resource, options = {}){
-  if(!category || !category.id || !resource) return;
-  const groupKey = String(category.id);
-  if(!groupMap.has(groupKey)){
-    const group = { categoryId:category.id, categoryLabel:category.label, categoryOrder:category.order, items:[], seen:new Set() };
-    groupMap.set(groupKey, group);
-    groups.push(group);
+function getSearchTextTokenEntries(value){
+  const text = String(value || "");
+  const entries = [];
+  const expression = /[A-Za-z0-9\u00c0-\u024f]+/g;
+  let match;
+  while((match = expression.exec(text))){
+    const tokens = getReferenceTokens(match[0]);
+    if(!tokens.length) continue;
+    entries.push({ token:tokens[0], index:match.index, end:match.index + match[0].length });
   }
-  const group = groupMap.get(groupKey);
-  const resourceId = String(resource.id || "");
-  if(group.seen.has(resourceId)) return;
-  group.seen.add(resourceId);
-  group.items.push({
-    resourceId,
-    resourceName:String(resource.name || "(Unnamed resource)"),
-    snippet:String(options.snippet || ""),
-    rank:Number.isFinite(options.rank) ? options.rank : 9999
-  });
+  return entries;
 }
 
-function getSearchFieldSnippet(field){
+function findSearchTextMatch(text, queryTokens){
+  const entries = getSearchTextTokenEntries(text);
+  for(const queryToken of queryTokens){
+    const entry = entries.find(candidate => searchTokensMatch(candidate.token, queryToken));
+    if(entry) return entry;
+  }
+  return null;
+}
+
+function getCenteredSearchText(text, queryTokens){
+  const compact = String(text || "").replace(/\s+/g, " ").trim();
+  if(!compact) return "";
+  const match = findSearchTextMatch(compact, queryTokens);
+  if(!match) return compact.length > 190 ? `${compact.slice(0, 187)}...` : compact;
+
+  let start = Math.max(0, match.index - 75);
+  let end = Math.min(compact.length, match.end + 110);
+  if(start > 0){
+    const nextSpace = compact.indexOf(" ", start);
+    if(nextSpace >= 0 && nextSpace < match.index) start = nextSpace + 1;
+  }
+  if(end < compact.length){
+    const previousSpace = compact.lastIndexOf(" ", end);
+    if(previousSpace > match.end) end = previousSpace;
+  }
+  return `${start > 0 ? "..." : ""}${compact.slice(start, end)}${end < compact.length ? "..." : ""}`;
+}
+
+function getInformationSearchSectionLabel(informationText, queryTokens){
+  const text = String(informationText || "").replace(/\r\n?/g, "\n");
+  const match = findSearchTextMatch(text, queryTokens);
+  if(!match) return "";
+
+  let offset = 0;
+  let sectionLabel = "";
+  for(const line of text.split("\n")){
+    if(offset > match.index) break;
+    const trimmed = line.trim();
+    if(trimmed === "---"){
+      sectionLabel = "";
+    }else{
+      const heading = trimmed.match(/^\*\*\s*(.*?)\s*\*\*$/);
+      if(heading && heading[1]){
+        const label = heading[1].trim();
+        const normalizedLabel = normalizeReferenceSearchText(label);
+        const structuralHeading = /^(eligibility|services?|services offered|population served|contact|hours|languages?|note)(\b|$)/.test(normalizedLabel);
+        if(!structuralHeading) sectionLabel = label;
+      }
+    }
+    offset += line.length + 1;
+  }
+  return sectionLabel;
+}
+
+function getSearchFieldSnippet(field, queryTokens){
   if(field.kind === "name") return "Name match";
   if(field.kind === "category") return `Category: ${field.text}`;
   if(field.kind === "type") return `Type: ${field.text}`;
   if(field.kind === "for") return `For: ${field.text}`;
   if(field.kind === "list") return "Category: Lists";
 
-  const text = String(field.text || "").replace(/\s+/g, " ").trim();
-  const shortened = text.length > 170 ? `${text.slice(0, 167)}...` : text;
-  return shortened ? `${field.label}: ${shortened}` : `${field.label} match`;
+  const centered = getCenteredSearchText(field.text, queryTokens);
+  return centered ? `${field.label}: ${centered}` : `${field.label} match`;
 }
 
 function getResourceSearchFields(resource){
@@ -4820,7 +4997,15 @@ function getResourceSearchMatch(resource, queryTokens){
 
   const completeField = fields.find(field => searchTextMatchesAllTokens(field.text, queryTokens));
   if(completeField){
-    return { rank:completeField.rank, snippet:getSearchFieldSnippet(completeField) };
+    const sectionLabel = completeField.kind === "information" && resourceMatchesListsHeuristic(resource)
+      ? getInformationSearchSectionLabel(completeField.text, queryTokens)
+      : "";
+    return {
+      rank:completeField.rank,
+      snippet:getSearchFieldSnippet(completeField, queryTokens),
+      sectionLabel,
+      fieldLabel:completeField.label
+    };
   }
 
   const matchingFields = fields.filter(field =>
@@ -4828,55 +5013,61 @@ function getResourceSearchMatch(resource, queryTokens){
   );
   const labels = Array.from(new Set(matchingFields.map(field => field.label)));
   const bestRank = matchingFields.reduce((rank, field) => Math.min(rank, field.rank), 9);
-  return { rank:10 + bestRank, snippet:`Matches across: ${labels.join(", ")}` };
+  return { rank:10 + bestRank, snippet:`Matches across: ${labels.join(", ")}`, sectionLabel:"", fieldLabel:"Multiple fields" };
 }
 
 function buildSearchResults(query){
   const cleanQuery = String(query || "").trim();
-  const empty = { query:cleanQuery, mode:"none", groups:[] };
+  const empty = { query:cleanQuery, mode:"none", items:[] };
   const queryTokens = getReferenceTokens(cleanQuery);
   if(!queryTokens.length) return empty;
 
   const resources = Array.isArray(data.resources) ? data.resources : [];
-  const groups = [];
-  const groupMap = new Map();
-
-  resources.forEach(resource => {
+  const items = resources.map(resource => {
     const match = getResourceSearchMatch(resource, queryTokens);
-    if(!match) return;
-    getResourceCategoryEntriesForSearch(resource).forEach(category => {
-      addSearchResult(groupMap, groups, category, resource, match);
-    });
+    if(!match) return null;
+    return {
+      resourceId:String(resource && resource.id || ""),
+      resourceName:String(resource && resource.name || "(Unnamed resource)"),
+      categories:getResourceCategoryEntriesForSearch(resource),
+      ...match
+    };
+  }).filter(Boolean).sort((a, b) => {
+    if(a.rank !== b.rank) return a.rank - b.rank;
+    return a.resourceName.localeCompare(b.resourceName, undefined, { sensitivity:"base" });
   });
 
-  return { query:cleanQuery, mode:groups.length ? "results" : "none", groups:sortSearchResultGroups(groups) };
+  return { query:cleanQuery, mode:items.length ? "results" : "none", items };
 }
 
-function sortSearchResultGroups(groups){
-  return (Array.isArray(groups) ? groups : [])
-    .map(group => ({
-      ...group,
-      items:group.items.slice().sort((a,b)=>{
-        if(a.rank !== b.rank) return a.rank - b.rank;
-        return a.resourceName.localeCompare(b.resourceName, undefined, { sensitivity:"base" });
-      })
-    }))
-    .sort((a, b) => {
-      if(a.categoryOrder !== b.categoryOrder) return a.categoryOrder - b.categoryOrder;
-      return a.categoryLabel.localeCompare(b.categoryLabel, undefined, { sensitivity:"base" });
-    });
+function openSearchResult(resourceId){
+  const nextResource = String(resourceId || "");
+  if(!nextResource) return;
+  searchDetailResourceId = nextResource;
+  searchResultReturnResourceId = nextResource;
+  isSearchOpen = false;
+  view = "search-detail";
+  safeRender();
 }
 
-function openSearchResult(categoryId, resourceId){
+function openSearchResultInCategory(categoryId, resourceId){
   const nextCategory = String(categoryId || "");
   const nextResource = String(resourceId || "");
   if(!nextCategory || !nextResource) return;
   currentCategory = nextCategory;
   setSelectedCategoryFilters(currentCategory, []);
   expandedSearchResourceId = nextResource;
+  searchDetailResourceId = "";
   isSearchOpen = false;
   view = "category";
   safeRender();
+  window.setTimeout(() => {
+    const card = Array.from(document.querySelectorAll(".resource-card[data-resource-id]"))
+      .find(candidate => candidate.dataset.resourceId === nextResource);
+    if(!card) return;
+    if(typeof card.scrollIntoView === "function") card.scrollIntoView({ block:"center" });
+    if(typeof card.focus === "function") card.focus({ preventScroll:true });
+  }, 0);
 }
 
 function resourceIsListStyle(resource){

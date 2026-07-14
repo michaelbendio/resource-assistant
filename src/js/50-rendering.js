@@ -84,6 +84,8 @@ function performSearch(query){
   searchQuery = String(query || "").trim();
   searchResults = buildSearchResults(searchQuery);
   expandedSearchResourceId = "";
+  searchDetailResourceId = "";
+  searchResultReturnResourceId = "";
   view = "search-results";
   safeRender();
 }
@@ -405,7 +407,7 @@ function showUserHelp(){
         <p>Click a resource to display Information, phone numbers, addresses, websites, hours, and notes.</p>
         <p>Click the resource again to hide the additional information.</p>
         <h3>Search</h3>
-        <p>Use Search to find resources by name, description, category, Type, For group, Lists, contact details, website, hours, PDF name, and text in the resource information. You can enter words in any order.</p>
+        <p>Use Search to find resources by name, description, category, Type, For group, Lists, contact details, website, hours, PDF name, and text in the resource information. You can enter words in any order. Each resource appears once. Open a result to see the full resource with matching words highlighted, or use a category button to find and expand its card in that category.</p>
         <h3>Selecting Resources for Printing</h3>
         <p>⬜ Resource is not selected for printing.</p>
         <p>🖨️ Resource is selected for printing.</p>
@@ -712,6 +714,44 @@ function buildResourceCard(res,{expanded=false,showDescription=false,showPrintTo
   return card;
 }
 
+function highlightSearchMatches(root, queryTokens){
+  if(!root || !queryTokens.length) return [];
+  const textNodes = [];
+  const collectTextNodes = node => {
+    Array.from(node && node.childNodes || []).forEach(child => {
+      if(child.nodeType === 3){
+        textNodes.push(child);
+      }else if(child.nodeType === 1 && String(child.tagName || "").toLowerCase() !== "mark"){
+        collectTextNodes(child);
+      }
+    });
+  };
+  collectTextNodes(root);
+
+  const highlights = [];
+  textNodes.forEach(node => {
+    const text = String(node.nodeValue || "");
+    const matches = getSearchTextTokenEntries(text)
+      .filter(entry => queryTokens.some(queryToken => searchTokensMatch(entry.token, queryToken)));
+    if(!matches.length || !node.parentNode) return;
+
+    const fragment = document.createDocumentFragment();
+    let offset = 0;
+    matches.forEach(match => {
+      if(match.index > offset) fragment.appendChild(document.createTextNode(text.slice(offset, match.index)));
+      const mark = document.createElement("mark");
+      mark.className = "search-match-highlight";
+      mark.textContent = text.slice(match.index, match.end);
+      fragment.appendChild(mark);
+      highlights.push(mark);
+      offset = match.end;
+    });
+    if(offset < text.length) fragment.appendChild(document.createTextNode(text.slice(offset)));
+    node.parentNode.replaceChild(fragment, node);
+  });
+  return highlights;
+}
+
 // ============================================================
 // RENDERING — CATEGORIES
 // ============================================================
@@ -839,45 +879,120 @@ function renderSearchResultsView(){
   title.textContent = `Search results for: ${results.query || ""}`;
   appView.appendChild(title);
 
-  if(!results.groups.length){
+  if(!results.items.length){
     const empty = document.createElement("p");
     empty.textContent = results.query ? "No matching resources." : "Enter a search term.";
     appView.appendChild(empty);
     return;
   }
 
-  results.groups.forEach(group => {
-    const section = document.createElement("div");
-    section.className = "search-result-group";
+  const list = document.createElement("ul");
+  list.className = "search-result-list";
+  results.items.forEach(item => {
+    const row = document.createElement("li");
+    row.className = "search-result-item";
 
-    const heading = document.createElement("div");
-    heading.className = "search-result-group-title";
-    heading.textContent = group.categoryLabel;
-    section.appendChild(heading);
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "search-result-button";
+    btn.dataset.searchResourceId = item.resourceId;
+    btn.textContent = item.resourceName;
+    btn.onclick = () => openSearchResult(item.resourceId);
+    row.appendChild(btn);
 
-    const list = document.createElement("ul");
-    list.className = "search-result-list";
-    group.items.forEach(item => {
-      const row = document.createElement("li");
-      row.className = "search-result-item";
+    if(item.sectionLabel){
+      const section = document.createElement("div");
+      section.className = "search-result-section";
+      section.textContent = `Found under: ${item.sectionLabel}`;
+      row.appendChild(section);
+    }
 
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "search-result-button";
-      btn.textContent = item.resourceName;
-      btn.onclick = () => openSearchResult(group.categoryId, item.resourceId);
-      row.appendChild(btn);
+    if(item.snippet){
+      const snippet = document.createElement("div");
+      snippet.className = "search-result-snippet";
+      snippet.textContent = item.snippet;
+      row.appendChild(snippet);
+    }
 
-      if(item.snippet){
-        const snippet = document.createElement("div");
-        snippet.className = "search-result-snippet";
-        snippet.textContent = item.snippet;
-        row.appendChild(snippet);
-      }
-
-      list.appendChild(row);
-    });
-    section.appendChild(list);
-    appView.appendChild(section);
+    if(item.categories.length){
+      const categories = document.createElement("div");
+      categories.className = "search-result-categories";
+      categories.textContent = `Categories: ${item.categories.map(category => category.label).join(" · ")}`;
+      row.appendChild(categories);
+    }
+    list.appendChild(row);
   });
+  appView.appendChild(list);
+}
+
+function getCurrentSearchResultItem(resourceId){
+  const results = searchResults || buildSearchResults(searchQuery);
+  return results.items.find(item => item.resourceId === String(resourceId || "")) || null;
+}
+
+function returnToSearchResults(){
+  const returnResourceId = searchResultReturnResourceId;
+  searchDetailResourceId = "";
+  view = "search-results";
+  safeRender();
+  window.setTimeout(() => {
+    const button = Array.from(document.querySelectorAll(".search-result-button[data-search-resource-id]"))
+      .find(candidate => candidate.dataset.searchResourceId === returnResourceId);
+    if(button && typeof button.focus === "function") button.focus();
+  }, 0);
+}
+
+function renderSearchDetailView(){
+  const resourceId = String(searchDetailResourceId || "");
+  const resource = (Array.isArray(data.resources) ? data.resources : [])
+    .find(candidate => String(candidate && candidate.id || "") === resourceId);
+  const resultItem = getCurrentSearchResultItem(resourceId);
+  if(!resource || !resultItem){
+    returnToSearchResults();
+    return;
+  }
+
+  const back = document.createElement("button");
+  back.type = "button";
+  back.className = "button secondary search-detail-back";
+  back.textContent = "Back to search results";
+  back.onclick = returnToSearchResults;
+  appView.appendChild(back);
+
+  const heading = document.createElement("h2");
+  heading.className = "search-detail-title";
+  heading.textContent = `Search match for: ${searchQuery}`;
+  appView.appendChild(heading);
+
+  if(resultItem.sectionLabel){
+    const context = document.createElement("div");
+    context.className = "search-detail-context";
+    context.textContent = `Found under: ${resultItem.sectionLabel}`;
+    appView.appendChild(context);
+  }
+
+  if(resultItem.categories.length){
+    const controls = document.createElement("div");
+    controls.className = "search-detail-controls";
+    resultItem.categories.forEach(category => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "button secondary search-detail-category";
+      button.textContent = `View in ${category.label}`;
+      button.onclick = () => openSearchResultInCategory(category.id, resourceId);
+      controls.appendChild(button);
+    });
+    appView.appendChild(controls);
+  }
+
+  const card = buildResourceCard(resource, { expanded:true, showDescription:true });
+  card.classList.add("search-detail-card");
+  card.tabIndex = -1;
+  appView.appendChild(card);
+  const highlights = highlightSearchMatches(card, getReferenceTokens(searchQuery));
+  window.setTimeout(() => {
+    const target = highlights[0] || card;
+    if(typeof target.scrollIntoView === "function") target.scrollIntoView({ block:"center" });
+    if(typeof card.focus === "function") card.focus({ preventScroll:true });
+  }, 0);
 }

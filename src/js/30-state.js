@@ -177,6 +177,8 @@ let isSearchOpen = false;
 let searchQuery = "";
 let searchResults = null;
 let expandedSearchResourceId = "";
+let searchDetailResourceId = "";
+let searchResultReturnResourceId = "";
 let selectedCategoryFilters = {}; // categoryId -> transient selected category/For filters
 let dismissedTipIds = (() => {
   try{
