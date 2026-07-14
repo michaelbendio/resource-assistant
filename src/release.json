@@ -1,8 +1,9 @@
 {
   "version": "2.2.0",
   "date": "2026-07-13",
-  "message": "Expand resource search coverage",
+  "message": "Clean up Provo categories",
   "includedCommits": [
+    "892fff953ef4a5f29df69138a1c3619d8171620a",
     "443bffd34ef86f2fdf7ed07f0eeb4d4b4c653055",
     "6cddecad4c406cdb60c2165c9b2726e737d804e6",
     "5f6ea60abf0dce308baee210619991ea3151b671",

@@ -358,6 +358,27 @@ function normalizeDataCategoryFilterShape(nextData){
     });
     resource.categoryFilters = normalized;
   });
+
+  // A resource type must remain selectable after package import. Older packages
+  // sometimes stored a categoryFilters value without declaring the same value
+  // on the category, which made the assignment invisible in Admin and public
+  // filtering. Preserve those active values in the category definition.
+  const categoriesById = new Map(nextData.categories
+    .filter(category => category && category.id)
+    .map(category => [String(category.id), category]));
+  nextData.resources.forEach(resource => {
+    const filterMap = resource && resource.categoryFilters && typeof resource.categoryFilters === "object"
+      ? resource.categoryFilters
+      : {};
+    Object.keys(filterMap).forEach(categoryId => {
+      const category = categoriesById.get(String(categoryId));
+      if(!category) return;
+      category.filters = normalizeCategoryFilters([
+        ...normalizeCategoryFilters(category.filters),
+        ...normalizeCategoryFilters(filterMap[categoryId])
+      ]);
+    });
+  });
 }
 
 function normalizeDataForGroupsShape(nextData){

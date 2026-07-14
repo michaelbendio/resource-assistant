@@ -599,6 +599,103 @@ function runSelfTests(){
   });
 
   tests.push({
+    name: "CATEGORY MIGRATIONS CONSOLIDATE LEGACY DATA",
+    fn: () => {
+      const local = {
+        resourcePackageSchemaVersion:RESOURCE_PACKAGE_SCHEMA_VERSION,
+        packageVersion:19,
+        categories:[
+          { id:"immigration", label:"Immigration", filters:["Asylum"] },
+          { id:"legal", label:"Legal", filters:["Pro bono", "Immigration"] }
+        ],
+        resources:[{
+          id:"immigration-help",
+          name:"Immigration Help",
+          categories:["immigration", "legal"],
+          categoryFilters:{ immigration:["Asylum"], legal:["Pro bono"] },
+          forGroups:[],
+          informationText:"",
+          lastModified:"2026-03-01T00:00:00.000Z"
+        }],
+        changes:[]
+      };
+      const incoming = {
+        resourcePackageSchemaVersion:RESOURCE_PACKAGE_SCHEMA_VERSION,
+        packageVersion:20,
+        categories:[{ id:"legal", label:"Legal", filters:["Pro bono", "Immigration"] }],
+        categoryMigrations:[{ fromId:"immigration", toId:"legal", toFilter:"Immigration" }],
+        resources:[],
+        changes:[]
+      };
+      const { mergedData } = mergeResourcePackages(local, incoming);
+      if(mergedData.categories.some(category => category.id === "immigration")){
+        throw new Error("legacy category survived migration");
+      }
+      const resource = mergedData.resources.find(item => item.id === "immigration-help");
+      if(!resource || JSON.stringify(resource.categories) !== JSON.stringify(["legal"])){
+        throw new Error(`legacy category assignment was not consolidated: ${JSON.stringify(resource && resource.categories)}`);
+      }
+      const legalFilters = resource.categoryFilters.legal || [];
+      if(!legalFilters.includes("Pro bono") || !legalFilters.includes("Asylum") || !legalFilters.includes("Immigration")){
+        throw new Error(`legacy category types were not preserved: ${JSON.stringify(legalFilters)}`);
+      }
+      if(resource.categoryFilters.immigration){
+        throw new Error("legacy category type key survived migration");
+      }
+      const legalCategory = mergedData.categories.find(category => category.id === "legal");
+      if(!legalCategory.filters.includes("Asylum")){
+        throw new Error("migrated resource type was not declared on the canonical category");
+      }
+      if(JSON.stringify(mergedData.categoryMigrations) !== JSON.stringify(incoming.categoryMigrations)){
+        throw new Error("category migrations were not preserved for future exports");
+      }
+    }
+  });
+
+  tests.push({
+    name: "CATEGORY MIGRATIONS REMOVE OBSOLETE EMPTY CATEGORY",
+    fn: () => {
+      const local = {
+        categories:[{ id:"vxx", label:"vxx", filters:[] }],
+        resources:[{ id:"old", name:"Old", categories:["vxx"], categoryFilters:{ vxx:["Temporary"] } }],
+        changes:[]
+      };
+      const incoming = {
+        categories:[],
+        categoryMigrations:[{ fromId:"vxx" }],
+        resources:[],
+        changes:[]
+      };
+      const { mergedData } = mergeResourcePackages(local, incoming);
+      if(mergedData.categories.length) throw new Error("obsolete category was not removed");
+      if(mergedData.resources[0].categories.length) throw new Error("obsolete category assignment was not removed");
+      if(Object.keys(mergedData.resources[0].categoryFilters).length){
+        throw new Error("obsolete category types were not removed");
+      }
+    }
+  });
+
+  tests.push({
+    name: "CATEGORY MIGRATION VALIDATION",
+    fn: () => {
+      const valid = validateImportData({
+        categories:[{ id:"legal", label:"Legal" }],
+        categoryMigrations:[{ fromId:"old-legal", toId:"legal" }],
+        resources:[]
+      });
+      if(!valid.ok) throw new Error(`valid category migration was rejected: ${valid.errors.join(", ")}`);
+      const invalid = validateImportData({
+        categories:[{ id:"legal", label:"Legal" }],
+        categoryMigrations:[{ fromId:"old-legal", toId:"missing" }],
+        resources:[]
+      });
+      if(invalid.ok || !invalid.errors.some(error => error.includes("unknown target 'missing'"))){
+        throw new Error("unknown category migration target was not rejected");
+      }
+    }
+  });
+
+  tests.push({
     name: "TITLE UPDATE TOGGLE",
     fn: () => {
       const previousView = view;
@@ -2407,7 +2504,7 @@ function runSelfTests(){
             { id:"training", name:"Training Resource", categories:["employment"], categoryFilters:{ employment:["Career Training"] }, forGroups:[], informationText:"" },
             { id:"vets", name:"Service Resource", categories:["employment","housing"], categoryFilters:{}, forGroups:["Veterans"], phone:"555-1212", informationText:"" },
             { id:"senior", name:"Community Help", categories:["housing"], categoryFilters:{}, forGroups:["Seniors"], informationText:"" },
-            { id:"room", name:"Room Resource", categories:["housing"], categoryFilters:{ housing:["Shared Rooms"] }, forGroups:[], informationText:"" }
+            { id:"room", name:"Room Resource", categories:["housing"], categoryFilters:{ housing:["Shared Rooms"] }, forGroups:[], phone:"555-0000", informationText:"" }
           ]
         };
         const categoryResults = buildSearchResults("housing");

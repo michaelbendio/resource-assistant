@@ -293,6 +293,84 @@ function mergeChanges(localChanges, incomingChanges){
   return merged;
 }
 
+function normalizeCategoryMigrations(packageData){
+  if(!packageData || typeof packageData !== "object") return;
+  const source = Array.isArray(packageData.categoryMigrations) ? packageData.categoryMigrations : [];
+  const normalized = [];
+  const indexByFromId = new Map();
+
+  source.forEach(entry => {
+    if(!entry || typeof entry !== "object") return;
+    const fromId = String(entry.fromId || "").trim();
+    const toId = String(entry.toId || "").trim();
+    const toFilter = String(entry.toFilter || "").trim();
+    if(!fromId || (toId && fromId === toId)) return;
+
+    const migration = { fromId };
+    if(toId) migration.toId = toId;
+    if(toId && toFilter) migration.toFilter = toFilter;
+    if(indexByFromId.has(fromId)){
+      normalized[indexByFromId.get(fromId)] = migration;
+    }else{
+      indexByFromId.set(fromId, normalized.length);
+      normalized.push(migration);
+    }
+  });
+
+  packageData.categoryMigrations = normalized;
+}
+
+function mergeCategoryMigrations(localMigrations, incomingMigrations){
+  const holder = {
+    categoryMigrations: [
+      ...(Array.isArray(localMigrations) ? localMigrations : []),
+      ...(Array.isArray(incomingMigrations) ? incomingMigrations : [])
+    ]
+  };
+  normalizeCategoryMigrations(holder);
+  return holder.categoryMigrations;
+}
+
+function applyCategoryMigrations(packageData, migrations){
+  if(!packageData || typeof packageData !== "object") return;
+  if(!Array.isArray(packageData.categories)) packageData.categories = [];
+  if(!Array.isArray(packageData.resources)) packageData.resources = [];
+  const holder = { categoryMigrations:Array.isArray(migrations) ? migrations : [] };
+  normalizeCategoryMigrations(holder);
+
+  holder.categoryMigrations.forEach(migration => {
+    const fromId = migration.fromId;
+    const toId = migration.toId || "";
+    packageData.categories = packageData.categories.filter(category => String(category && category.id || "") !== fromId);
+
+    packageData.resources.forEach(resource => {
+      if(!resource || typeof resource !== "object") return;
+      const categories = Array.isArray(resource.categories) ? resource.categories.map(String) : [];
+      const filterMap = resource.categoryFilters && typeof resource.categoryFilters === "object" && !Array.isArray(resource.categoryFilters)
+        ? resource.categoryFilters
+        : {};
+      const oldFilters = normalizeCategoryFilters(filterMap[fromId]);
+      const affected = categories.includes(fromId) || oldFilters.length > 0;
+      if(!affected) return;
+
+      const nextCategories = categories.filter(categoryId => categoryId !== fromId);
+      if(toId) nextCategories.push(toId);
+      resource.categories = normalizeTaxonomyLabels(nextCategories);
+      delete filterMap[fromId];
+
+      if(toId){
+        const nextFilters = normalizeCategoryFilters([
+          ...normalizeCategoryFilters(filterMap[toId]),
+          ...oldFilters,
+          ...(migration.toFilter ? [migration.toFilter] : [])
+        ]);
+        if(nextFilters.length) filterMap[toId] = nextFilters;
+      }
+      resource.categoryFilters = filterMap;
+    });
+  });
+}
+
 function getRecentChanges(){
   normalizeChanges(data);
   return data.changes.slice().sort((a,b)=>String(b.timestamp||"").localeCompare(String(a.timestamp||"")));
@@ -441,6 +519,7 @@ function normalizePackageData(nextData){
   normalizeLegacyTagsShape(nextData);
   normalizeDataForGroupsShape(nextData);
   normalizeDataCategoryFilterShape(nextData);
+  normalizeCategoryMigrations(nextData);
   normalizeDataVerifiedOnShape(nextData);
   normalizeChanges(nextData);
   nextData.packageVersion = normalizePackageVersionValue(nextData.packageVersion);
@@ -459,6 +538,7 @@ function buildResourcePackageData(sourceData){
     packageVersion: source.packageVersion,
     lastModified: source.lastModified || nowISO(),
     categories: source.categories,
+    categoryMigrations: source.categoryMigrations,
     forGroups: source.forGroups,
     resources: source.resources,
     changes: source.changes
@@ -478,12 +558,16 @@ function mergeResourcePackages(localData, incomingData){
   // mutate the user's current data.
   const local = normalizePackageData(cloneDataObject(localData));
   const incoming = normalizePackageData(cloneDataObject(incomingData));
+  const categoryMigrations = mergeCategoryMigrations(local.categoryMigrations, incoming.categoryMigrations);
+  applyCategoryMigrations(local, categoryMigrations);
+  applyCategoryMigrations(incoming, categoryMigrations);
   const categoryMerge = mergeItemsById(local.categories, incoming.categories, { kind:"categories" });
   const resourceMerge = mergeItemsById(local.resources, incoming.resources, { kind:"resources" });
   const mergedData = {
     ...local,
     ...incoming,
     categories: categoryMerge.merged,
+    categoryMigrations,
     resources: resourceMerge.merged,
     changes: mergeChanges(local.changes, incoming.changes),
     forGroups: normalizeTaxonomyLabels([...(local.forGroups || []), ...(incoming.forGroups || [])]),
@@ -673,6 +757,10 @@ function validateImportData(imported){
     errors.push("Missing or invalid 'resources' array");
   }
 
+  if(imported.categoryMigrations != null && !Array.isArray(imported.categoryMigrations)){
+    errors.push("Invalid 'categoryMigrations' array");
+  }
+
   if(imported.appChanges != null && !Array.isArray(imported.appChanges)){
     errors.push("Invalid 'appChanges' array");
   }
@@ -693,6 +781,23 @@ function validateImportData(imported){
       }
       categoryIds.add(c.id);
     }
+  });
+
+  const migratedCategoryIds = new Set();
+  (Array.isArray(imported.categoryMigrations) ? imported.categoryMigrations : []).forEach((migration, i) => {
+    if(!migration || typeof migration !== "object"){
+      errors.push(`Category migration at index ${i} must be an object`);
+      return;
+    }
+    const fromId = String(migration.fromId || "").trim();
+    const toId = String(migration.toId || "").trim();
+    const toFilter = String(migration.toFilter || "").trim();
+    if(!fromId) errors.push(`Category migration at index ${i} is missing fromId`);
+    if(fromId && migratedCategoryIds.has(fromId)) errors.push(`Duplicate category migration from '${fromId}'`);
+    if(fromId) migratedCategoryIds.add(fromId);
+    if(toId && fromId === toId) errors.push(`Category migration '${fromId}' cannot target itself`);
+    if(toId && !categoryIds.has(toId)) errors.push(`Category migration '${fromId}' references unknown target '${toId}'`);
+    if(toFilter && !toId) errors.push(`Category migration '${fromId}' has toFilter without toId`);
   });
 
   const resourceIds = new Set();
