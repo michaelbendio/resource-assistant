@@ -1,0 +1,126 @@
+#!/usr/bin/env python3
+"""Convert a TSO resource package between plain JSON and ZIP containers."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+import tempfile
+import zipfile
+from pathlib import Path
+
+
+PACKAGE_JSON_NAME = "tso-resources.json"
+SUPPORTED_SUFFIXES = {".json", ".zip"}
+
+
+def default_output_path(input_path: Path) -> Path:
+    output_suffix = ".zip" if input_path.suffix.lower() == ".json" else ".json"
+    return input_path.with_suffix(output_suffix)
+
+
+def validate_json(json_bytes: bytes, source_name: str) -> None:
+    try:
+        package = json.loads(json_bytes.decode("utf-8"))
+    except UnicodeDecodeError as error:
+        raise ValueError(f"{source_name} is not UTF-8 JSON: {error}") from error
+    except json.JSONDecodeError as error:
+        raise ValueError(
+            f"{source_name} is not valid JSON: line {error.lineno}, column {error.colno}: {error.msg}"
+        ) from error
+
+    if not isinstance(package, dict):
+        raise ValueError(f"{source_name} must contain a JSON object")
+    if not isinstance(package.get("categories"), list):
+        raise ValueError(f"{source_name} is missing a 'categories' array")
+    if not isinstance(package.get("resources"), list):
+        raise ValueError(f"{source_name} is missing a 'resources' array")
+
+
+def json_to_zip(input_path: Path, output_path: Path) -> None:
+    json_bytes = input_path.read_bytes()
+    validate_json(json_bytes, input_path.name)
+    with zipfile.ZipFile(
+        output_path,
+        mode="w",
+        compression=zipfile.ZIP_DEFLATED,
+        compresslevel=6,
+    ) as package_zip:
+        package_zip.writestr(PACKAGE_JSON_NAME, json_bytes)
+
+
+def zip_to_json(input_path: Path, output_path: Path) -> None:
+    try:
+        with zipfile.ZipFile(input_path, mode="r") as package_zip:
+            entries = [info for info in package_zip.infolist() if info.filename == PACKAGE_JSON_NAME]
+            if not entries:
+                raise ValueError(f"{input_path.name} does not contain {PACKAGE_JSON_NAME}")
+            if len(entries) > 1:
+                raise ValueError(f"{input_path.name} contains more than one {PACKAGE_JSON_NAME}")
+            json_bytes = package_zip.read(entries[0])
+    except zipfile.BadZipFile as error:
+        raise ValueError(f"{input_path.name} is not a valid ZIP file") from error
+
+    validate_json(json_bytes, f"{input_path.name}/{PACKAGE_JSON_NAME}")
+    output_path.write_bytes(json_bytes)
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Convert a TSO resource package from JSON to ZIP or from ZIP to JSON. "
+            f"ZIP packages contain {PACKAGE_JSON_NAME}."
+        )
+    )
+    parser.add_argument("input", type=Path, help="Input .json or .zip resource package")
+    parser.add_argument("--output", "-o", type=Path, help="Output path; defaults to the input name with the other extension")
+    parser.add_argument("--force", "-f", action="store_true", help="Overwrite an existing output file")
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = parse_args()
+    input_path = args.input.expanduser()
+    suffix = input_path.suffix.lower()
+
+    if suffix not in SUPPORTED_SUFFIXES:
+        print("Input filename must end in .json or .zip.", file=sys.stderr)
+        return 2
+    if not input_path.is_file():
+        print(f"Input file not found: {input_path}", file=sys.stderr)
+        return 2
+
+    output_path = (args.output.expanduser() if args.output else default_output_path(input_path))
+    if input_path.resolve() == output_path.resolve():
+        print("Input and output paths must be different.", file=sys.stderr)
+        return 2
+    if output_path.exists() and not args.force:
+        print(f"Output already exists: {output_path} (use --force to overwrite)", file=sys.stderr)
+        return 2
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_file = tempfile.NamedTemporaryFile(
+        prefix=f".{output_path.name}.",
+        dir=output_path.parent,
+        delete=False,
+    )
+    temporary_path = Path(temporary_file.name)
+    temporary_file.close()
+    try:
+        if suffix == ".json":
+            json_to_zip(input_path, temporary_path)
+        else:
+            zip_to_json(input_path, temporary_path)
+        temporary_path.replace(output_path)
+    except (OSError, ValueError) as error:
+        temporary_path.unlink(missing_ok=True)
+        print(f"Conversion failed: {error}", file=sys.stderr)
+        return 1
+
+    print(f"Converted {input_path} -> {output_path}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

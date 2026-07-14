@@ -76,6 +76,20 @@ After a batch of edits, share the updated resources:
 
 Admin edits are saved in the browser first. They are not shared with anyone else until a new resource package is exported.
 
+## Convert a resource package between JSON and ZIP
+
+Use `convert-resource-package` to change only the package container. A JSON input
+becomes a ZIP containing `tso-resources.json`; a ZIP input extracts that file as
+JSON. The input data is not merged with other resources or otherwise changed.
+
+```sh
+python3 convert-resource-package alice-resources.json
+python3 convert-resource-package albuquerque-resource-package.zip
+```
+
+By default, the output uses the input filename with the other extension. Use
+`--output PATH` to choose another name or `--force` to replace an existing output.
+
 ## Church-hosted direction
 
 See [`docs/church-hosting.md`](docs/church-hosting.md) for the staged path from the
