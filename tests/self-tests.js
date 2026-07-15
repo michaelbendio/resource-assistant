@@ -2798,6 +2798,7 @@ function runSelfTests(){
       const previousCategory = currentCategory;
       const previousSearchQuery = searchQuery;
       const previousSearchResults = searchResults;
+      const previousDismissedTipIds = new Set(dismissedTipIds);
       try{
         data = {
           categories:[{ id:"food", label:"Food" }],
@@ -2816,16 +2817,29 @@ function runSelfTests(){
 
         view = "categories";
         currentCategory = null;
+        dismissedTipIds.delete(getCategoryTipId());
         render();
         const landingInput = appView.querySelector(".landing-search-input");
         const landingButton = appView.querySelector(".landing-search .button.primary");
         const categoryButton = appView.querySelector(".category-card-open");
+        const categoryTip = appView.querySelector(".red-tip");
+        const categoryReminder = appView.querySelector(".category-reminder");
+        const landingSearch = appView.querySelector(".landing-search");
         if(!landingInput || !landingButton) throw new Error("landing search controls were not rendered");
         if(appView.querySelector(".landing-search-title")) throw new Error("landing search title should not be rendered");
         if((appView.textContent || "").includes("Browse by category")) throw new Error("removed category heading was rendered");
         if(document.getElementById("tabSearch")) throw new Error("top-bar search icon should not be rendered");
         if(!categoryButton || categoryButton.getAttribute("aria-label") !== "View Food resources"){
           throw new Error("category card did not expose its navigation cue");
+        }
+        if(categoryButton.querySelector(".category-card-chevron") || categoryButton.textContent.includes("›")){
+          throw new Error("category card rendered a disclosure chevron");
+        }
+        const landingChildren = Array.from(appView.children);
+        if(!categoryTip || !categoryReminder || !landingSearch
+          || landingChildren.indexOf(categoryTip) >= landingChildren.indexOf(categoryReminder)
+          || landingChildren.indexOf(categoryReminder) >= landingChildren.indexOf(landingSearch)){
+          throw new Error("bug-report reminder was not between the category tip and search field");
         }
 
         landingInput.value = "pantry";
@@ -2851,6 +2865,8 @@ function runSelfTests(){
         currentCategory = previousCategory;
         searchQuery = previousSearchQuery;
         searchResults = previousSearchResults;
+        dismissedTipIds.clear();
+        previousDismissedTipIds.forEach(tipId => dismissedTipIds.add(tipId));
       }
     }
   });

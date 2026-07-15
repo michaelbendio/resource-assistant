@@ -64,6 +64,7 @@ function prepareRenderShell(){
 
 function renderCategoryReminder(){
   const categoryMessage = document.createElement("p");
+  categoryMessage.className = "category-reminder";
   categoryMessage.textContent = `${CATEGORY_REMINDER_TEXT} `;
   categoryMessage.style.margin = "0 0 12px";
   categoryMessage.style.color = "#555";
@@ -181,12 +182,6 @@ function renderCategoriesGrid(){
     const label = document.createElement("strong");
     label.textContent = cat.label;
     openButton.appendChild(label);
-
-    const chevron = document.createElement("span");
-    chevron.className = "category-card-chevron";
-    chevron.setAttribute("aria-hidden", "true");
-    chevron.textContent = "›";
-    openButton.appendChild(chevron);
     openButton.onclick = () => openCategoryFromCard(cat.id);
     card.appendChild(openButton);
 
@@ -218,8 +213,8 @@ function renderCategoriesView(){
   // and resource-package merge entry point.
   renderCategoryTip();
   renderPendingUpdatesNotice();
-  renderLandingSearch();
   renderCategoryReminder();
+  renderLandingSearch();
   renderCategoriesGrid();
   renderMergeResourcesButton();
 }

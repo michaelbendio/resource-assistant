@@ -29,8 +29,9 @@ body {
   line-height:1.5;
 }
 .topbar {
-  display:flex;
-  justify-content:space-between;
+  display:grid;
+  grid-template-columns:auto minmax(0, 1fr) auto;
+  column-gap:24px;
   align-items:center;
   padding:16px var(--page-gutter);
   background:#003366;
@@ -43,6 +44,22 @@ body {
 .topbar .title {
   font-size:20px;
   font-weight:600;
+}
+
+.topbar .categories-button {
+  justify-self:center;
+  padding:6px 12px;
+  border:1px solid white;
+  border-radius:4px;
+  background:white;
+  color:#003366;
+  font:inherit;
+  font-weight:700;
+  cursor:pointer;
+}
+
+.topbar .categories-button:hover {
+  background:#f0f5fa;
 }
 
 .topbar .tabs {
@@ -167,12 +184,6 @@ body {
   outline:3px solid rgba(47,111,171,.35);
   outline-offset:4px;
   border-radius:4px;
-}
-.category-card-chevron {
-  flex:0 0 auto;
-  color:#52708d;
-  font-size:24px;
-  line-height:1;
 }
 .resource-card { position:relative; }
 .resource-card-interactive {
@@ -779,8 +790,8 @@ textarea.information-editor { min-height:320px; resize:vertical; }
 
 <div class="topbar">
   <div class="title" id="appTitle">&lt;New&gt; TSO Resources</div>
+  <button id="tabCategories" class="categories-button" type="button">Categories</button>
   <div class="tabs">
-    <span id="tabCategories">Categories</span>
     <span id="tabPrintSelection" role="button" aria-label="Print Preview">🖨️ (0)</span>
     <button id="helpButton" class="help-button" type="button">Help</button>
     <span id="tabAdmin">Admin</span>
@@ -850,7 +861,7 @@ textarea.information-editor { min-height:320px; resize:vertical; }
 
 <script id="app-release-data" type="application/json">
 {
-  "version": "2.2.1",
+  "version": "2.2.2",
   "changes": [
     {
       "date": "2026-07-14",
@@ -2939,6 +2950,7 @@ function prepareRenderShell(){
 
 function renderCategoryReminder(){
   const categoryMessage = document.createElement("p");
+  categoryMessage.className = "category-reminder";
   categoryMessage.textContent = `${CATEGORY_REMINDER_TEXT} `;
   categoryMessage.style.margin = "0 0 12px";
   categoryMessage.style.color = "#555";
@@ -3056,12 +3068,6 @@ function renderCategoriesGrid(){
     const label = document.createElement("strong");
     label.textContent = cat.label;
     openButton.appendChild(label);
-
-    const chevron = document.createElement("span");
-    chevron.className = "category-card-chevron";
-    chevron.setAttribute("aria-hidden", "true");
-    chevron.textContent = "›";
-    openButton.appendChild(chevron);
     openButton.onclick = () => openCategoryFromCard(cat.id);
     card.appendChild(openButton);
 
@@ -3093,8 +3099,8 @@ function renderCategoriesView(){
   // and resource-package merge entry point.
   renderCategoryTip();
   renderPendingUpdatesNotice();
-  renderLandingSearch();
   renderCategoryReminder();
+  renderLandingSearch();
   renderCategoriesGrid();
   renderMergeResourcesButton();
 }
