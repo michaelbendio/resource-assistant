@@ -363,6 +363,9 @@ function runSelfTests(){
         if(!/Resource data last modified:/.test(appView.textContent || "")){
           throw new Error("resource data modified label was missing");
         }
+        if(Array.from(appView.querySelectorAll("button")).some(button => button.textContent.trim() === "View Categories")){
+          throw new Error("redundant View Categories button was rendered");
+        }
         if(!APP_CHANGE_LOG.length || !appView.textContent.includes(APP_CHANGE_LOG[0].message)){
           throw new Error("app change log entries were missing");
         }
