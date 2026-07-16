@@ -360,6 +360,9 @@ function runSelfTests(){
         if(!/App Changes — Last 14 Days:/.test(appView.textContent || "")){
           throw new Error("app change log heading was missing");
         }
+        if(!/Resource data last modified:/.test(appView.textContent || "")){
+          throw new Error("resource data modified label was missing");
+        }
         if(!APP_CHANGE_LOG.length || !appView.textContent.includes(APP_CHANGE_LOG[0].message)){
           throw new Error("app change log entries were missing");
         }
