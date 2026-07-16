@@ -1,12 +1,17 @@
 {
-  "version": "2.2.3",
+  "version": "2.2.2",
   "date": "2026-07-15",
-  "message": "Refine User and Admin Help",
+  "message": "Show latest app changes",
   "includedCommits": [
+    "77e4c789f0a79f20aad78f5c4779c018bc9f5638",
+    "0fa0fd4fd19a633c13f6fa490a47b131ac7afac2",
     "892fff953ef4a5f29df69138a1c3619d8171620a",
     "443bffd34ef86f2fdf7ed07f0eeb4d4b4c653055",
     "6cddecad4c406cdb60c2165c9b2726e737d804e6",
     "5f6ea60abf0dce308baee210619991ea3151b671",
     "6dcb68562ff4986074ebeb824cdf41d867228696"
-  ]
+  ],
+  "appChangeMessages": {
+    "0fa0fd4fd19a633c13f6fa490a47b131ac7afac2": "Changed the title bar layout"
+  }
 }

@@ -55,6 +55,10 @@ def load_release() -> dict[str, object]:
             str(commit_hash).strip()
             for commit_hash in release.get("includedCommits", [])
         ] if isinstance(release.get("includedCommits", []), list) else [],
+        "appChangeMessages": {
+            str(commit_hash).strip(): str(message).strip()
+            for commit_hash, message in release.get("appChangeMessages", {}).items()
+        } if isinstance(release.get("appChangeMessages", {}), dict) else {},
     }
     if not re.fullmatch(r"\d+\.\d+\.\d+", normalized["version"]):
         raise SystemExit("src/release.json version must use major.minor.patch format")
@@ -66,6 +70,10 @@ def load_release() -> dict[str, object]:
         raise SystemExit("src/release.json message must not be blank")
     if any(not re.fullmatch(r"[0-9a-f]{40}", commit_hash) for commit_hash in normalized["includedCommits"]):
         raise SystemExit("src/release.json includedCommits must contain full lowercase Git commit IDs")
+    if any(not re.fullmatch(r"[0-9a-f]{40}", commit_hash) for commit_hash in normalized["appChangeMessages"]):
+        raise SystemExit("src/release.json appChangeMessages keys must be full lowercase Git commit IDs")
+    if any(not message for message in normalized["appChangeMessages"].values()):
+        raise SystemExit("src/release.json appChangeMessages values must not be blank")
     return normalized
 
 
@@ -88,7 +96,7 @@ def read_recent_git_commits() -> list[dict[str, str]]:
         if not message.strip():
             continue
         try:
-            committed_at = datetime.fromisoformat(timestamp).astimezone(timezone.utc)
+            committed_at = datetime.fromisoformat(timestamp)
         except ValueError:
             continue
         commits.append({
@@ -109,15 +117,16 @@ def merge_app_changes(
         current_time = current_time.replace(tzinfo=timezone.utc)
     cutoff = current_time.astimezone(timezone.utc) - timedelta(days=14)
     included_commits = set(release.get("includedCommits", []))
+    message_overrides = release.get("appChangeMessages", {})
     changes = []
     for commit in commits:
         commit_hash = str(commit.get("hash", "")).strip()
-        message = str(commit.get("message", "")).strip()
+        message = str(message_overrides.get(commit_hash, commit.get("message", ""))).strip()
         try:
-            committed_at = datetime.fromisoformat(str(commit.get("timestamp", ""))).astimezone(timezone.utc)
+            committed_at = datetime.fromisoformat(str(commit.get("timestamp", "")))
         except ValueError:
             continue
-        if committed_at < cutoff or not message or commit_hash not in included_commits:
+        if committed_at.astimezone(timezone.utc) < cutoff or not message or commit_hash not in included_commits:
             continue
         changes.append({"date": committed_at.date().isoformat(), "message": message})
     return changes

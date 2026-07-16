@@ -61,6 +61,49 @@ class AppChangeLogTests(unittest.TestCase):
 
         self.assertEqual(sum(change["message"] == "Repeated subject" for change in changes), 2)
 
+    def test_uses_commit_local_date_for_display(self) -> None:
+        release = {
+            "version":"2.2.4",
+            "date":"2026-07-15",
+            "message":"Show latest app changes",
+            "includedCommits":["evening-commit"],
+        }
+        commits = [{
+            "hash":"evening-commit",
+            "timestamp":"2026-07-15T19:30:00-06:00",
+            "message":"Evening change",
+        }]
+
+        changes = merge_app_changes(
+            release,
+            commits,
+            datetime(2026, 7, 16, 2, 0, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual(changes, [{"date":"2026-07-15", "message":"Evening change"}])
+
+    def test_selected_commit_can_use_app_specific_message(self) -> None:
+        now = datetime(2026, 7, 15, 18, 0, tzinfo=timezone.utc)
+        release = {
+            "version":"2.2.4",
+            "date":"2026-07-15",
+            "message":"Show latest app changes",
+            "includedCommits":["selected"],
+            "appChangeMessages":{"selected":"Changed the title bar layout"},
+        }
+        commits = [{
+            "hash":"selected",
+            "timestamp":now.isoformat(),
+            "message":"Refine category landing layout",
+        }]
+
+        changes = merge_app_changes(release, commits, now)
+
+        self.assertEqual(changes, [{
+            "date":"2026-07-15",
+            "message":"Changed the title bar layout",
+        }])
+
 
 if __name__ == "__main__":
     unittest.main()
