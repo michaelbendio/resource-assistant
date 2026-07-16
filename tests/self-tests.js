@@ -266,7 +266,7 @@ function runSelfTests(){
         if(getComputedStyle(packageBar).position !== "sticky") throw new Error("package bar should be sticky");
         if(getComputedStyle(modeBar).position !== "sticky") throw new Error("mode bar should be sticky");
         const packageLabels = Array.from(packageBar.querySelectorAll("button")).map(button => button.textContent.trim());
-        ["Save Resource Package", "Change TSO Name", "Help"].forEach(label => {
+        ["Save Resource Package", "Change TSO Name", "Admin Help"].forEach(label => {
           if(!packageLabels.includes(label)) throw new Error(`${label} was not in the package bar`);
         });
         const modeLabels = Array.from(modeBar.querySelectorAll("button")).map(button => button.textContent.trim());
@@ -1608,6 +1608,33 @@ function runSelfTests(){
   });
 
   tests.push({
+    name: "USER HELP MATCHES CURRENT RESOURCE WORKFLOW",
+    fn: () => {
+      const previousData = data;
+      try{
+        data = { categories:[{ id:"education", label:"Education", filters:["GED"] }], resources:[], changes:[] };
+        showUserHelp();
+        const modal = document.getElementById("referenceModal");
+        const text = modal ? (modal.textContent || "").replace(/\s+/g, " ") : "";
+        if(!text.includes("GED is a Type of educational resource")) throw new Error("Type example missing from User Help");
+        if(!text.includes("It also searches the automatically generated Lists category")) throw new Error("Lists search guidance missing");
+        if(!text.includes("words can appear in different parts of a resource")) throw new Error("cross-field search guidance missing");
+        if(!text.includes("View in…")) throw new Error("search category action missing");
+        if(!text.includes("find and select the resource package zip file you received")) throw new Error("resource package picker guidance missing");
+        if(text.includes("⬜ Resource is not selected") || text.includes("🖨️ Resource is selected")){
+          throw new Error("obsolete print-selection legend remained in User Help");
+        }
+        if(text.includes("Click a resource to display Information") || text.includes("Click the resource again")){
+          throw new Error("obsolete resource expansion guidance remained in User Help");
+        }
+      }finally{
+        data = previousData;
+        closeReferenceModal();
+      }
+    }
+  });
+
+  tests.push({
     name: "ADMIN HELP HAS PRINT AND TRAINING",
     fn: () => {
       const previousData = data;
@@ -1621,6 +1648,21 @@ function runSelfTests(){
         if(!document.getElementById("adminHelpPrintButton")) throw new Error("Print button missing");
         if(!document.getElementById("adminTrainingPrintButton")) throw new Error("Training print button missing");
         if(!/First-Time Admin Training/.test(modal.textContent || "")) throw new Error("training section missing");
+        const helpText = (modal.textContent || "").replace(/\s+/g, " ");
+        if(!helpText.includes("Complete this setup step only if the blue bar says <New> TSO Resources")){
+          throw new Error("conditional untitled-file setup guidance missing");
+        }
+        if(helpText.includes("Press Ctrl+Alt+A to enable admin mode") || helpText.includes("Enter admin mode.")){
+          throw new Error("redundant admin-mode setup guidance remained");
+        }
+        if(!helpText.includes("No resources in this category")) throw new Error("empty Education training step missing");
+        if(!helpText.includes("Resources in this category list on the right is empty")) throw new Error("empty category resource list guidance missing");
+        if(!helpText.includes("Types are category-specific choices")) throw new Error("Types guidance missing");
+        if(!helpText.includes("Users see the changes after they merge the resource package")) throw new Error("package sharing guidance missing");
+        if(helpText.includes("Category filters are") || helpText.includes("category-specific filters")){
+          throw new Error("obsolete category filter terminology remained in Admin Help");
+        }
+        if(helpText.includes("Click Delete or press Delete")) throw new Error("obsolete keyboard-delete guidance remained");
       }finally{
         data = previousData;
         closeReferenceModal();

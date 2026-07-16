@@ -37,7 +37,7 @@ function renderAdmin(){
       </div>
       <div class="admin-toolbar-reference-actions admin-sticky-reference-actions">
         ${shouldShowChangeTsoNameButton() ? `<button class="button" onclick="showAdminSetup()">Change TSO Name</button>` : ""}
-        <button class="button admin-toolbar-help" onclick="showAdminHelp()">Help</button>
+        <button class="button admin-toolbar-help" onclick="showAdminHelp()">Admin Help</button>
       </div>
     </div>
 

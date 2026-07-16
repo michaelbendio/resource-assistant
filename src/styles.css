@@ -566,6 +566,14 @@ textarea.information-editor { min-height:320px; resize:vertical; }
 .admin-help-content ol,
 .admin-help-content ul { margin:8px 0 0 22px; padding:0; }
 .admin-help-content li { margin:4px 0; }
+.reference-modal-body kbd {
+  padding:1px 5px;
+  border:1px solid #b8c3ce;
+  border-radius:4px;
+  background:#f5f7fa;
+  font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size:.9em;
+}
 .admin-training-actions { margin:10px 0 12px; }
 .admin-training-sample {
   white-space:pre-wrap;
