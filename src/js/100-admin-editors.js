@@ -605,6 +605,9 @@ function categoryNameExists(name, excludeId){
 }
 
 function validateCategoryDraft(draft){
+  if(!String(draft && draft.label || "").trim()){
+    return { valid:false, message:"Category name is required." };
+  }
   if(categoryNameExists(draft && draft.label, draft && draft.id)){
     return { valid:false, message:"Category already exists." };
   }
@@ -1073,7 +1076,7 @@ function populateCategoryBrowseOptions(sel, pairs){
     btn.tabIndex = -1;
     btn.dataset.categoryIndex = String(i);
     btn.dataset.categoryId = String(c.id || "");
-    btn.textContent = c.label || "";
+    btn.textContent = String(c && c.label || "").trim() || "(Unnamed category)";
     sel.appendChild(btn);
   });
 }
@@ -1138,7 +1141,6 @@ function newCategory(){
     filters: []
   });
 
-  persist();
   newCategoryIds.add(categoryId);
   adminTab = "categories";
   selectedCategoryIndex = String(newIndex);

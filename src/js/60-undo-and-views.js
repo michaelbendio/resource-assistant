@@ -106,6 +106,7 @@ function renderPendingUpdatesNotice(){
 function getCategoryCardsForRender(){
   // Lists is derived from resource shape, not stored as a real package category.
   return data.categories
+    .filter(cat => String(cat && cat.label || "").trim())
     .map(cat => ({ id:cat.id, label:cat.label, source:cat }))
     .concat(getListsResources().length ? [{ id:LISTS_CATEGORY_ID, label:"Lists", source:null }] : [])
     .sort((a,b)=>String(a.label || "").localeCompare(String(b.label || ""), undefined, { sensitivity:"base" }));

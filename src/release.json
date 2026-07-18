@@ -1,7 +1,7 @@
 {
-  "version": "2.2.2",
-  "date": "2026-07-16",
-  "message": "Update title bar App Changes wording",
+  "version": "2.2.3",
+  "date": "2026-07-18",
+  "message": "Prevent unnamed ghost categories",
   "includedCommits": [
     "77e4c789f0a79f20aad78f5c4779c018bc9f5638",
     "0fa0fd4fd19a633c13f6fa490a47b131ac7afac2",

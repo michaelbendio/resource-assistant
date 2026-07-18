@@ -869,7 +869,7 @@ textarea.information-editor { min-height:320px; resize:vertical; }
 
 <script id="app-release-data" type="application/json">
 {
-  "version": "2.2.2",
+  "version": "2.2.3",
   "changes": [
     {
       "date": "2026-07-15",
@@ -886,18 +886,6 @@ textarea.information-editor { min-height:320px; resize:vertical; }
     {
       "date": "2026-07-13",
       "message": "Fix category update badge details"
-    },
-    {
-      "date": "2026-07-03",
-      "message": "Auto-fit resource information editor"
-    },
-    {
-      "date": "2026-07-03",
-      "message": "Compress saved resource package zips"
-    },
-    {
-      "date": "2026-07-03",
-      "message": "Add PDF package support and admin fixes"
     }
   ]
 }
@@ -3014,6 +3002,7 @@ function renderPendingUpdatesNotice(){
 function getCategoryCardsForRender(){
   // Lists is derived from resource shape, not stored as a real package category.
   return data.categories
+    .filter(cat => String(cat && cat.label || "").trim())
     .map(cat => ({ id:cat.id, label:cat.label, source:cat }))
     .concat(getListsResources().length ? [{ id:LISTS_CATEGORY_ID, label:"Lists", source:null }] : [])
     .sort((a,b)=>String(a.label || "").localeCompare(String(b.label || ""), undefined, { sensitivity:"base" }));
@@ -4565,7 +4554,7 @@ function validateImportData(imported){
   const categoryIds = new Set();
   (Array.isArray(imported.categories) ? imported.categories : []).forEach((c, i) => {
     if(!c.id) errors.push(`Category at index ${i} is missing id`);
-    if(!c.label) warnings.push(`Category '${c.id || i}' missing label`);
+    if(!String(c && c.label || "").trim()) errors.push(`Category '${c && c.id || i}' is missing a label`);
     if(c.id){
       if(categoryIds.has(c.id)){
         errors.push(`Duplicate category id '${c.id}'`);
@@ -5337,6 +5326,9 @@ function categoryNameExists(name, excludeId){
 }
 
 function validateCategoryDraft(draft){
+  if(!String(draft && draft.label || "").trim()){
+    return { valid:false, message:"Category name is required." };
+  }
   if(categoryNameExists(draft && draft.label, draft && draft.id)){
     return { valid:false, message:"Category already exists." };
   }
@@ -5805,7 +5797,7 @@ function populateCategoryBrowseOptions(sel, pairs){
     btn.tabIndex = -1;
     btn.dataset.categoryIndex = String(i);
     btn.dataset.categoryId = String(c.id || "");
-    btn.textContent = c.label || "";
+    btn.textContent = String(c && c.label || "").trim() || "(Unnamed category)";
     sel.appendChild(btn);
   });
 }
@@ -5870,7 +5862,6 @@ function newCategory(){
     filters: []
   });
 
-  persist();
   newCategoryIds.add(categoryId);
   adminTab = "categories";
   selectedCategoryIndex = String(newIndex);

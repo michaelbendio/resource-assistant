@@ -768,6 +768,88 @@ function runSelfTests(){
   });
 
   tests.push({
+    name: "CATEGORY NAMES ARE REQUIRED",
+    fn: () => {
+      const draftValidation = validateCategoryDraft({ id:"blank", label:"   " });
+      if(draftValidation.valid || draftValidation.message !== "Category name is required."){
+        throw new Error("blank category draft was not rejected");
+      }
+      const importValidation = validateImportData({
+        categories:[{ id:"blank", label:"   " }],
+        resources:[]
+      });
+      if(importValidation.ok || !importValidation.errors.some(error => error.includes("missing a label"))){
+        throw new Error("package with blank category label was not rejected");
+      }
+    }
+  });
+
+  tests.push({
+    name: "UNNAMED CATEGORIES ARE HIDDEN PUBLICLY AND VISIBLE IN ADMIN",
+    fn: () => {
+      const previousData = data;
+      try{
+        data = {
+          categories:[
+            { id:"blank", label:"", filters:[] },
+            { id:"food", label:"Food", filters:[] }
+          ],
+          resources:[],
+          changes:[]
+        };
+        const cards = getCategoryCardsForRender();
+        if(cards.some(category => category.id === "blank")){
+          throw new Error("unnamed category rendered on the public category grid");
+        }
+        const selector = document.createElement("div");
+        populateCategoryBrowseOptions(selector, getAlphabeticalCategoryPairs());
+        const unnamedOption = selector.querySelector('[data-category-id="blank"]');
+        if(!unnamedOption || unnamedOption.textContent !== "(Unnamed category)"){
+          throw new Error("unnamed category was not exposed for repair in Admin");
+        }
+      }finally{
+        data = previousData;
+      }
+    }
+  });
+
+  tests.push({
+    name: "NEW CATEGORY DRAFT IS NOT PERSISTED BEFORE DONE",
+    fn: () => {
+      const previousData = data;
+      const previousAdminTab = adminTab;
+      const previousSelectedCategoryIndex = selectedCategoryIndex;
+      const previousEditing = editing;
+      const previousEditorSnapshot = editorSnapshot;
+      const previousStoredData = localStorage.getItem(DATA_STORAGE_KEY);
+      let draftId = "";
+      try{
+        data = { categories:[], resources:[], forGroups:[], changes:[] };
+        adminTab = "categories";
+        selectedCategoryIndex = "";
+        editing = null;
+        editorSnapshot = "";
+        renderAdmin();
+        newCategory();
+        draftId = String(data.categories[0] && data.categories[0].id || "");
+        if(!draftId) throw new Error("new category draft was not created");
+        if(localStorage.getItem(DATA_STORAGE_KEY) !== previousStoredData){
+          throw new Error("new category draft was persisted before Done");
+        }
+      }finally{
+        if(draftId) newCategoryIds.delete(draftId);
+        data = previousData;
+        adminTab = previousAdminTab;
+        selectedCategoryIndex = previousSelectedCategoryIndex;
+        editing = previousEditing;
+        editorSnapshot = previousEditorSnapshot;
+        if(previousStoredData == null) localStorage.removeItem(DATA_STORAGE_KEY);
+        else localStorage.setItem(DATA_STORAGE_KEY, previousStoredData);
+      }
+    }
+  });
+
+  tests.push({
     name: "TITLE UPDATE TOGGLE",
     fn: () => {
       const previousView = view;

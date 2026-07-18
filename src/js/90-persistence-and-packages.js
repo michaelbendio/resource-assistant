@@ -800,7 +800,7 @@ function validateImportData(imported){
   const categoryIds = new Set();
   (Array.isArray(imported.categories) ? imported.categories : []).forEach((c, i) => {
     if(!c.id) errors.push(`Category at index ${i} is missing id`);
-    if(!c.label) warnings.push(`Category '${c.id || i}' missing label`);
+    if(!String(c && c.label || "").trim()) errors.push(`Category '${c && c.id || i}' is missing a label`);
     if(c.id){
       if(categoryIds.has(c.id)){
         errors.push(`Duplicate category id '${c.id}'`);
