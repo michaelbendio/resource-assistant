@@ -20,6 +20,29 @@ Output:
 new.html
 ```
 
+## Publish all production files
+
+After the approved release commit has been pushed, run:
+
+```sh
+python3 publish-tso-release
+```
+
+This is the mandatory final release step. It builds production and debug outputs,
+runs the Python test suite, generates the Provo and Albuquerque files, and copies
+these three production files to `iCloud Drive/Documents/TSO`:
+
+```text
+new.html
+provo.html
+albuquerque.html
+```
+
+The command verifies byte parity, app version, storage IDs, and page titles. It
+fails if relevant release files are uncommitted, the current commit is not pushed
+to its upstream branch, iCloud is unavailable, or any file differs. A different
+destination can be supplied for controlled testing with `--icloud-dir PATH`.
+
 ## Debug version
 
 Build the debug version with all browser self-tests:

@@ -1,7 +1,7 @@
 {
-  "version": "2.2.3",
+  "version": "2.2.4",
   "date": "2026-07-18",
-  "message": "Include 2.2.3 in App Changes",
+  "message": "Automate releases and clean legacy ghost categories",
   "includedCommits": [
     "a78cab6ede397363a99799befc9f2dffe59e2362",
     "77e4c789f0a79f20aad78f5c4779c018bc9f5638",

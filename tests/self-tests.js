@@ -785,6 +785,48 @@ function runSelfTests(){
   });
 
   tests.push({
+    name: "UNUSED LEGACY GHOST CATEGORY IS REMOVED SAFELY",
+    fn: () => {
+      const legacyPackage = {
+        categories:[
+          { id:"ghost", label:"" },
+          { id:"food", label:"Food" }
+        ],
+        resources:[{ id:"pantry", name:"Pantry", categories:["food"], categoryFilters:{} }],
+        changes:[{ id:"change", categoryIds:["ghost", "food"] }]
+      };
+      const removed = removeUnusedUnnamedCategories(legacyPackage);
+      if(JSON.stringify(removed) !== JSON.stringify(["ghost"])){
+        throw new Error(`unused ghost category was not removed: ${JSON.stringify(removed)}`);
+      }
+      if(legacyPackage.categories.some(category => category.id === "ghost")){
+        throw new Error("unused ghost category remained in the package");
+      }
+      if(JSON.stringify(legacyPackage.changes[0].categoryIds) !== JSON.stringify(["food"])){
+        throw new Error("removed ghost category remained in change metadata");
+      }
+      const report = validateImportData(legacyPackage);
+      if(!report.ok) throw new Error(`cleaned legacy package was rejected: ${report.errors.join(", ")}`);
+    }
+  });
+
+  tests.push({
+    name: "REFERENCED UNNAMED CATEGORY IS NOT DISCARDED",
+    fn: () => {
+      const unsafePackage = {
+        categories:[{ id:"ghost", label:"" }],
+        resources:[{ id:"assigned", name:"Assigned", categories:["ghost"], categoryFilters:{} }]
+      };
+      const removed = removeUnusedUnnamedCategories(unsafePackage);
+      if(removed.length) throw new Error("referenced unnamed category was discarded");
+      const report = validateImportData(unsafePackage);
+      if(report.ok || !report.errors.some(error => error.includes("missing a label"))){
+        throw new Error("referenced unnamed category did not remain a blocking error");
+      }
+    }
+  });
+
+  tests.push({
     name: "UNNAMED CATEGORIES ARE HIDDEN PUBLICLY AND VISIBLE IN ADMIN",
     fn: () => {
       const previousData = data;
@@ -2041,7 +2083,10 @@ function runSelfTests(){
     fn: () => {
       const packageData = buildResourcePackageData({
         packageVersion:7,
-        categories:[{ id:"food", label:"Food", filters:["Pantries"] }],
+        categories:[
+          { id:"ghost", label:"", filters:[] },
+          { id:"food", label:"Food", filters:["Pantries"] }
+        ],
         forGroups:["Veterans"],
         resources:[{ id:"pantry", name:"Pantry", categories:["food"], categoryFilters:{ food:["Pantries"] }, forGroups:["Veterans"], informationText:"" }],
         changes:[],
@@ -2058,6 +2103,9 @@ function runSelfTests(){
       }
       if("tags" in packageData || packageData.resources.some(resource => "tags" in resource)){
         throw new Error("legacy tags should not be exported");
+      }
+      if(packageData.categories.some(category => category.id === "ghost")){
+        throw new Error("unused unnamed category was exported");
       }
     }
   });

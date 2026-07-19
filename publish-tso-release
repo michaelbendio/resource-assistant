@@ -1,0 +1,216 @@
+#!/usr/bin/env python3
+"""Build, publish, and verify the complete TSO Resources production release."""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import re
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parent
+DEFAULT_ICLOUD_TSO_DIR = (
+    Path.home() / "Library/Mobile Documents/com~apple~CloudDocs/Documents/TSO"
+)
+RELEASE_PATHS = (
+    "AGENTS.md",
+    "README.md",
+    "docs",
+    "build-tso-resources",
+    "make-local-tso",
+    "publish-tso-release",
+    "new.html",
+    "src",
+    "tests",
+    "vendor",
+)
+PRODUCTION_FILES = {
+    "new.html": {"storage_id": "", "title": "&lt;New&gt; TSO Resources"},
+    "provo.html": {"storage_id": "provo", "title": "Provo TSO Resources"},
+    "albuquerque.html": {
+        "storage_id": "albuquerque",
+        "title": "Albuquerque TSO Resources",
+    },
+}
+
+
+class ReleaseError(RuntimeError):
+    """Raised when a production release cannot be proven complete."""
+
+
+def run(command: list[str]) -> None:
+    print("+", " ".join(command), flush=True)
+    subprocess.run(command, cwd=ROOT, check=True)
+
+
+def capture(command: list[str]) -> str:
+    return subprocess.run(
+        command,
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+
+def release_version() -> str:
+    release = json.loads((ROOT / "src/release.json").read_text(encoding="utf-8"))
+    version = str(release.get("version", "")).strip()
+    if not re.fullmatch(r"\d+\.\d+\.\d+", version):
+        raise ReleaseError("src/release.json does not contain a valid release version.")
+    return version
+
+
+def verify_git_release_state() -> None:
+    changed_release_paths = capture(
+        ["git", "status", "--porcelain", "--untracked-files=all", "--", *RELEASE_PATHS]
+    )
+    if changed_release_paths:
+        raise ReleaseError("Release files have uncommitted changes; commit and push them first.")
+
+    try:
+        head = capture(["git", "rev-parse", "HEAD"])
+        upstream = capture(["git", "rev-parse", "@{upstream}"])
+    except subprocess.CalledProcessError as error:
+        raise ReleaseError("The current branch does not have a readable upstream branch.") from error
+    if head != upstream:
+        raise ReleaseError("The current release commit has not been pushed to its upstream branch.")
+
+
+def extract_release_payload(html: str, path: Path) -> dict[str, object]:
+    match = re.search(
+        r'<script\s+id="app-release-data"\s+type="application/json">\s*(.*?)\s*</script>',
+        html,
+        flags=re.DOTALL,
+    )
+    if not match:
+        raise ReleaseError(f"{path} is missing app-release-data.")
+    try:
+        payload = json.loads(match.group(1))
+    except json.JSONDecodeError as error:
+        raise ReleaseError(f"{path} has invalid app-release-data.") from error
+    if not isinstance(payload, dict):
+        raise ReleaseError(f"{path} app-release-data is not an object.")
+    return payload
+
+
+def verify_html(path: Path, *, version: str, storage_id: str, title: str) -> None:
+    html = path.read_text(encoding="utf-8")
+    storage_tag = f'<meta name="tso-storage-id" content="{storage_id}">'
+    title_tag = f"<title>{title}</title>"
+    if storage_tag not in html:
+        raise ReleaseError(f"{path} does not have storage id {storage_id!r}.")
+    if title_tag not in html:
+        raise ReleaseError(f"{path} does not have title {title!r}.")
+    payload = extract_release_payload(html, path)
+    if str(payload.get("version", "")) != version:
+        raise ReleaseError(f"{path} does not contain app version {version}.")
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def verify_published_files(icloud_tso_dir: Path, version: str) -> None:
+    for filename, expected in PRODUCTION_FILES.items():
+        local_path = ROOT / filename
+        published_path = icloud_tso_dir / filename
+        if not local_path.is_file():
+            raise ReleaseError(f"Missing local production file: {local_path}")
+        if not published_path.is_file():
+            raise ReleaseError(f"Missing published production file: {published_path}")
+        if local_path.read_bytes() != published_path.read_bytes():
+            raise ReleaseError(f"Published file differs from local production file: {filename}")
+        verify_html(local_path, version=version, **expected)
+        verify_html(published_path, version=version, **expected)
+        print(f"PASS {filename} {sha256(local_path)}")
+
+
+def build_and_test() -> None:
+    run([sys.executable, "build-tso-resources"])
+    run([sys.executable, "build-tso-resources", "--with-tests"])
+    run(
+        [
+            sys.executable,
+            "-m",
+            "unittest",
+            "discover",
+            "-s",
+            "tests",
+            "-p",
+            "test_*.py",
+        ]
+    )
+
+
+def generate_office_files() -> None:
+    source = str(ROOT / "new.html")
+    for office in ("provo", "albuquerque"):
+        run(
+            [
+                sys.executable,
+                "make-local-tso",
+                office,
+                "--source",
+                source,
+                "--output",
+                str(ROOT / f"{office}.html"),
+                "--no-icloud-copy",
+            ]
+        )
+
+
+def publish(icloud_tso_dir: Path) -> None:
+    if not icloud_tso_dir.is_dir():
+        raise ReleaseError(
+            f"iCloud TSO directory is unavailable: {icloud_tso_dir}. "
+            "Publication was not attempted."
+        )
+    for filename in PRODUCTION_FILES:
+        destination = icloud_tso_dir / filename
+        temporary = destination.with_name(f".{filename}.publishing")
+        try:
+            shutil.copy2(ROOT / filename, temporary)
+            temporary.replace(destination)
+        finally:
+            temporary.unlink(missing_ok=True)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Build, test, publish, and verify all TSO production HTML files."
+    )
+    parser.add_argument(
+        "--icloud-dir",
+        type=Path,
+        default=DEFAULT_ICLOUD_TSO_DIR,
+        help="Destination TSO directory. Defaults to iCloud Drive/Documents/TSO.",
+    )
+    args = parser.parse_args()
+
+    try:
+        verify_git_release_state()
+        version = release_version()
+        build_and_test()
+        generate_office_files()
+        verify_git_release_state()
+        publish(args.icloud_dir.expanduser())
+        verify_published_files(args.icloud_dir.expanduser(), version)
+    except (ReleaseError, subprocess.CalledProcessError, OSError) as error:
+        print(f"RELEASE FAILED: {error}", file=sys.stderr)
+        return 1
+
+    print(f"RELEASE COMPLETE: version {version}; 3 production files verified.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

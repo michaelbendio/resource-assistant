@@ -55,3 +55,22 @@ unless the user provides another version. Before committing:
 3. Ask: `Commit as version X.Y.Z? Reply y or provide a version number.`
 
 Do not commit or push until the user replies `y` or supplies the version to use.
+
+## Mandatory production release
+
+After an approved release commit has been pushed, do not report the release as
+complete until this command succeeds:
+
+```sh
+python3 publish-tso-release
+```
+
+This is the required final release step. It builds and tests the modular app,
+generates `new.html`, `provo.html`, and `albuquerque.html`, copies all three to
+`iCloud Drive/Documents/TSO`, and verifies byte parity, app version, storage IDs,
+and page titles. The command must fail rather than silently skip publication when
+iCloud is unavailable, release files are uncommitted, the current commit has not
+been pushed to its upstream branch, or any verification differs.
+
+Do not substitute a manual checklist for this command. Do not report a release
+as complete based only on a successful build, commit, or push.

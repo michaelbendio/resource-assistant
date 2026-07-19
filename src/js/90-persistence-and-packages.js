@@ -549,10 +549,59 @@ function normalizePackageData(nextData){
   return nextData;
 }
 
+function removeUnusedUnnamedCategories(packageData){
+  // Older app versions could persist a blank category as soon as Admin clicked
+  // New. Remove only categories that have no resource/filter/migration target;
+  // a referenced unnamed category remains invalid so data is never discarded.
+  if(!packageData || typeof packageData !== "object" || !Array.isArray(packageData.categories)) return [];
+  const resources = Array.isArray(packageData.resources) ? packageData.resources : [];
+  const migrationTargets = new Set((Array.isArray(packageData.categoryMigrations) ? packageData.categoryMigrations : [])
+    .map(migration => String(migration && migration.toId || ""))
+    .filter(Boolean));
+  const removableIds = new Set();
+
+  packageData.categories.forEach(category => {
+    const id = String(category && category.id || "");
+    if(!id || String(category && category.label || "").trim()) return;
+    const isReferenced = migrationTargets.has(id) || resources.some(resource => {
+      const categories = Array.isArray(resource && resource.categories)
+        ? resource.categories.map(String)
+        : [];
+      const categoryFilters = resource && resource.categoryFilters && typeof resource.categoryFilters === "object"
+        ? resource.categoryFilters
+        : {};
+      return categories.includes(id) || Object.prototype.hasOwnProperty.call(categoryFilters, id);
+    });
+    if(!isReferenced) removableIds.add(id);
+  });
+
+  if(!removableIds.size) return [];
+  packageData.categories = packageData.categories.filter(category =>
+    !removableIds.has(String(category && category.id || ""))
+  );
+  if(Array.isArray(packageData.changes)){
+    packageData.changes.forEach(entry => {
+      if(!entry || !Array.isArray(entry.categoryIds)) return;
+      entry.categoryIds = entry.categoryIds.filter(id => !removableIds.has(String(id)));
+    });
+  }
+  return Array.from(removableIds);
+}
+
 function buildResourcePackageData(sourceData){
   // Resource packages are intentionally smaller than local app state. Do not add
   // UI-only fields such as lastLoadedPackageInfo, undo, or selected filters here.
   const source = normalizePackageData(cloneDataObject(sourceData || {}));
+  removeUnusedUnnamedCategories(source);
+  const referencedUnnamedCategory = source.categories.find(category =>
+    !String(category && category.label || "").trim()
+  );
+  if(referencedUnnamedCategory){
+    throw new Error(
+      `Category '${String(referencedUnnamedCategory.id || "unknown")}' is missing a label. ` +
+      "Name or delete it in Admin before saving the resource package."
+    );
+  }
   return {
     resourcePackageSchemaVersion: RESOURCE_PACKAGE_SCHEMA_VERSION,
     appVersion: APP_VERSION,
@@ -890,6 +939,7 @@ async function mergeImportPackage(event){
 
     const jsonText = await jsonFile.async("string");
     const imported = JSON.parse(jsonText);
+    const removedUnnamedCategoryIds = removeUnusedUnnamedCategories(imported);
 
     const report = validateImportData(imported);
     if(!report.ok){
@@ -939,6 +989,13 @@ async function mergeImportPackage(event){
       safeRender();
     }
     const warningBlocks = [];
+    if(removedUnnamedCategoryIds.length > 0){
+      warningBlocks.push(
+        "The package contained an unused unnamed category left by an older app. " +
+        "It was removed automatically:\n\n" +
+        removedUnnamedCategoryIds.map(id => `• ${id}`).join("\n")
+      );
+    }
     if(resourcesWithPdf.length > 0){
       warningBlocks.push(
         "The following PDFs were not preserved:\n\n" +

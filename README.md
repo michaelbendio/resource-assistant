@@ -30,6 +30,21 @@ The ordered application sources are listed in `build-tso-resources`. The build
 inlines the CSS, seed JSON, JSZip, and application JavaScript so the result remains
 a portable single HTML file.
 
+## Publish a production release
+
+After the approved release commit has been pushed, publish and verify all active
+production files with one command:
+
+```sh
+python3 publish-tso-release
+```
+
+The command builds and tests the app, generates the Provo and Albuquerque files,
+copies `new.html`, `provo.html`, and `albuquerque.html` to
+`iCloud Drive/Documents/TSO`, and verifies the copied bytes, version, storage IDs,
+and titles. It exits with an error if the release commit is not pushed, iCloud is
+unavailable, or any verification fails.
+
 ## Make a local TSO Resources file
 
 `new.html` is the starter application. Make a local TSO copy from it, for example:
