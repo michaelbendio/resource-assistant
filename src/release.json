@@ -1,8 +1,9 @@
 {
   "version": "2.2.4",
   "date": "2026-07-18",
-  "message": "Automate releases and clean legacy ghost categories",
+  "message": "Include 2.2.4 in App Changes",
   "includedCommits": [
+    "e9f6a74d99a9ac76de5051a15d7fcea059b674e3",
     "a78cab6ede397363a99799befc9f2dffe59e2362",
     "77e4c789f0a79f20aad78f5c4779c018bc9f5638",
     "0fa0fd4fd19a633c13f6fa490a47b131ac7afac2",
@@ -13,6 +14,7 @@
     "6dcb68562ff4986074ebeb824cdf41d867228696"
   ],
   "appChangeMessages": {
+    "e9f6a74d99a9ac76de5051a15d7fcea059b674e3": "Clean legacy ghost categories.",
     "0fa0fd4fd19a633c13f6fa490a47b131ac7afac2": "Change the title bar layoug"
   }
 }
