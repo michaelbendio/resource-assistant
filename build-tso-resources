@@ -118,7 +118,10 @@ def merge_app_changes(
     cutoff = current_time.astimezone(timezone.utc) - timedelta(days=14)
     included_commits = set(release.get("includedCommits", []))
     message_overrides = release.get("appChangeMessages", {})
-    changes = []
+    changes = [{
+        "date": str(release.get("date", "")).strip(),
+        "message": str(release.get("message", "")).strip(),
+    }]
     for commit in commits:
         commit_hash = str(commit.get("hash", "")).strip()
         message = str(message_overrides.get(commit_hash, commit.get("message", ""))).strip()

@@ -42,7 +42,10 @@ class AppChangeLogTests(unittest.TestCase):
 
         changes = merge_app_changes(release, commits, now)
 
-        self.assertEqual(changes, [{"date":"2026-07-08", "message":"Selected recent commit"}])
+        self.assertEqual(changes, [
+            {"date":"2026-07-13", "message":"Pending release"},
+            {"date":"2026-07-08", "message":"Selected recent commit"},
+        ])
 
     def test_repeated_subjects_are_preserved_when_both_commits_are_selected(self) -> None:
         now = datetime(2026, 7, 13, 18, 0, tzinfo=timezone.utc)
@@ -80,7 +83,10 @@ class AppChangeLogTests(unittest.TestCase):
             datetime(2026, 7, 16, 2, 0, tzinfo=timezone.utc),
         )
 
-        self.assertEqual(changes, [{"date":"2026-07-15", "message":"Evening change"}])
+        self.assertEqual(changes, [
+            {"date":"2026-07-15", "message":"Show latest app changes"},
+            {"date":"2026-07-15", "message":"Evening change"},
+        ])
 
     def test_selected_commit_can_use_app_specific_message(self) -> None:
         now = datetime(2026, 7, 15, 18, 0, tzinfo=timezone.utc)
@@ -99,9 +105,28 @@ class AppChangeLogTests(unittest.TestCase):
 
         changes = merge_app_changes(release, commits, now)
 
+        self.assertEqual(changes, [
+            {"date":"2026-07-15", "message":"Show latest app changes"},
+            {"date":"2026-07-15", "message":"Changed the title bar layout"},
+        ])
+
+    def test_current_release_message_is_visible_without_its_own_commit_hash(self) -> None:
+        release = {
+            "version":"2.2.5",
+            "date":"2026-07-21",
+            "message":"Keep print buttons visible",
+            "includedCommits":[],
+        }
+
+        changes = merge_app_changes(
+            release,
+            [],
+            datetime(2026, 7, 21, 18, 0, tzinfo=timezone.utc),
+        )
+
         self.assertEqual(changes, [{
-            "date":"2026-07-15",
-            "message":"Changed the title bar layout",
+            "date":"2026-07-21",
+            "message":"Keep print buttons visible",
         }])
 
 

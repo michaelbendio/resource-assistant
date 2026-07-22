@@ -629,14 +629,18 @@ textarea.information-editor { min-height:320px; resize:vertical; }
   display:flex;
   justify-content:center;
   align-items:center;
+  box-sizing:border-box;
+  padding:16px;
+  z-index:100;
 }
 #printModal.hidden { display:none; }
 #printContentWrapper {
   background:white;
+  box-sizing:border-box;
   padding:20px;
-  max-height:90%;
+  max-height:100%;
   overflow:auto;
-  width:800px;
+  width:min(800px, 100%);
 }
 @media print {
   @page {
@@ -869,8 +873,12 @@ textarea.information-editor { min-height:320px; resize:vertical; }
 
 <script id="app-release-data" type="application/json">
 {
-  "version": "2.2.4",
+  "version": "2.2.5",
   "changes": [
+    {
+      "date": "2026-07-21",
+      "message": "Keep print buttons visible"
+    },
     {
       "date": "2026-07-18",
       "message": "Clean legacy ghost categories."
@@ -885,7 +893,7 @@ textarea.information-editor { min-height:320px; resize:vertical; }
     },
     {
       "date": "2026-07-15",
-      "message": "Change the title bar layoug"
+      "message": "Change the title bar layout"
     },
     {
       "date": "2026-07-13",

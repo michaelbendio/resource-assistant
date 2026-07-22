@@ -1,7 +1,7 @@
 {
-  "version": "2.2.4",
-  "date": "2026-07-18",
-  "message": "Include 2.2.4 in App Changes",
+  "version": "2.2.5",
+  "date": "2026-07-21",
+  "message": "Keep print buttons visible",
   "includedCommits": [
     "e9f6a74d99a9ac76de5051a15d7fcea059b674e3",
     "a78cab6ede397363a99799befc9f2dffe59e2362",
@@ -15,6 +15,6 @@
   ],
   "appChangeMessages": {
     "e9f6a74d99a9ac76de5051a15d7fcea059b674e3": "Clean legacy ghost categories.",
-    "0fa0fd4fd19a633c13f6fa490a47b131ac7afac2": "Change the title bar layoug"
+    "0fa0fd4fd19a633c13f6fa490a47b131ac7afac2": "Change the title bar layout"
   }
 }

@@ -2210,6 +2210,23 @@ function runSelfTests(){
   });
 
   tests.push({
+    name: "PRINT REVIEW STAYS ABOVE TITLE BAR",
+    fn: () => {
+      const topbar = document.querySelector(".topbar");
+      if(!topbar) throw new Error("title bar missing");
+
+      const modalZIndex = Number.parseInt(getComputedStyle(printModal).zIndex, 10);
+      const topbarZIndex = Number.parseInt(getComputedStyle(topbar).zIndex, 10);
+      if(!Number.isFinite(modalZIndex) || modalZIndex <= topbarZIndex){
+        throw new Error(`print review z-index ${modalZIndex} does not clear title bar z-index ${topbarZIndex}`);
+      }
+      if(getComputedStyle(printContentWrapper).boxSizing !== "border-box"){
+        throw new Error("print review size does not include its padding");
+      }
+    }
+  });
+
+  tests.push({
     name: "PRINT PREVIEW HAS NO PROGRESS MESSAGE",
     fn: () => {
       const previousQueue = PrintWorkflow.queue;

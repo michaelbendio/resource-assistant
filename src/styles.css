@@ -619,14 +619,18 @@ textarea.information-editor { min-height:320px; resize:vertical; }
   display:flex;
   justify-content:center;
   align-items:center;
+  box-sizing:border-box;
+  padding:16px;
+  z-index:100;
 }
 #printModal.hidden { display:none; }
 #printContentWrapper {
   background:white;
+  box-sizing:border-box;
   padding:20px;
-  max-height:90%;
+  max-height:100%;
   overflow:auto;
-  width:800px;
+  width:min(800px, 100%);
 }
 @media print {
   @page {
