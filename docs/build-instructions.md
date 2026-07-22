@@ -30,13 +30,15 @@ python3 publish-tso-release
 
 This is the mandatory final release step. It builds production and debug outputs,
 runs the Python test suite, generates the Provo and Albuquerque files, and copies
-these three production files to `iCloud Drive/Documents/TSO`:
+these two office files to `iCloud Drive/Documents/TSO`:
 
 ```text
-new.html
 provo.html
 albuquerque.html
 ```
+
+The generated `new.html` remains a local build artifact and is not copied to
+iCloud Drive.
 
 The command verifies byte parity, app version, storage IDs, and page titles. It
 fails if relevant release files are uncommitted, the current commit is not pushed

@@ -28,8 +28,7 @@ RELEASE_PATHS = (
     "tests",
     "vendor",
 )
-PRODUCTION_FILES = {
-    "new.html": {"storage_id": "", "title": "&lt;New&gt; TSO Resources"},
+PUBLISHED_FILES = {
     "provo.html": {"storage_id": "provo", "title": "Provo TSO Resources"},
     "albuquerque.html": {
         "storage_id": "albuquerque",
@@ -120,7 +119,7 @@ def sha256(path: Path) -> str:
 
 
 def verify_published_files(icloud_tso_dir: Path, version: str) -> None:
-    for filename, expected in PRODUCTION_FILES.items():
+    for filename, expected in PUBLISHED_FILES.items():
         local_path = ROOT / filename
         published_path = icloud_tso_dir / filename
         if not local_path.is_file():
@@ -174,7 +173,7 @@ def publish(icloud_tso_dir: Path) -> None:
             f"iCloud TSO directory is unavailable: {icloud_tso_dir}. "
             "Publication was not attempted."
         )
-    for filename in PRODUCTION_FILES:
+    for filename in PUBLISHED_FILES:
         destination = icloud_tso_dir / filename
         temporary = destination.with_name(f".{filename}.publishing")
         try:
@@ -208,7 +207,7 @@ def main() -> int:
         print(f"RELEASE FAILED: {error}", file=sys.stderr)
         return 1
 
-    print(f"RELEASE COMPLETE: version {version}; 3 production files verified.")
+    print(f"RELEASE COMPLETE: version {version}; 2 published office files verified.")
     return 0
 
 

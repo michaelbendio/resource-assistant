@@ -40,9 +40,10 @@ python3 publish-tso-release
 ```
 
 The command builds and tests the app, generates the Provo and Albuquerque files,
-copies `new.html`, `provo.html`, and `albuquerque.html` to
-`iCloud Drive/Documents/TSO`, and verifies the copied bytes, version, storage IDs,
-and titles. It exits with an error if the release commit is not pushed, iCloud is
+copies `provo.html` and `albuquerque.html` to `iCloud Drive/Documents/TSO`, and
+verifies the copied bytes, version, storage IDs, and titles. The generated
+`new.html` remains a local build artifact and is not copied to iCloud Drive. The
+command exits with an error if the release commit is not pushed, iCloud is
 unavailable, or any verification fails.
 
 ## Make a local TSO Resources file

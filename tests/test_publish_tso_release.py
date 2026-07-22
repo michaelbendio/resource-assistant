@@ -73,7 +73,7 @@ class PublishTsoReleaseTests(unittest.TestCase):
             ):
                 publish_tso_release.publish(missing)
 
-    def test_publish_and_verify_all_three_files(self) -> None:
+    def test_publish_and_verify_only_office_files(self) -> None:
         previous_root = publish_tso_release.ROOT
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir) / "repo"
@@ -82,7 +82,11 @@ class PublishTsoReleaseTests(unittest.TestCase):
             destination.mkdir(parents=True)
             try:
                 publish_tso_release.ROOT = root
-                for filename, expected in publish_tso_release.PRODUCTION_FILES.items():
+                (root / "new.html").write_text(
+                    sample_html("2.2.3", "", "&lt;New&gt; TSO Resources"),
+                    encoding="utf-8",
+                )
+                for filename, expected in publish_tso_release.PUBLISHED_FILES.items():
                     (root / filename).write_text(
                         sample_html("2.2.3", expected["storage_id"], expected["title"]),
                         encoding="utf-8",
@@ -90,6 +94,7 @@ class PublishTsoReleaseTests(unittest.TestCase):
                 with redirect_stdout(io.StringIO()):
                     publish_tso_release.publish(destination)
                     publish_tso_release.verify_published_files(destination, "2.2.3")
+                    self.assertFalse((destination / "new.html").exists())
                     (destination / "provo.html").write_text("changed", encoding="utf-8")
                     with self.assertRaisesRegex(
                         publish_tso_release.ReleaseError,
