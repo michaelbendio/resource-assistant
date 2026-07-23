@@ -184,7 +184,7 @@ function runSelfTests(){
       };
       normalizeLastLoadedPackageInfo(sample);
       if(!sample.lastLoadedPackageInfo) throw new Error("package info missing after normalize");
-      if(sample.lastLoadedPackageInfo.packageVersion !== "Unknown") throw new Error("package version fallback failed");
+      if(sample.lastLoadedPackageInfo.sourcePackageVersion !== "Unknown") throw new Error("package version fallback failed");
       if(sample.lastLoadedPackageInfo.changes.length !== 2) throw new Error("package changes were not normalized");
       if(!Date.parse(sample.lastLoadedPackageInfo.loadedAt)) throw new Error("loadedAt was not normalized");
     }
@@ -201,12 +201,12 @@ function runSelfTests(){
         }
       };
       sample.lastLoadedPackageInfo = {
-        packageVersion: 2,
+        sourcePackageVersion: 2,
         loadedAt: "2026-02-01T00:00:00.000Z",
         changes: ["two"]
       };
       normalizeLastLoadedPackageInfo(sample);
-      if(sample.lastLoadedPackageInfo.packageVersion !== 2) throw new Error("package info did not replace");
+      if(sample.lastLoadedPackageInfo.sourcePackageVersion !== 2) throw new Error("package info did not replace");
       if(sample.lastLoadedPackageInfo.changes.length !== 1 || sample.lastLoadedPackageInfo.changes[0] !== "two"){
         throw new Error("replacement changes were not preserved");
       }
@@ -372,14 +372,23 @@ function runSelfTests(){
         if(!/No resource package updates loaded\./.test(appView.textContent || "")){
           throw new Error("missing no-package-loaded message");
         }
+        data.packageVersion = 11;
         data.lastLoadedPackageInfo = {
-          packageVersion: 1,
+          sourcePackageVersion: 6,
           loadedAt: nowISO(),
-          changes: ["Career Education - Formatted the services"]
+          changes: []
         };
         render();
-        if(!/Resource Package 1:/.test(appView.textContent || "")){
-          throw new Error("missing package version heading");
+        if(!/Latest Resource Package 11:/.test(appView.textContent || "")){
+          throw new Error("latest package heading did not preserve the working version");
+        }
+        if(!/No resource package updates were loaded from Resource Package 6\./.test(appView.textContent || "")){
+          throw new Error("no-update message did not identify the source package");
+        }
+        data.lastLoadedPackageInfo.changes = ["Career Education - Formatted the services"];
+        render();
+        if(!/Updates loaded from Resource Package 6:/.test(appView.textContent || "")){
+          throw new Error("loaded-update message did not identify the source package");
         }
         if(!/Career Education - Formatted the services/.test(appView.textContent || "")){
           throw new Error("missing package change text");
@@ -546,6 +555,41 @@ function runSelfTests(){
       }
       if(!fallback.includes("Resource Two - Resource added")){
         throw new Error("missing added resource fallback summary");
+      }
+    }
+  });
+
+  tests.push({
+    name: "OLDER PACKAGE DOES NOT LOWER WORKING PACKAGE VERSION",
+    fn: () => {
+      const local = {
+        packageVersion:11,
+        categories:[],
+        resources:[{
+          id:"amelia-resource",
+          name:"Amelia Resource",
+          informationText:"",
+          lastModified:"2026-07-22T18:00:00.000Z"
+        }],
+        changes:[]
+      };
+      const incoming = {
+        packageVersion:6,
+        categories:[],
+        resources:[{
+          id:"amelia-resource",
+          name:"Amelia Resource",
+          informationText:"",
+          lastModified:"2026-07-22T17:00:00.000Z"
+        }],
+        changes:[]
+      };
+      const { mergedData, summary } = mergeResourcePackages(local, incoming);
+      if(mergedData.packageVersion !== 11){
+        throw new Error(`older package lowered working version to ${mergedData.packageVersion}`);
+      }
+      if(summary.resourcesAdded || summary.resourcesUpdated || summary.categoriesAdded || summary.categoriesUpdated){
+        throw new Error("older duplicate package reported updates");
       }
     }
   });

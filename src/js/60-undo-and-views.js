@@ -388,10 +388,18 @@ function renderCategoryView(){
 }
 
 function renderUpdateInfo(packageInfo, packageChanges){
-  const resourcePackageVersion = packageInfo ? packageInfo.packageVersion : normalizePackageVersionValue(data && data.packageVersion);
+  const resourcePackageVersion = normalizePackageVersionValue(data && data.packageVersion);
+  const sourcePackageVersion = packageInfo
+    ? normalizePackageVersionValue(packageInfo.sourcePackageVersion)
+    : "Unknown";
+  const packageUpdateContent = packageInfo
+    ? packageChanges.length
+      ? `<div>Updates loaded from Resource Package ${escapeHTML(String(sourcePackageVersion))}:</div><ul>${packageChanges.map(change => `<li>${escapeHTML(change)}</li>`).join("")}</ul>`
+      : `<div>No resource package updates were loaded from Resource Package ${escapeHTML(String(sourcePackageVersion))}.</div>`
+    : `<div>No resource package updates loaded.</div>`;
   appView.innerHTML += `<div class="category-card"><div>App version: ${escapeHTML(data.appVersion || APP_VERSION)}</div><div>Resource data last modified: ${escapeHTML(formatDateOnly(data.lastModified))}</div></div>`;
   appView.innerHTML += `<div class="category-card"><strong>App Changes — Last 14 Days:</strong>${APP_CHANGE_LOG.length ? `<ul>${APP_CHANGE_LOG.map(change => `<li>${escapeHTML(change.date)} — ${escapeHTML(change.message)}</li>`).join("")}</ul>` : `<div>No selected app changes in the last 14 days.</div>`}</div>`;
-  appView.innerHTML += `<div class="category-card"><strong>Latest Resource Package ${escapeHTML(String(resourcePackageVersion))}:</strong>${packageChanges.length ? `<ul>${packageChanges.map(change => `<li>${escapeHTML(change)}</li>`).join("")}</ul>` : `<div>No resource package updates loaded.</div>`}</div>`;
+  appView.innerHTML += `<div class="category-card"><strong>Latest Resource Package ${escapeHTML(String(resourcePackageVersion))}:</strong>${packageUpdateContent}</div>`;
 }
 
 function renderRecentChangeLog(entries){

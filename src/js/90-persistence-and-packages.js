@@ -241,6 +241,13 @@ function getNextPackageVersionValue(value){
   return 1;
 }
 
+function getLatestPackageVersionValue(...values){
+  const numericVersions = values
+    .map(normalizePackageVersionValue)
+    .filter(value => typeof value === "number" && Number.isFinite(value));
+  return numericVersions.length ? Math.max(...numericVersions) : "Unknown";
+}
+
 function normalizeLastLoadedPackageInfo(packageData){
   if(!packageData || typeof packageData !== "object") return;
   const source = packageData.lastLoadedPackageInfo;
@@ -254,7 +261,9 @@ function normalizeLastLoadedPackageInfo(packageData){
       .filter(Boolean)
     : [];
   packageData.lastLoadedPackageInfo = {
-    packageVersion: normalizePackageVersionValue(source.packageVersion),
+    sourcePackageVersion: normalizePackageVersionValue(
+      source.sourcePackageVersion != null ? source.sourcePackageVersion : source.packageVersion
+    ),
     loadedAt: Date.parse(String(source.loadedAt || "")) ? String(source.loadedAt) : nowISO(),
     changes
   };
@@ -480,6 +489,8 @@ function mergeItemsById(localItems, incomingItems, options = {}){
   const incomingById = new Map(incomingList.map(item => [String(item && item.id || ""), item]).filter(([id]) => id));
   const seen = new Set();
   const merged = [];
+  const addedIds = [];
+  const updatedIds = [];
   const addedNames = [];
   const updatedNames = [];
   let added = 0;
@@ -494,6 +505,7 @@ function mergeItemsById(localItems, incomingItems, options = {}){
     seen.add(id);
     if(incomingItem && choice.item === incomingItem && choice.changed){
       updated += 1;
+      updatedIds.push(id);
       updatedNames.push(String(incomingItem.name || incomingItem.title || id));
     }
   });
@@ -504,10 +516,11 @@ function mergeItemsById(localItems, incomingItems, options = {}){
     merged.push(cloneDataObject(incomingItem));
     seen.add(id);
     added += 1;
+    addedIds.push(id);
     addedNames.push(String(incomingItem.name || incomingItem.title || id));
   });
 
-  return { merged, added, updated, addedNames, updatedNames };
+  return { merged, added, updated, addedIds, updatedIds, addedNames, updatedNames };
 }
 
 function mergeIncomingResourcePDFs(mergedResources, incomingResources){
@@ -643,6 +656,7 @@ function mergeResourcePackages(localData, incomingData){
   const mergedData = {
     ...local,
     ...incoming,
+    packageVersion: getLatestPackageVersionValue(local.packageVersion, incoming.packageVersion),
     categories: categoryMerge.merged,
     categoryMigrations,
     resources: resourceMerge.merged,
@@ -658,6 +672,10 @@ function mergeResourcePackages(localData, incomingData){
       categoriesUpdated: categoryMerge.updated,
       resourcesAdded: resourceMerge.added,
       resourcesUpdated: resourceMerge.updated,
+      categoryIdsAdded: categoryMerge.addedIds,
+      categoryIdsUpdated: categoryMerge.updatedIds,
+      resourceIdsAdded: resourceMerge.addedIds,
+      resourceIdsUpdated: resourceMerge.updatedIds,
       categoryNamesAdded: categoryMerge.addedNames,
       categoryNamesUpdated: categoryMerge.updatedNames,
       resourceNamesAdded: resourceMerge.addedNames,
@@ -997,12 +1015,22 @@ async function mergeImportPackage(event){
 
     const missingPdfPaths = await mergeZipAssets(zip, mergedData);
     applyMergedData(mergedData);
-    const loadedChanges = getRecentChanges().filter(entry => importedChangeIds.has(String(entry.id || "")));
+    const mergedTargetKeys = new Set([
+      ...(mergeSummary.resourceIdsAdded || []).map(id => `resource:${id}`),
+      ...(mergeSummary.resourceIdsUpdated || []).map(id => `resource:${id}`),
+      ...(mergeSummary.categoryIdsAdded || []).map(id => `category:${id}`),
+      ...(mergeSummary.categoryIdsUpdated || []).map(id => `category:${id}`)
+    ]);
+    const loadedChanges = getRecentChanges().filter(entry => {
+      const changeId = String(entry && entry.id || "");
+      const targetKey = `${String(entry && entry.type || "")}:${String(entry && entry.targetId || "")}`;
+      return importedChangeIds.has(changeId) && mergedTargetKeys.has(targetKey);
+    });
     const loadedChangeSummaries = loadedChanges.length
       ? loadedChanges.map(formatPackageChangeSummary)
       : buildPackageMergeSummary(mergeSummary);
     data.lastLoadedPackageInfo = {
-      packageVersion: importedPackageVersion,
+      sourcePackageVersion: importedPackageVersion,
       loadedAt: nowISO(),
       changes: loadedChangeSummaries
     };
