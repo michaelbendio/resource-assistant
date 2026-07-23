@@ -1068,7 +1068,7 @@ async function mergeImportPackage(event){
     if(warningBlocks.length){
       alert(warningBlocks.join("\n\n"));
     }
-    showToast("Resource package merged. You can delete the package zip when you are done.");
+    showToast("Resource package merged.");
     return true;
   }catch(e){
     alert("Load failed: " + e.message);

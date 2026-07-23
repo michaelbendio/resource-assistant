@@ -873,11 +873,11 @@ textarea.information-editor { min-height:320px; resize:vertical; }
 
 <script id="app-release-data" type="application/json">
 {
-  "version": "2.2.6",
+  "version": "2.2.7",
   "changes": [
     {
-      "date": "2026-07-22",
-      "message": "Preserve latest resource package version"
+      "date": "2026-07-23",
+      "message": "Remove post-merge package deletion message"
     },
     {
       "date": "2026-07-18",
@@ -4846,7 +4846,7 @@ async function mergeImportPackage(event){
     if(warningBlocks.length){
       alert(warningBlocks.join("\n\n"));
     }
-    showToast("Resource package merged. You can delete the package zip when you are done.");
+    showToast("Resource package merged.");
     return true;
   }catch(e){
     alert("Load failed: " + e.message);
