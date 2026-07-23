@@ -434,6 +434,31 @@ function runSelfTests(){
   });
 
   tests.push({
+    name: "PACKAGE SAVE REUSES OPENED FILE LOCATION",
+    fn: () => {
+      const previousHandle = lastOpenedResourcePackageHandle;
+      const openedHandle = { kind:"file", name:"received-resource-package.zip" };
+      let pickerOptions = null;
+      const originalPicker = window.showSaveFilePicker;
+      try{
+        lastOpenedResourcePackageHandle = openedHandle;
+        window.showSaveFilePicker = options => {
+          pickerOptions = options;
+          return Promise.reject(Object.assign(new Error("test complete"), { name:"AbortError" }));
+        };
+        beginResourcePackageSave().catch(() => {});
+        if(!pickerOptions) throw new Error("save picker was not opened");
+        if(pickerOptions.id !== "tso-resources") throw new Error("save picker did not reuse the resource package picker id");
+        if(pickerOptions.startIn !== openedHandle) throw new Error("save picker did not start at the opened package location");
+      }finally{
+        lastOpenedResourcePackageHandle = previousHandle;
+        if(originalPicker === undefined) delete window.showSaveFilePicker;
+        else window.showSaveFilePicker = originalPicker;
+      }
+    }
+  });
+
+  tests.push({
     name: "PACKAGE SAVE DOWNLOAD FILENAME",
     fn: () => {
       const originalCreateObjectURL = URL.createObjectURL;

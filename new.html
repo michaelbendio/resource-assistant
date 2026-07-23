@@ -2424,7 +2424,7 @@ function showAdminHelp(options = {}){
             <p>After a batch of edits:</p>
             <ol>
               <li>Click <strong>Show change log</strong> and review the listed changes.</li>
-              <li>Click <strong>Save Resource Package</strong>.</li>
+              <li>Click <strong>Save Resource Package</strong>. When supported by your browser, the save picker starts in the folder where you opened the merged resource package.</li>
               <li>Save the resource package zip.</li>
               <li>Share that resource package zip through the normal distribution process.</li>
             </ol>
@@ -3780,6 +3780,8 @@ function clearChangeLog(){
 // - Merge Resources imports a package ZIP and resolves conflicts by
 //   lastModified timestamps where possible.
 
+let lastOpenedResourcePackageHandle = null;
+
 function persist(){
   // Writes the canonical JSON snapshot used to restore app state on reload.
   if(DEBUG) assertInvariants("persist");
@@ -4467,7 +4469,7 @@ async function beginResourcePackageSave(){
   if(typeof window.showSaveFilePicker === "function"){
     const handle = await window.showSaveFilePicker({
       id: "tso-resources",
-      startIn: "downloads",
+      startIn: lastOpenedResourcePackageHandle || "downloads",
       suggestedName,
       types: [{
         description: "TSO resource package",
@@ -4572,9 +4574,36 @@ async function exportPackage(){
   }
 }
 
-function beginMergeImportPackage(){
+async function beginMergeImportPackage(){
   // Opens a package ZIP picker for merge-based resource reload.
   if(!commitPendingEditsIfChanged()) return;
+
+  if(typeof window.showOpenFilePicker === "function"){
+    try{
+      const handles = await window.showOpenFilePicker({
+        id: "tso-resources",
+        startIn: lastOpenedResourcePackageHandle || "downloads",
+        // Do not filter by extension here. Some valid ZIP packages are dimmed
+        // by macOS pickers, so import-time validation remains authoritative.
+        multiple: false
+      });
+      const handle = handles && handles[0];
+      if(!handle) return;
+      const file = await handle.getFile();
+      const merged = await mergeImportPackage({
+        target: {
+          files: [file],
+          value: "",
+          remove(){}
+        }
+      });
+      if(merged) lastOpenedResourcePackageHandle = handle;
+    }catch(err){
+      if(err && err.name === "AbortError") return;
+      alert("Load failed: " + err.message);
+    }
+    return;
+  }
 
   const input = document.createElement("input");
   input.type = "file";
@@ -4782,6 +4811,7 @@ async function mergeImportPackage(event){
       alert(warningBlocks.join("\n\n"));
     }
     showToast("Resource package merged. You can delete the package zip when you are done.");
+    return true;
   }catch(e){
     alert("Load failed: " + e.message);
   }finally{

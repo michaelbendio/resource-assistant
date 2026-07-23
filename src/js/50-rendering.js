@@ -518,7 +518,7 @@ function showAdminHelp(options = {}){
             <p>After a batch of edits:</p>
             <ol>
               <li>Click <strong>Show change log</strong> and review the listed changes.</li>
-              <li>Click <strong>Save Resource Package</strong>.</li>
+              <li>Click <strong>Save Resource Package</strong>. When supported by your browser, the save picker starts in the folder where you opened the merged resource package.</li>
               <li>Save the resource package zip.</li>
               <li>Share that resource package zip through the normal distribution process.</li>
             </ol>
