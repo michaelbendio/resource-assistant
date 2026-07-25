@@ -357,8 +357,18 @@ function runSelfTests(){
         recentUpdateDetail = [];
         pendingRecentUpdates = [];
         render();
-        if(!/App Changes — Last 14 Days:/.test(appView.textContent || "")){
+        const appChangesHeading = Array.from(appView.querySelectorAll("strong"))
+          .find(element => element.textContent.trim() === "App Changes");
+        if(!appChangesHeading){
           throw new Error("app change log heading was missing");
+        }
+        const appChangesList = appChangesHeading.parentElement.querySelector("ul");
+        const appChangeItems = appChangesList ? Array.from(appChangesList.querySelectorAll("li")) : [];
+        if(!appChangesList || appChangeItems.length !== Math.min(APP_CHANGE_LOG.length, 5)){
+          throw new Error("app change log was not rendered as a five-item bulleted list");
+        }
+        if(APP_CHANGE_LOG.length && appChangeItems[0].textContent.trim() !== "7/25/26 2.2.8 — Preserve latest resource package updates"){
+          throw new Error("latest app change did not use the required date, version, and message format");
         }
         if(!/Resource data last modified:/.test(appView.textContent || "")){
           throw new Error("resource data modified label was missing");

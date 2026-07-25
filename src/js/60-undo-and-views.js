@@ -397,8 +397,15 @@ function renderUpdateInfo(packageInfo, packageChanges){
       ? `<div>Updates loaded from Resource Package ${escapeHTML(String(sourcePackageVersion))}:</div><ul>${packageChanges.map(change => `<li>${escapeHTML(change)}</li>`).join("")}</ul>`
       : `<div>No resource package updates were loaded from Resource Package ${escapeHTML(String(sourcePackageVersion))}.</div>`
     : `<div>No resource package updates loaded.</div>`;
+  const appChangeItems = APP_CHANGE_LOG.slice(0, 5).map(change => {
+    const dateParts = String(change.date || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const displayDate = dateParts
+      ? `${Number(dateParts[2])}/${Number(dateParts[3])}/${dateParts[1].slice(-2)}`
+      : String(change.date || "");
+    return `<li>${escapeHTML(displayDate)} ${escapeHTML(change.version)} — ${escapeHTML(change.message)}</li>`;
+  }).join("");
   appView.innerHTML += `<div class="category-card"><div>App version: ${escapeHTML(data.appVersion || APP_VERSION)}</div><div>Resource data last modified: ${escapeHTML(formatDateOnly(data.lastModified))}</div></div>`;
-  appView.innerHTML += `<div class="category-card"><strong>App Changes — Last 14 Days:</strong>${APP_CHANGE_LOG.length ? `<ul>${APP_CHANGE_LOG.map(change => `<li>${escapeHTML(change.date)} — ${escapeHTML(change.message)}</li>`).join("")}</ul>` : `<div>No selected app changes in the last 14 days.</div>`}</div>`;
+  appView.innerHTML += `<div class="category-card"><strong>App Changes</strong>${appChangeItems ? `<ul>${appChangeItems}</ul>` : `<div>No app changes available.</div>`}</div>`;
   appView.innerHTML += `<div class="category-card"><strong>Latest Resource Package ${escapeHTML(String(resourcePackageVersion))}:</strong>${packageUpdateContent}</div>`;
 }
 

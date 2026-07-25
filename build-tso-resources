@@ -4,11 +4,10 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 import json
 import os
 import re
-import subprocess
 import tempfile
 from pathlib import Path
 
@@ -51,14 +50,15 @@ def load_release() -> dict[str, object]:
         "version": str(release.get("version", "")).strip(),
         "date": str(release.get("date", "")).strip(),
         "message": str(release.get("message", "")).strip(),
-        "includedCommits": [
-            str(commit_hash).strip()
-            for commit_hash in release.get("includedCommits", [])
-        ] if isinstance(release.get("includedCommits", []), list) else [],
-        "appChangeMessages": {
-            str(commit_hash).strip(): str(message).strip()
-            for commit_hash, message in release.get("appChangeMessages", {}).items()
-        } if isinstance(release.get("appChangeMessages", {}), dict) else {},
+        "appChanges": [
+            {
+                "date": str(change.get("date", "")).strip(),
+                "version": str(change.get("version", "")).strip(),
+                "message": str(change.get("message", "")).strip(),
+            }
+            for change in release.get("appChanges", [])
+            if isinstance(change, dict)
+        ] if isinstance(release.get("appChanges", []), list) else [],
     }
     if not re.fullmatch(r"\d+\.\d+\.\d+", normalized["version"]):
         raise SystemExit("src/release.json version must use major.minor.patch format")
@@ -68,78 +68,27 @@ def load_release() -> dict[str, object]:
         raise SystemExit("src/release.json date must use YYYY-MM-DD format") from error
     if not normalized["message"]:
         raise SystemExit("src/release.json message must not be blank")
-    if any(not re.fullmatch(r"[0-9a-f]{40}", commit_hash) for commit_hash in normalized["includedCommits"]):
-        raise SystemExit("src/release.json includedCommits must contain full lowercase Git commit IDs")
-    if any(not re.fullmatch(r"[0-9a-f]{40}", commit_hash) for commit_hash in normalized["appChangeMessages"]):
-        raise SystemExit("src/release.json appChangeMessages keys must be full lowercase Git commit IDs")
-    if any(not message for message in normalized["appChangeMessages"].values()):
-        raise SystemExit("src/release.json appChangeMessages values must not be blank")
+    for change in normalized["appChanges"]:
+        try:
+            datetime.strptime(change["date"], "%Y-%m-%d")
+        except ValueError as error:
+            raise SystemExit("src/release.json appChanges dates must use YYYY-MM-DD format") from error
+        if not re.fullmatch(r"\d+\.\d+\.\d+", change["version"]):
+            raise SystemExit("src/release.json appChanges versions must use major.minor.patch format")
+        if not change["message"]:
+            raise SystemExit("src/release.json appChanges messages must not be blank")
     return normalized
 
 
-def read_recent_git_commits() -> list[dict[str, str]]:
-    result = subprocess.run(
-        ["git", "log", "--format=%H%x00%cI%x00%s", "--since=15.days.ago"],
-        cwd=ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        return []
-    commits = []
-    for line in result.stdout.splitlines():
-        parts = line.split("\0", 2)
-        if len(parts) != 3:
-            continue
-        commit_hash, timestamp, message = parts
-        if not message.strip():
-            continue
-        try:
-            committed_at = datetime.fromisoformat(timestamp)
-        except ValueError:
-            continue
-        commits.append({
-            "hash": commit_hash,
-            "timestamp": committed_at.isoformat(),
-            "message": message.strip(),
-        })
-    return commits
-
-
-def merge_app_changes(
-    release: dict[str, object],
-    commits: list[dict[str, str]],
-    now: datetime | None = None,
-) -> list[dict[str, str]]:
-    current_time = now or datetime.now(timezone.utc)
-    if current_time.tzinfo is None:
-        current_time = current_time.replace(tzinfo=timezone.utc)
-    cutoff = current_time.astimezone(timezone.utc) - timedelta(days=14)
-    included_commits = set(release.get("includedCommits", []))
-    message_overrides = release.get("appChangeMessages", {})
-    changes = [{
-        "date": str(release.get("date", "")).strip(),
-        "message": str(release.get("message", "")).strip(),
-    }]
-    for commit in commits:
-        commit_hash = str(commit.get("hash", "")).strip()
-        message = str(message_overrides.get(commit_hash, commit.get("message", ""))).strip()
-        try:
-            committed_at = datetime.fromisoformat(str(commit.get("timestamp", "")))
-        except ValueError:
-            continue
-        if committed_at.astimezone(timezone.utc) < cutoff or not message or commit_hash not in included_commits:
-            continue
-        changes.append({"date": committed_at.date().isoformat(), "message": message})
-    return changes
+def latest_app_changes(release: dict[str, object]) -> list[dict[str, str]]:
+    return list(release.get("appChanges", []))[:5]
 
 
 def build_app_release_data() -> str:
     release = load_release()
     payload = {
         "version": release["version"],
-        "changes": merge_app_changes(release, read_recent_git_commits()),
+        "changes": latest_app_changes(release),
     }
     return json.dumps(payload, indent=2).replace("</", "<\\/")
 

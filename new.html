@@ -876,36 +876,29 @@ textarea.information-editor { min-height:320px; resize:vertical; }
   "version": "2.2.8",
   "changes": [
     {
-      "date": "2026-07-24",
+      "date": "2026-07-25",
+      "version": "2.2.8",
       "message": "Preserve latest resource package updates"
     },
     {
       "date": "2026-07-24",
+      "version": "2.2.7",
       "message": "Remove post-merge resource package deletion message"
     },
     {
+      "date": "2026-07-22",
+      "version": "2.2.6",
+      "message": "Preserve latest resource package version"
+    },
+    {
+      "date": "2026-07-21",
+      "version": "2.2.5",
+      "message": "Keep print buttons visible"
+    },
+    {
       "date": "2026-07-18",
+      "version": "2.2.4",
       "message": "Clean legacy ghost categories."
-    },
-    {
-      "date": "2026-07-18",
-      "message": "Prevent unnamed ghost categories"
-    },
-    {
-      "date": "2026-07-15",
-      "message": "Refine User and Admin Help"
-    },
-    {
-      "date": "2026-07-15",
-      "message": "Change the title bar layout"
-    },
-    {
-      "date": "2026-07-13",
-      "message": "Expand resource search coverage"
-    },
-    {
-      "date": "2026-07-13",
-      "message": "Fix category update badge details"
     }
   ]
 }
@@ -3313,8 +3306,15 @@ function renderUpdateInfo(packageInfo, packageChanges){
       ? `<div>Updates loaded from Resource Package ${escapeHTML(String(sourcePackageVersion))}:</div><ul>${packageChanges.map(change => `<li>${escapeHTML(change)}</li>`).join("")}</ul>`
       : `<div>No resource package updates were loaded from Resource Package ${escapeHTML(String(sourcePackageVersion))}.</div>`
     : `<div>No resource package updates loaded.</div>`;
+  const appChangeItems = APP_CHANGE_LOG.slice(0, 5).map(change => {
+    const dateParts = String(change.date || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const displayDate = dateParts
+      ? `${Number(dateParts[2])}/${Number(dateParts[3])}/${dateParts[1].slice(-2)}`
+      : String(change.date || "");
+    return `<li>${escapeHTML(displayDate)} ${escapeHTML(change.version)} — ${escapeHTML(change.message)}</li>`;
+  }).join("");
   appView.innerHTML += `<div class="category-card"><div>App version: ${escapeHTML(data.appVersion || APP_VERSION)}</div><div>Resource data last modified: ${escapeHTML(formatDateOnly(data.lastModified))}</div></div>`;
-  appView.innerHTML += `<div class="category-card"><strong>App Changes — Last 14 Days:</strong>${APP_CHANGE_LOG.length ? `<ul>${APP_CHANGE_LOG.map(change => `<li>${escapeHTML(change.date)} — ${escapeHTML(change.message)}</li>`).join("")}</ul>` : `<div>No selected app changes in the last 14 days.</div>`}</div>`;
+  appView.innerHTML += `<div class="category-card"><strong>App Changes</strong>${appChangeItems ? `<ul>${appChangeItems}</ul>` : `<div>No app changes available.</div>`}</div>`;
   appView.innerHTML += `<div class="category-card"><strong>Latest Resource Package ${escapeHTML(String(resourcePackageVersion))}:</strong>${packageUpdateContent}</div>`;
 }
 
