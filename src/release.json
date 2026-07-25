@@ -3,6 +3,7 @@
   "date": "2026-07-24",
   "message": "Preserve latest resource package updates",
   "includedCommits": [
+    "04efb0598059da5980159804120d3a0dbf064763",
     "e9f6a74d99a9ac76de5051a15d7fcea059b674e3",
     "a78cab6ede397363a99799befc9f2dffe59e2362",
     "77e4c789f0a79f20aad78f5c4779c018bc9f5638",
