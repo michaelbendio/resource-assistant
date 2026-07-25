@@ -1,7 +1,7 @@
 {
-  "version": "2.2.7",
+  "version": "2.2.8",
   "date": "2026-07-24",
-  "message": "Remove post-merge resource package deletion message",
+  "message": "Preserve latest resource package updates",
   "includedCommits": [
     "e9f6a74d99a9ac76de5051a15d7fcea059b674e3",
     "a78cab6ede397363a99799befc9f2dffe59e2362",

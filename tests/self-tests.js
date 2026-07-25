@@ -374,21 +374,16 @@ function runSelfTests(){
         }
         data.packageVersion = 11;
         data.lastLoadedPackageInfo = {
-          sourcePackageVersion: 6,
+          sourcePackageVersion: 11,
           loadedAt: nowISO(),
-          changes: []
+          changes: ["Career Education - Formatted the services"]
         };
         render();
         if(!/Latest Resource Package 11:/.test(appView.textContent || "")){
           throw new Error("latest package heading did not preserve the working version");
         }
-        if(!/No resource package updates were loaded from Resource Package 6\./.test(appView.textContent || "")){
-          throw new Error("no-update message did not identify the source package");
-        }
-        data.lastLoadedPackageInfo.changes = ["Career Education - Formatted the services"];
-        render();
-        if(!/Updates loaded from Resource Package 6:/.test(appView.textContent || "")){
-          throw new Error("loaded-update message did not identify the source package");
+        if(!/Updates loaded from Resource Package 11:/.test(appView.textContent || "")){
+          throw new Error("latest package update source was missing");
         }
         if(!/Career Education - Formatted the services/.test(appView.textContent || "")){
           throw new Error("missing package change text");
@@ -590,6 +585,30 @@ function runSelfTests(){
       }
       if(summary.resourcesAdded || summary.resourcesUpdated || summary.categoriesAdded || summary.categoriesUpdated){
         throw new Error("older duplicate package reported updates");
+      }
+    }
+  });
+
+  tests.push({
+    name: "OLDER PACKAGE DOES NOT REPLACE LATEST PACKAGE UPDATE INFO",
+    fn: () => {
+      const latestInfo = {
+        sourcePackageVersion:15,
+        loadedAt:"2026-07-24T12:00:00.000Z",
+        changes:["Current update"]
+      };
+      if(shouldReplaceLatestPackageInfo(latestInfo, 6)){
+        throw new Error("older package replaced latest package update info");
+      }
+      if(!shouldReplaceLatestPackageInfo(latestInfo, 16)){
+        throw new Error("later package did not replace latest package update info");
+      }
+      if(!shouldReplaceLatestPackageInfo({
+        sourcePackageVersion:6,
+        loadedAt:"2026-07-24T12:00:00.000Z",
+        changes:[]
+      }, 15)){
+        throw new Error("newer package could not restore overwritten update info");
       }
     }
   });

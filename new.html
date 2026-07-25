@@ -873,11 +873,11 @@ textarea.information-editor { min-height:320px; resize:vertical; }
 
 <script id="app-release-data" type="application/json">
 {
-  "version": "2.2.7",
+  "version": "2.2.8",
   "changes": [
     {
       "date": "2026-07-24",
-      "message": "Remove post-merge resource package deletion message"
+      "message": "Preserve latest resource package updates"
     },
     {
       "date": "2026-07-18",
@@ -4236,6 +4236,20 @@ function buildPackageMergeSummary(summary){
   return entries;
 }
 
+function shouldReplaceLatestPackageInfo(packageInfo, importedPackageVersion){
+  const incomingVersion = normalizePackageVersionValue(importedPackageVersion);
+  if(typeof incomingVersion !== "number" || !Number.isFinite(incomingVersion)){
+    return !packageInfo;
+  }
+  const displayedSourceVersion = packageInfo
+    ? normalizePackageVersionValue(packageInfo.sourcePackageVersion)
+    : "Unknown";
+  if(typeof displayedSourceVersion !== "number" || !Number.isFinite(displayedSourceVersion)){
+    return true;
+  }
+  return incomingVersion > displayedSourceVersion;
+}
+
 function chooseMergeObject(localItem, incomingItem){
   // Package merging is conservative: keep local data unless the incoming item is
   // clearly newer, and fall back to incoming data only when no timestamps can
@@ -4777,6 +4791,9 @@ async function mergeImportPackage(event){
     normalizePackageData(imported);
     const importedChangeIds = new Set((imported.changes || []).map(entry => String(entry && entry.id || "")).filter(Boolean));
     const importedPackageVersion = normalizePackageVersionValue(imported.packageVersion);
+    const currentPackageInfo = (data && data.lastLoadedPackageInfo && typeof data.lastLoadedPackageInfo === "object")
+      ? cloneDataObject(data.lastLoadedPackageInfo)
+      : null;
 
     const localResourcesWithPdf = ((data && data.resources) || [])
       .map(r => ({ resource:r, paths:collectPDFPathsFromResource(r) }))
@@ -4807,11 +4824,18 @@ async function mergeImportPackage(event){
     const loadedChangeSummaries = loadedChanges.length
       ? loadedChanges.map(formatPackageChangeSummary)
       : buildPackageMergeSummary(mergeSummary);
-    data.lastLoadedPackageInfo = {
-      sourcePackageVersion: importedPackageVersion,
-      loadedAt: nowISO(),
-      changes: loadedChangeSummaries
-    };
+    if(shouldReplaceLatestPackageInfo(currentPackageInfo, importedPackageVersion)){
+      const persistentChangeSummaries = !loadedChangeSummaries.length
+        ? (imported.changes || []).map(formatPackageChangeSummary)
+        : loadedChangeSummaries;
+      data.lastLoadedPackageInfo = {
+        sourcePackageVersion: importedPackageVersion,
+        loadedAt: nowISO(),
+        changes: persistentChangeSummaries
+      };
+    }else{
+      data.lastLoadedPackageInfo = currentPackageInfo;
+    }
     normalizeLastLoadedPackageInfo(data);
     data.changes = [];
     persist();
@@ -4846,7 +4870,11 @@ async function mergeImportPackage(event){
     if(warningBlocks.length){
       alert(warningBlocks.join("\n\n"));
     }
-    showToast("Resource package merged.");
+    showToast(
+      loadedChangeSummaries.length
+        ? "Resource package merged."
+        : `No resource package updates were loaded from Resource Package ${importedPackageVersion}.`
+    );
     return true;
   }catch(e){
     alert("Load failed: " + e.message);
