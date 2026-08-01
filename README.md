@@ -81,14 +81,23 @@ Before editing live resources, load the latest resource package:
 1. Go to `Categories`.
 2. Click `Merge Resources`.
 3. Choose the latest resource package ZIP file.
-4. Wait for the merge to finish before making edits.
+4. If the package contains items tagged for deletion, review their effects immediately. Print the proposed-deletions list if you want a paper worksheet, approve the deletions you want applied, and leave the others unchecked to keep them.
+5. Wait for the merge to finish before making edits.
+
+The app keeps one pre-merge restore point. In Admin, use `Return to before merge`
+to discard the merge and every edit made after it.
 
 After a batch of edits, share the updated resources:
 
 1. Click `Show change log` and review the listed changes.
 2. Click `Save Resource Package`.
 3. Save the exported resource package ZIP file.
-4. Share that ZIP file through the normal distribution process.
+4. Resource missionaries send that ZIP file to the office admin. The admin merges it into the current office package before saving the next package for publication.
+
+Delete actions tag resources, categories, Types, and For groups for deletion. The
+tagged item remains active until an admin merges the package and approves the
+deletion. Approved deletions are retained in future packages so that merging an
+older package does not recreate them.
 
 Admin edits are saved in the browser first. They are not shared with anyone else until a new resource package is exported.
 
@@ -108,5 +117,5 @@ By default, the output uses the input filename with the other extension. Use
 
 ## Church-hosted direction
 
-See [`docs/church-hosting.md`](docs/church-hosting.md) for the staged path from the
-current local application to centrally hosted, Microsoft-authenticated TSO Resources.
+See [`docs/church-hosting.md`](docs/church-hosting.md) for the SharePoint document-library
+workflow and the deferred publishing phase.

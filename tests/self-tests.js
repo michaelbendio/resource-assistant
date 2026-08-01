@@ -1154,14 +1154,14 @@ function runSelfTests(){
         const confirmBtn = document.getElementById("categoryDeleteConfirmBtn");
         if(!confirmBtn) throw new Error("category delete confirm button missing");
         confirmBtn.click();
-        if(data.categories.some(category => category.id === "veterans-services")){
-          throw new Error("index 0 category was not deleted");
+        if(!data.categories.some(category => category.id === "veterans-services")){
+          throw new Error("tagging removed the index 0 category before review");
         }
-        if(data.resources[0].categories.includes("veterans-services")){
-          throw new Error("deleted category remained on resource");
+        if(!data.resources[0].categories.includes("veterans-services")){
+          throw new Error("tagging changed the category assignment before review");
         }
-        if(data.resources[0].categoryFilters["veterans-services"]){
-          throw new Error("deleted category filters remained on resource");
+        if(!data.deletionRequests.some(request => request.key === "category:veterans-services")){
+          throw new Error("index 0 category was not tagged for deletion");
         }
       }finally{
         closeCategoryDeletePrompt();
@@ -1225,11 +1225,14 @@ function runSelfTests(){
         const confirmBtn = document.getElementById("categoryDeleteConfirmBtn");
         if(!confirmBtn) throw new Error("category delete confirm button missing");
         confirmBtn.click();
-        if(data.categories.some(category => category.id === "vxx")){
-          throw new Error("last sorted category was not deleted");
+        if(!data.categories.some(category => category.id === "vxx")){
+          throw new Error("tagging removed the last sorted category before review");
         }
-        if(data.resources[0].categories.includes("vxx")){
-          throw new Error("deleted last sorted category remained on resource");
+        if(!data.resources[0].categories.includes("vxx")){
+          throw new Error("tagging changed the last sorted category assignment before review");
+        }
+        if(!data.deletionRequests.some(request => request.key === "category:vxx")){
+          throw new Error("last sorted category was not tagged for deletion");
         }
       }finally{
         closeCategoryDeletePrompt();
@@ -1291,11 +1294,17 @@ function runSelfTests(){
         const confirmBtn = document.getElementById("categoryDeleteConfirmBtn");
         if(!confirmBtn) throw new Error("category delete confirm button missing");
         confirmBtn.click();
-        if(data.categories.some(category => category.id === "vxx")){
-          throw new Error("selected row category was not deleted when index was stale");
+        if(!data.categories.some(category => category.id === "vxx")){
+          throw new Error("selected row category was removed before review when index was stale");
         }
         if(!data.categories.some(category => category.id === "alpha")){
-          throw new Error("stale index category was deleted instead");
+          throw new Error("stale index category was removed instead");
+        }
+        if(!data.deletionRequests.some(request => request.key === "category:vxx")){
+          throw new Error("selected row category was not tagged when index was stale");
+        }
+        if(data.deletionRequests.some(request => request.key === "category:alpha")){
+          throw new Error("stale index category was tagged instead");
         }
       }finally{
         closeCategoryDeletePrompt();
@@ -2205,6 +2214,197 @@ function runSelfTests(){
       if(packageData.categories.some(category => category.id === "ghost")){
         throw new Error("unused unnamed category was exported");
       }
+      if(!Array.isArray(packageData.deletionRequests) || !Array.isArray(packageData.deletions)){
+        throw new Error("deletion workflow arrays were not exported");
+      }
+    }
+  });
+
+  tests.push({
+    name: "LEGACY AND CURRENT DELETION SCHEMAS VALIDATE",
+    fn: () => {
+      const base = { categories:[], resources:[] };
+      const legacy = validateImportData({ ...base, resourcePackageSchemaVersion:LEGACY_RESOURCE_PACKAGE_SCHEMA_VERSION });
+      const current = validateImportData({ ...base, resourcePackageSchemaVersion:RESOURCE_PACKAGE_SCHEMA_VERSION, deletionRequests:[], deletions:[] });
+      const future = validateImportData({ ...base, resourcePackageSchemaVersion:RESOURCE_PACKAGE_SCHEMA_VERSION + 1 });
+      if(!legacy.ok) throw new Error(`schema 2 package was rejected: ${legacy.errors.join(", ")}`);
+      if(!current.ok) throw new Error(`schema 3 package was rejected: ${current.errors.join(", ")}`);
+      if(future.ok) throw new Error("unsupported future schema was accepted");
+    }
+  });
+
+  tests.push({
+    name: "DELETION REQUESTS MERGE WITHOUT APPLYING",
+    fn: () => {
+      const local = {
+        categories:[{ id:"food", label:"Food", filters:["Pantries"] }],
+        forGroups:[],
+        resources:[{ id:"pantry", name:"Pantry", categories:["food"], categoryFilters:{ food:["Pantries"] }, forGroups:[] }],
+        deletionRequests:[],
+        deletions:[]
+      };
+      const incoming = {
+        ...cloneDataObject(local),
+        deletionRequests:[createDeletionRequest("resource", { targetId:"pantry", label:"Pantry", requestedAt:"2026-07-31T12:00:00.000Z" })]
+      };
+      const { mergedData } = mergeResourcePackages(local, incoming);
+      if(!mergedData.resources.some(resource => resource.id === "pantry")){
+        throw new Error("pending deletion removed a resource during merge");
+      }
+      if(!mergedData.deletionRequests.some(request => request.key === "resource:pantry")){
+        throw new Error("incoming deletion request was not merged");
+      }
+    }
+  });
+
+  tests.push({
+    name: "APPROVED TOMBSTONES APPLY KNOCK-ON EFFECTS",
+    fn: () => {
+      const sample = {
+        categories:[
+          { id:"food", label:"Food", filters:["Pantries", "Meals"] },
+          { id:"housing", label:"Housing", filters:[] }
+        ],
+        forGroups:["Veterans", "Families"],
+        resources:[
+          { id:"pantry", name:"Pantry", categories:["food"], categoryFilters:{ food:["Pantries", "Meals"] }, forGroups:["Veterans"] },
+          { id:"shelter", name:"Shelter", categories:["housing"], categoryFilters:{ housing:[] }, forGroups:["Families"] },
+          { id:"remove-me", name:"Remove Me", categories:[], categoryFilters:{}, forGroups:[] }
+        ],
+        deletionRequests:[],
+        deletions:[
+          { kind:"type", categoryId:"food", label:"Pantries", deletedAt:"2026-07-31T12:00:00.000Z" },
+          { kind:"forGroup", label:"Veterans", deletedAt:"2026-07-31T12:00:00.000Z" },
+          { kind:"category", targetId:"housing", label:"Housing", deletedAt:"2026-07-31T12:00:00.000Z" },
+          { kind:"resource", targetId:"remove-me", label:"Remove Me", deletedAt:"2026-07-31T12:00:00.000Z" }
+        ]
+      };
+      normalizePackageData(sample);
+      const pantry = sample.resources.find(resource => resource.id === "pantry");
+      const shelter = sample.resources.find(resource => resource.id === "shelter");
+      const food = sample.categories.find(category => category.id === "food");
+      if(!pantry || pantry.categoryFilters.food.includes("Pantries")) throw new Error("approved Type deletion was not applied");
+      if(pantry.forGroups.includes("Veterans")) throw new Error("approved For group deletion was not applied");
+      if(food.filters.includes("Pantries")) throw new Error("approved Type remained on category");
+      if(sample.forGroups.includes("Veterans")) throw new Error("approved For group remained in taxonomy");
+      if(sample.categories.some(category => category.id === "housing")) throw new Error("approved category remained");
+      if(shelter.categories.includes("housing") || shelter.categoryFilters.housing) throw new Error("category knock-on cleanup was not applied");
+      if(sample.resources.some(resource => resource.id === "remove-me")) throw new Error("approved resource remained");
+    }
+  });
+
+  tests.push({
+    name: "TOMBSTONE PREVENTS OLDER PACKAGE RESURRECTION",
+    fn: () => {
+      const local = {
+        categories:[], resources:[], forGroups:[], deletionRequests:[],
+        deletions:[{ kind:"resource", targetId:"old", label:"Old Resource", deletedAt:"2026-07-31T12:00:00.000Z" }]
+      };
+      const incoming = {
+        categories:[], forGroups:[], deletionRequests:[], deletions:[],
+        resources:[{ id:"old", name:"Old Resource", categories:[], categoryFilters:{}, forGroups:[], lastModified:"2026-07-01T12:00:00.000Z" }]
+      };
+      const { mergedData } = mergeResourcePackages(local, incoming);
+      if(mergedData.resources.some(resource => resource.id === "old")){
+        throw new Error("older package resurrected a tombstoned resource");
+      }
+      if(!mergedData.deletions.some(record => record.key === "resource:old")){
+        throw new Error("resource tombstone was lost during merge");
+      }
+    }
+  });
+
+  tests.push({
+    name: "DELETION REVIEW PRINT APPROVE AND UNDO",
+    fn: () => {
+      const previousData = data;
+      const previousStoredData = localStorage.getItem(DATA_STORAGE_KEY);
+      const previousReview = localStorage.getItem(DELETION_REVIEW_STORAGE_KEY);
+      const previousUndo = localStorage.getItem(UNDO_STORAGE_KEY);
+      try{
+        data = {
+          packageVersion:11,
+          categories:[{ id:"food", label:"Food", filters:[] }],
+          forGroups:[],
+          resources:[{ id:"pantry", name:"Community Pantry", categories:["food"], categoryFilters:{ food:[] }, forGroups:[], informationText:"" }],
+          changes:[],
+          deletions:[],
+          deletionRequests:[createDeletionRequest("category", {
+            targetId:"food",
+            label:"Food",
+            description:"Outdated category",
+            requestedAt:"2026-07-31T12:00:00.000Z"
+          })]
+        };
+        saveDeletionReview("missionary-resource-package.zip", 11, data.deletionRequests);
+        showDeletionReview();
+        const modal = document.getElementById("deletionReviewModal");
+        if(!modal || !(modal.textContent || "").includes("Community Pantry")){
+          throw new Error("deletion review did not show the affected resource");
+        }
+        printProposedDeletions();
+        const reportText = printContent.textContent || "";
+        if(!reportText.includes("missionary-resource-package.zip") || !reportText.includes("☐ Approve") || !reportText.includes("Notes:")){
+          throw new Error("printable proposed-deletions report is incomplete");
+        }
+        PrintWorkflow.close();
+        approveSelectedDeletions();
+        if(data.categories.some(category => category.id === "food")) throw new Error("approved category deletion was not applied");
+        if(!data.deletions.some(record => record.key === "category:food")) throw new Error("approved deletion tombstone was not saved");
+        undoLastDeletion();
+        if(!data.categories.some(category => category.id === "food")) throw new Error("undo did not restore the approved deletion");
+        if(!data.deletionRequests.some(record => record.key === "category:food")) throw new Error("undo did not restore the pending request");
+      }finally{
+        closeDeletionReview();
+        PrintWorkflow.close();
+        data = previousData;
+        if(previousStoredData == null) localStorage.removeItem(DATA_STORAGE_KEY);
+        else localStorage.setItem(DATA_STORAGE_KEY, previousStoredData);
+        if(previousReview == null) localStorage.removeItem(DELETION_REVIEW_STORAGE_KEY);
+        else localStorage.setItem(DELETION_REVIEW_STORAGE_KEY, previousReview);
+        if(previousUndo == null) localStorage.removeItem(UNDO_STORAGE_KEY);
+        else localStorage.setItem(UNDO_STORAGE_KEY, previousUndo);
+      }
+    }
+  });
+
+  tests.push({
+    name: "PRE-MERGE RESTORE POINT",
+    fn: () => {
+      const previousData = data;
+      const previousStoredData = localStorage.getItem(DATA_STORAGE_KEY);
+      const previousSnapshot = localStorage.getItem(PRE_MERGE_STORAGE_KEY);
+      const previousReview = localStorage.getItem(DELETION_REVIEW_STORAGE_KEY);
+      const previousUndo = localStorage.getItem(UNDO_STORAGE_KEY);
+      const previousConfirm = window.confirm;
+      try{
+        data = {
+          packageVersion:11,
+          categories:[],
+          forGroups:[],
+          resources:[{ id:"before", name:"Before Merge", categories:[], categoryFilters:{}, forGroups:[], informationText:"" }],
+          changes:[], deletionRequests:[], deletions:[]
+        };
+        if(!savePreMergeSnapshot("incoming.zip")) throw new Error("pre-merge snapshot was not saved");
+        data.resources = [{ id:"after", name:"After Merge", categories:[], categoryFilters:{}, forGroups:[], informationText:"" }];
+        window.confirm = () => true;
+        restorePreMergeState();
+        if(!data.resources.some(resource => resource.id === "before") || data.resources.some(resource => resource.id === "after")){
+          throw new Error("pre-merge state was not restored");
+        }
+        if(getPreMergeSnapshot()) throw new Error("used pre-merge restore point was not cleared");
+      }finally{
+        window.confirm = previousConfirm;
+        data = previousData;
+        if(previousStoredData == null) localStorage.removeItem(DATA_STORAGE_KEY);
+        else localStorage.setItem(DATA_STORAGE_KEY, previousStoredData);
+        if(previousSnapshot == null) localStorage.removeItem(PRE_MERGE_STORAGE_KEY);
+        else localStorage.setItem(PRE_MERGE_STORAGE_KEY, previousSnapshot);
+        if(previousReview == null) localStorage.removeItem(DELETION_REVIEW_STORAGE_KEY);
+        else localStorage.setItem(DELETION_REVIEW_STORAGE_KEY, previousReview);
+        if(previousUndo == null) localStorage.removeItem(UNDO_STORAGE_KEY);
+        else localStorage.setItem(UNDO_STORAGE_KEY, previousUndo);
+      }
     }
   });
   tests.push({
@@ -2555,7 +2755,7 @@ function runSelfTests(){
   });
 
   tests.push({
-    name: "ADMIN FOR GROUP DELETE BULK UPDATE",
+    name: "ADMIN FOR GROUP DELETE CREATES TAG",
     fn: () => {
       const previousData = data;
       const previousAdminTab = adminTab;
@@ -2576,18 +2776,22 @@ function runSelfTests(){
         const adult = data.resources.find(resource => resource.id === "adult-ed");
         const career = data.resources.find(resource => resource.id === "career-ed");
         const food = data.resources.find(resource => resource.id === "food");
-        if(adult.forGroups.includes("GED") || career.forGroups.some(group => group.toLowerCase() === "ged")){
-          throw new Error("deleted For group remained on a matching resource");
+        if(!adult.forGroups.includes("GED") || !career.forGroups.some(group => group.toLowerCase() === "ged")){
+          throw new Error("tagging a For group changed matching resources before review");
         }
         if(!adult.forGroups.includes("List")) throw new Error("unrelated For group was removed");
         if(!food.forGroups.includes("Food")) throw new Error("non-matching resource was changed");
-        if(adult.lastModified === "2026-01-01T00:00:00.000Z" || career.lastModified === "2026-01-01T00:00:00.000Z"){
-          throw new Error("matching resources were not timestamped");
+        if(adult.lastModified !== "2026-01-01T00:00:00.000Z" || career.lastModified !== "2026-01-01T00:00:00.000Z"){
+          throw new Error("tagging changed matching resource timestamps before review");
         }
         if(food.lastModified !== "2026-01-01T00:00:00.000Z"){
           throw new Error("non-matching resource timestamp changed");
         }
-        if(data.changes.length !== 2) throw new Error("For group delete should create one change entry per changed resource");
+        if(data.changes.length !== 0) throw new Error("tagging should not add applied-deletion change entries");
+        if(!data.forGroups.includes("GED")) throw new Error("tagged For group was removed before review");
+        if(!data.deletionRequests.some(request => request.key === "forGroup:ged")){
+          throw new Error("removed For group was not tagged for deletion");
+        }
       }finally{
         data = previousData;
         adminTab = previousAdminTab;

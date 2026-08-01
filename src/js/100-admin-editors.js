@@ -735,9 +735,21 @@ function applyCategoryDraft(idx, draft){
   // Apply validated category draft into canonical data model.
   const cat = data.categories[idx];
   if(!cat) return;
+  const previousFilters = normalizeCategoryFilters(cat.filters);
+  const nextFilters = normalizeCategoryFilters(draft.filters);
+  const nextKeys = new Set(nextFilters.map(deletionLabelKey));
+  const removedFilters = previousFilters.filter(filter => !nextKeys.has(deletionLabelKey(filter)));
+  if(removedFilters.length){
+    setUndoSnapshot(removedFilters.length === 1 ? "Type deletion tag" : "Type deletion tags");
+    const requests = removedFilters.map(filter => createDeletionRequest("type", {
+      categoryId:cat.id,
+      label:filter
+    }));
+    data.deletionRequests = mergeDeletionRecords(data.deletionRequests, requests, "requestedAt");
+  }
   cat.id = cat.id || draft.id || generateResourceId();
   cat.label = draft.label || cat.label;
-  cat.filters = normalizeCategoryFilters(draft.filters);
+  cat.filters = normalizeCategoryFilters([...nextFilters, ...removedFilters]);
   cat.lastModified = nowISO();
 }
 
@@ -1076,7 +1088,10 @@ function populateCategoryBrowseOptions(sel, pairs){
     btn.tabIndex = -1;
     btn.dataset.categoryIndex = String(i);
     btn.dataset.categoryId = String(c.id || "");
-    btn.textContent = String(c && c.label || "").trim() || "(Unnamed category)";
+    const label = String(c && c.label || "").trim() || "(Unnamed category)";
+    btn.textContent = hasDeletionRequest("category", { targetId:c.id })
+      ? `${label} — tagged for deletion`
+      : label;
     sel.appendChild(btn);
   });
 }
@@ -1183,7 +1198,7 @@ function promptCategoryDeleteDescription(cat, onSubmit){
     <div class="reference-modal-panel" role="dialog" aria-modal="true" aria-labelledby="categoryDeletePromptTitle" aria-describedby="categoryDeletePromptSubtitle">
       <div class="reference-modal-header">
         <div>
-          <div id="categoryDeletePromptTitle" class="reference-modal-title">Delete Category</div>
+          <div id="categoryDeletePromptTitle" class="reference-modal-title">Tag Category for Deletion</div>
           <div id="categoryDeletePromptSubtitle" class="reference-modal-subtitle">${escapeHTML(cat.label || "(unnamed)")}</div>
         </div>
       </div>
@@ -1193,7 +1208,7 @@ function promptCategoryDeleteDescription(cat, onSubmit){
         </label>
         <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px;">
           <button class="button" type="button" id="categoryDeleteCancelBtn">Cancel</button>
-          <button class="button danger" type="button" id="categoryDeleteConfirmBtn">Delete</button>
+          <button class="button danger" type="button" id="categoryDeleteConfirmBtn">Tag for deletion</button>
         </div>
       </div>
     </div>
@@ -1229,26 +1244,11 @@ function completeCategoryDelete(categoryId, updateDescription){
   const idx = data.categories.findIndex(cat => String(cat && cat.id || "") === String(categoryId || ""));
   const cat = data.categories[idx];
   if(!cat) return;
-  const changeDescription = getCategoryDeleteChangeDescription(updateDescription);
-  setUndoSnapshot(`deleted category "${cat.label}"`);
-
-  // remove category from resources too
-  data.resources.forEach(r=>{
-    if(Array.isArray(r.categories)){
-      r.categories = r.categories.filter(id => id !== cat.id);
-    }
-    if(r.categoryFilters && typeof r.categoryFilters === "object"){
-      delete r.categoryFilters[cat.id];
-    }
-  });
-
-  data.categories.splice(idx,1);
-  delete selectedCategoryFilters[cat.id];
-  addChangeEntry(createChangeEntry("category", "removed", cat.id, cat.label || "(Unnamed category)", changeDescription));
-  newCategoryIds.delete(cat.id);
-  selectedCategoryIndex = "";
-  persist();
-  showChangeLog();
+  tagDeletionRequests([createDeletionRequest("category", {
+    targetId:cat.id,
+    label:cat.label || "(Unnamed category)",
+    description:updateDescription
+  })], `tagged category "${cat.label}" for deletion`);
 }
 
 function deleteCategory(){
@@ -1346,11 +1346,19 @@ function editCategory(idx){
   if(deleteFilterBtn){
     deleteFilterBtn.addEventListener("click", () => {
       const selected = Array.from(document.querySelectorAll(".catFilterSelect:checked"));
-      selected.forEach(checkbox => {
-        const row = checkbox.closest(".category-filter-row");
-        if(row) row.remove();
-      });
-      if(selected.length) validateCategoryEditorState();
+      if(!selected.length) return;
+      const category = data.categories[editing && editing.kind === "category" ? editing.idx : -1];
+      if(!category) return;
+      const labels = selected
+        .map(checkbox => checkbox.closest(".category-filter-row"))
+        .map(row => row && row.querySelector(".catFilterInput") ? row.querySelector(".catFilterInput").value.trim() : "")
+        .filter(Boolean);
+      if(!labels.length) return;
+      if(!confirm(`Tag ${labels.length === 1 ? `the Type '${labels[0]}'` : `${labels.length} Types`} for deletion?\n\nResources will remain unchanged until an admin reviews and approves the deletion after a package merge.`)) return;
+      tagDeletionRequests(labels.map(label => createDeletionRequest("type", {
+        categoryId:category.id,
+        label
+      })), labels.length === 1 ? `tagged Type "${labels[0]}" for deletion` : "tagged Types for deletion");
     });
   }
   validateCategoryEditorState();
@@ -1365,6 +1373,13 @@ function addCategoryFilterRow(value){
     <input type="checkbox" class="catFilterSelect" aria-label="Select filter">
     <input type="text" class="catFilterInput" value="${escapeHTML(value || "")}" aria-label="Category filter">
   `;
+  const category = editing && editing.kind === "category" ? data.categories[editing.idx] : null;
+  if(category && value && hasDeletionRequest("type", { categoryId:category.id, label:value })){
+    const status = document.createElement("span");
+    status.className = "deletion-tag-status";
+    status.textContent = "tagged for deletion";
+    row.appendChild(status);
+  }
   const input = row.querySelector(".catFilterInput");
   if(input){
     input.addEventListener("input", () => {
@@ -1490,7 +1505,10 @@ function populateResourceBrowseOptions(sel, preferredResourceId){
     const verifiedLabel = isValidMMYY(r.verifiedOn)
       ? `${r.name || ""} \u2014 ${formatVerifiedOnForDisplay(r.verifiedOn)}`
       : (r.name || "");
-    btn.textContent = adminShowVerifiedDates ? verifiedLabel : (r.name || "");
+    const baseLabel = adminShowVerifiedDates ? verifiedLabel : (r.name || "");
+    btn.textContent = hasDeletionRequest("resource", { targetId:r.id })
+      ? `${baseLabel} — tagged for deletion`
+      : baseLabel;
     sel.appendChild(btn);
   });
 
@@ -1609,8 +1627,6 @@ function deleteResource(){
   if(!commitPendingEditsIfChanged()) return;
   if(!selectedResourceId) return;
 
-  const sortedIds = getAdminResourceBrowseList().map(r => String(r.id || ""));
-  const selectedPos = sortedIds.indexOf(selectedResourceId);
   const idx = getResourceIndexById(selectedResourceId);
   const res = data.resources[idx];
   if(!res) return;
@@ -1619,22 +1635,11 @@ function deleteResource(){
   if(!confirmDelete) return;
   const updateDescription = prompt("Describe this update (optional):", "");
   if(updateDescription === null) return;
-  setUndoSnapshot(`deleted resource "${res.name}"`);
-
-  data.resources.splice(idx,1);
-  addChangeEntry(createChangeEntry("resource", "removed", res.id, res.name || "(Unnamed resource)", updateDescription, { categoryIds:res.categories }));
-  newResourceIds.delete(res.id);
-  const remainingIds = getAdminResourceBrowseList().map(r => String(r.id || ""));
-  if(!remainingIds.length){
-    selectedResourceId = "";
-    adminResourceEditMode = false;
-  }else{
-    const nextPos = Math.min(Math.max(selectedPos, 0), remainingIds.length - 1);
-    selectedResourceId = remainingIds[nextPos];
-  }
-
-  persist();
-  safeRenderAdmin();
+  tagDeletionRequests([createDeletionRequest("resource", {
+    targetId:res.id,
+    label:res.name || "(Unnamed resource)",
+    description:updateDescription
+  })], `tagged resource "${res.name}" for deletion`);
 }
 
 function openResourceEditor(){
@@ -2107,27 +2112,13 @@ function applyForGroupsDraft(draft){
   const nextGroups = normalizeTaxonomyLabels(draft && draft.forGroups);
   const nextKeys = new Set(nextGroups.map(group => group.toLowerCase()));
   const removedGroups = previousGroups.filter(group => !nextKeys.has(group.toLowerCase()));
-  const removedKeys = new Set(removedGroups.map(group => group.toLowerCase()));
-
-  data.forGroups = nextGroups;
-  if(removedKeys.size){
-    const modifiedAt = nowISO();
-    (Array.isArray(data.resources) ? data.resources : []).forEach(resource => {
-      const current = normalizeTaxonomyLabels(resource && resource.forGroups);
-      const next = current.filter(group => !removedKeys.has(group.toLowerCase()));
-      if(next.length === current.length) return;
-      resource.forGroups = next;
-      resource.lastModified = modifiedAt;
-      addChangeEntry(createChangeEntry(
-        "resource",
-        "updated",
-        resource.id,
-        resource.name || "(Unnamed resource)",
-        `Removed For group${removedGroups.length === 1 ? "" : "s"}: ${removedGroups.join(", ")}.`,
-        { categoryIds:resource.categories }
-      ));
-    });
+  if(removedGroups.length){
+    setUndoSnapshot(removedGroups.length === 1 ? "For group deletion tag" : "For group deletion tags");
+    data.deletionRequests = mergeDeletionRecords(data.deletionRequests, removedGroups.map(group =>
+      createDeletionRequest("forGroup", { label:group })
+    ), "requestedAt");
   }
+  data.forGroups = normalizeTaxonomyLabels([...nextGroups, ...removedGroups]);
 }
 
 function validateForGroupsDraft(draft){
@@ -2174,6 +2165,12 @@ function addForGroupRow(value){
   row.innerHTML = `
     <input type="text" class="forGroupInput" value="${escapeHTML(value || "")}" aria-label="For group">
   `;
+  if(value && hasDeletionRequest("forGroup", { label:value })){
+    const status = document.createElement("span");
+    status.className = "deletion-tag-status";
+    status.textContent = "tagged for deletion";
+    row.appendChild(status);
+  }
   const input = row.querySelector(".forGroupInput");
   if(input){
     input.addEventListener("input", () => {
@@ -2256,10 +2253,11 @@ function renderAdminForGroups(container){
     deleteBtn.onclick = () => {
       const rows = Array.from(document.querySelectorAll(".for-group-row"));
       const row = rows[selectedForGroupIndex];
-      if(row) row.remove();
-      selectedForGroupIndex = Math.max(0, Math.min(selectedForGroupIndex, rows.length - 2));
-      selectForGroupRow(selectedForGroupIndex);
-      updateForGroupsEditorActionBar();
+      const input = row ? row.querySelector(".forGroupInput") : null;
+      const group = input ? input.value.trim() : "";
+      if(!group) return;
+      if(!confirm(`Tag the For group '${group}' for deletion?\n\nResources will remain unchanged until an admin reviews and approves the deletion after a package merge.`)) return;
+      tagDeletionRequests([createDeletionRequest("forGroup", { label:group })], `tagged For group "${group}" for deletion`);
     };
   }
   refreshForGroupDetails();

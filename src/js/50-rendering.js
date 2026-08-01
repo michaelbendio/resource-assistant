@@ -489,8 +489,8 @@ function showAdminHelp(options = {}){
               <li>Click <strong>GED</strong> to show your practice resource as a GED Type.</li>
               <li>Click <strong>Spanish speaking</strong> or <strong>Veterans</strong> or both. Your practice resource is for them.</li>
               <li>Click <strong>Admin</strong> in the blue bar again. Click <strong>Show change log</strong>. Click <strong>Save Resource Package</strong> and choose the location for the resource package. Remember where you put it.</li>
-              <li>Click <strong>Resources</strong>, select your practice resource, and click <strong>Delete</strong>. Press <kbd>Ctrl+Alt+A</kbd> to exit admin mode.</li>
-              <li>Under the category buttons, on the right side, click <strong>Merge Resources</strong>. Choose the resource package zip you saved. Your practice resource will be back in Education.</li>
+              <li>Click <strong>Resources</strong>, select your practice resource, and click <strong>Delete</strong>. The resource remains active and is labeled <strong>tagged for deletion</strong>. Click <strong>Undo tagged resource ... for deletion</strong> so the practice resource is no longer tagged. Press <kbd>Ctrl+Alt+A</kbd> to exit admin mode.</li>
+              <li>Under the category buttons, on the right side, click <strong>Merge Resources</strong>. Choose the resource package zip you saved.</li>
               <li>In the Education category, click the gray square on the left of your practice resource. Use the printer icon in the blue bar to print your practice resource.</li>
             </ol>
           </div>
@@ -505,6 +505,7 @@ function showAdminHelp(options = {}){
               <li>Go to the <strong>Categories</strong> screen.</li>
               <li>Click <strong>Merge Resources</strong>.</li>
               <li>Choose the latest resource package zip.</li>
+              <li>If tagged deletions are present, review their consequences and approve or keep each one.</li>
               <li>Wait for the merge to finish before making edits.</li>
             </ol>
             <p>Packages are merged using the time each category or resource was last changed. Editing an older copy can make outdated information appear newer and prevent the correct version from replacing it.</p>
@@ -520,7 +521,7 @@ function showAdminHelp(options = {}){
               <li>Click <strong>Show change log</strong> and review the listed changes.</li>
               <li>Click <strong>Save Resource Package</strong>. When supported by your browser, the save picker starts in the folder where you opened the merged resource package.</li>
               <li>Save the resource package zip.</li>
-              <li>Share that resource package zip through the normal distribution process.</li>
+              <li>If you are a resource missionary, send that resource package zip to the office admin. The admin merges it into the current office package before publication.</li>
             </ol>
             <p><strong>Save Resource Package</strong> commits any open editor changes, increases the package version, and exports the current data. Users see the changes after they merge the resource package into their TSO file.</p>
           </div>
@@ -532,7 +533,7 @@ function showAdminHelp(options = {}){
             <p>Use <strong>Categories</strong> to manage the sections users see on the main screen.</p>
             <p><strong>New</strong> creates a blank category. Enter the category label, add any Types for that category, describe the update, and click <strong>Done</strong>.</p>
             <p><strong>Types</strong> are category-specific choices that answer: what specific type of help does this resource offer within this category?</p>
-            <p><strong>Delete</strong> removes the selected category. It does not delete the resources in that category, but those resources will no longer appear there. The app asks for confirmation and gives you a chance to describe the deletion.</p>
+            <p><strong>Delete</strong> tags the selected category for deletion. The category and its resources remain active until an admin reviews and approves the deletion after merging the package.</p>
             <p>Categories are shown alphabetically.</p>
             <p>The category editor also shows <strong>Resources in this category</strong>. Click a resource name there to open it in the resource editor.</p>
             <p>Category labels must be unique.</p>
@@ -548,7 +549,7 @@ function showAdminHelp(options = {}){
               <li>Click a resource to select it.</li>
               <li>Click <strong>Edit</strong>, double-click the resource, or press <kbd>Enter</kbd> to edit it.</li>
               <li>Click <strong>New</strong> to create a resource.</li>
-              <li>Click <strong>Delete</strong> to remove the selected resource.</li>
+              <li>Click <strong>Delete</strong> to tag the selected resource for deletion. It remains active until an admin approves the deletion after merging the package.</li>
               <li>Turn on <strong>Show verified dates</strong> to show and sort by verification date.</li>
             </ul>
             <p>In the resource editor:</p>
@@ -587,8 +588,16 @@ function showAdminHelp(options = {}){
           <div class="admin-help-section-body">
             <p><strong>For</strong> manages the governed list of groups a resource can be for.</p>
             <p>Use <strong>For</strong> for cross-category people-served groups, such as veterans or families with children. Use <strong>Types</strong> for the specific service being offered.</p>
-            <p>Select a group to see which resources use it. <strong>Delete</strong> removes the selected group. Click <strong>Done</strong> to apply the change; the group is then removed from every resource that uses it.</p>
-            <p>Before deleting groups, make sure your resource data is current. If you have received a newer resource package, merge it first. If another admin later saves an older version of a resource, a merge can bring the deleted group back.</p>
+            <p>Select a group to see which resources use it. <strong>Delete</strong> tags the selected group for deletion; it remains active until an admin approves it after merging the package.</p>
+          </div>
+        </details>
+
+        <details>
+          <summary>Tagged deletions</summary>
+          <div class="admin-help-section-body">
+            <p>Delete actions tag resources, categories, Types, and For groups for deletion without removing them. Tagged items remain active and are labeled <strong>tagged for deletion</strong>.</p>
+            <p>After an admin merges a package containing deletion tags, the review opens immediately. It shows affected resources and can print a working list. The admin chooses which deletions to approve and can continue editing the merged data.</p>
+            <p><strong>Return to before merge</strong> restores the one snapshot saved immediately before the latest merge. It also discards edits made after that merge.</p>
           </div>
         </details>
 
@@ -610,8 +619,8 @@ function showAdminHelp(options = {}){
         <details>
           <summary>Undo</summary>
           <div class="admin-help-section-body">
-            <p>Undo is available only for destructive deletions: category deletion, resource deletion, and For group deletion.</p>
-            <p>Only the most recent deletion can be undone. Use <strong>Undo ...</strong> in Admin mode to restore the saved snapshot, or <strong>Clear undo</strong> to remove it.</p>
+            <p>Undo is available for deletion tagging and approval.</p>
+            <p>Only the most recent deletion action can be undone. Use <strong>Undo ...</strong> in Admin mode to restore the saved snapshot, or <strong>Clear undo</strong> to remove it.</p>
             <p>Normal edits are not undone this way. If you make a wrong normal edit, edit the item again and describe the correction.</p>
           </div>
         </details>

@@ -568,6 +568,8 @@ function normalizePackageData(nextData){
   normalizeDataPDFShape(nextData);
   normalizeLegacyPackageShape(nextData);
   normalizeLegacyTagsShape(nextData);
+  normalizeDeletionWorkflowData(nextData);
+  applyDeletionTombstones(nextData);
   normalizeDataForGroupsShape(nextData);
   normalizeDataCategoryFilterShape(nextData);
   normalizeCategoryMigrations(nextData);
@@ -641,7 +643,9 @@ function buildResourcePackageData(sourceData){
     categoryMigrations: source.categoryMigrations,
     forGroups: source.forGroups,
     resources: source.resources,
-    changes: source.changes
+    changes: source.changes,
+    deletionRequests: source.deletionRequests,
+    deletions: source.deletions
   };
 }
 
@@ -663,6 +667,8 @@ function mergeResourcePackages(localData, incomingData){
   applyCategoryMigrations(incoming, categoryMigrations);
   const categoryMerge = mergeItemsById(local.categories, incoming.categories, { kind:"categories" });
   const resourceMerge = mergeItemsById(local.resources, incoming.resources, { kind:"resources" });
+  const deletionRequests = mergeDeletionRecords(local.deletionRequests, incoming.deletionRequests, "requestedAt");
+  const deletions = mergeDeletionRecords(local.deletions, incoming.deletions, "deletedAt");
   // Resource text still follows the timestamp winner, but PDF attachments from
   // the incoming package are additive. This lets a package restore attachments
   // when the browser has an equal/newer copy of the resource with no PDF metadata.
@@ -676,6 +682,8 @@ function mergeResourcePackages(localData, incomingData){
     resources: resourceMerge.merged,
     changes: mergeChanges(local.changes, incoming.changes),
     forGroups: normalizeTaxonomyLabels([...(local.forGroups || []), ...(incoming.forGroups || [])]),
+    deletionRequests,
+    deletions,
     resourcePackageSchemaVersion: RESOURCE_PACKAGE_SCHEMA_VERSION
   };
   normalizePackageData(mergedData);
@@ -901,8 +909,19 @@ function validateImportData(imported){
     errors.push("Invalid 'appChanges' array");
   }
 
-  if(imported.resourcePackageSchemaVersion != null && imported.resourcePackageSchemaVersion !== RESOURCE_PACKAGE_SCHEMA_VERSION){
-    errors.push(`Unsupported resource package schema. Expected ${RESOURCE_PACKAGE_SCHEMA_VERSION}.`);
+  if(imported.resourcePackageSchemaVersion != null
+    && imported.resourcePackageSchemaVersion !== LEGACY_RESOURCE_PACKAGE_SCHEMA_VERSION
+    && imported.resourcePackageSchemaVersion !== RESOURCE_PACKAGE_SCHEMA_VERSION){
+    errors.push(
+      `Unsupported resource package schema. Expected ${LEGACY_RESOURCE_PACKAGE_SCHEMA_VERSION} or ${RESOURCE_PACKAGE_SCHEMA_VERSION}.`
+    );
+  }
+
+  if(imported.deletionRequests != null && !Array.isArray(imported.deletionRequests)){
+    errors.push("Invalid 'deletionRequests' array");
+  }
+  if(imported.deletions != null && !Array.isArray(imported.deletions)){
+    errors.push("Invalid 'deletions' array");
   }
 
   collectLegacyPackageFieldErrors(imported).forEach(error => errors.push(error));
@@ -1011,6 +1030,8 @@ async function mergeImportPackage(event){
       return;
     }
     normalizePackageData(imported);
+    const incomingDeletionRequests = cloneDataObject(imported.deletionRequests || []);
+    if(!savePreMergeSnapshot(file.name)) return;
     const importedChangeIds = new Set((imported.changes || []).map(entry => String(entry && entry.id || "")).filter(Boolean));
     const importedPackageVersion = normalizePackageVersionValue(imported.packageVersion);
     const currentPackageInfo = (data && data.lastLoadedPackageInfo && typeof data.lastLoadedPackageInfo === "object")
@@ -1021,6 +1042,12 @@ async function mergeImportPackage(event){
       .map(r => ({ resource:r, paths:collectPDFPathsFromResource(r) }))
       .filter(item => item.paths.length);
     const { mergedData, summary:mergeSummary } = mergeResourcePackages(data, imported);
+    const mergedPendingDeletionKeys = new Set((mergedData.deletionRequests || []).map(request => request.key));
+    saveDeletionReview(
+      file.name,
+      importedPackageVersion,
+      incomingDeletionRequests.filter(request => mergedPendingDeletionKeys.has(request.key))
+    );
     const mergedById = new Map((mergedData.resources || []).map(r => [String(r && r.id || ""), r]));
     const resourcesWithPdf = localResourcesWithPdf
       .filter(item => {
@@ -1097,6 +1124,7 @@ async function mergeImportPackage(event){
         ? "Resource package merged."
         : `No resource package updates were loaded from Resource Package ${importedPackageVersion}.`
     );
+    if(getOutstandingDeletionReview()) setTimeout(showDeletionReview, 0);
     return true;
   }catch(e){
     alert("Load failed: " + e.message);

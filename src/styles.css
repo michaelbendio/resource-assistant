@@ -489,6 +489,7 @@ textarea.information-editor { min-height:320px; resize:vertical; }
 .for-group-row { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
 .for-group-row.selected { background:#eef4ff; outline:2px solid #99b8e8; outline-offset:2px; }
 .for-group-row input[type="text"] { flex:1; min-width:0; }
+.deletion-tag-status { color:#9a3412; font-size:13px; font-weight:bold; white-space:nowrap; }
 
 .reference-modal {
   position:fixed;
@@ -527,6 +528,26 @@ textarea.information-editor { min-height:320px; resize:vertical; }
   padding:16px 18px 18px;
   overflow:auto;
 }
+.deletion-review-panel { width:min(860px,100%); }
+.deletion-review-list { display:grid; gap:10px; }
+.deletion-review-item {
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr);
+  gap:10px;
+  align-items:start;
+  padding:12px;
+  border:1px solid #dde6ef;
+  border-radius:6px;
+  background:#fff;
+}
+.deletion-review-item input { margin-top:3px; }
+.deletion-review-target { margin-bottom:4px; }
+.deletion-review-actions { margin-top:16px; }
+.deletion-report > h1 { margin-top:0; }
+.deletion-report-item { break-inside:avoid; page-break-inside:avoid; border-top:1px solid #999; margin-top:16px; padding-top:12px; }
+.deletion-report-item h2 { font-size:16px; }
+.deletion-report-decision { margin-top:14px; }
+.deletion-report-notes { min-height:54px; border-bottom:1px solid #777; }
 .reference-group { margin-top:14px; }
 .reference-group:first-child { margin-top:0; }
 .reference-group-title { font-weight:bold; margin-bottom:6px; }

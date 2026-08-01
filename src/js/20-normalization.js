@@ -285,18 +285,18 @@ function getAdminResourceBrowseList(){
 function buildAdminDeleteConfirmation(kind, name){
   if(kind === "resource"){
     return [
-      `Are you sure you want to delete the resource '${name}'?`,
+      `Tag the resource '${name}' for deletion?`,
       "",
-      "This removes it from all categories and the print selection.",
-      "Undo will be available in Admin to restore what you deleted."
+      "The resource will remain active until an admin reviews and approves the deletion after a package merge.",
+      "Undo will remove the deletion tag."
     ].join("\n");
   }
   if(kind === "category"){
     return [
-      `Are you sure you want to delete the category '${name}'?`,
+      `Tag the category '${name}' for deletion?`,
       "",
-      "Resources are not deleted, but they will no longer appear under this category.",
-      "Undo will be available in Admin to restore what you deleted."
+      "The category and its resources will remain active until an admin reviews and approves the deletion after a package merge.",
+      "Undo will remove the deletion tag."
     ].join("\n");
   }
   return "Are you sure?";

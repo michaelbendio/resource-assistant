@@ -52,13 +52,17 @@ const PRINT_SELECTION_STORAGE_KEY = getStorageKey("PrintSelection");
 const LEGACY_FAVORITES_STORAGE_KEY = getStorageKey("Favorites");
 const TSO_NAME_STORAGE_KEY = getStorageKey("TsoName");
 const UNDO_STORAGE_KEY = getStorageKey("Undo");
+const PRE_MERGE_STORAGE_KEY = getStorageKey("PreMerge");
+const DELETION_REVIEW_STORAGE_KEY = getStorageKey("DeletionReview");
 const DISMISSED_TIPS_STORAGE_KEY = getStorageKey("DismissedTips");
 const NEW_ADMIN_TRAINING_PENDING_KEY = "tsoResourcesNewAdminTrainingPending";
 const STARTUP_STATE_STORAGE_KEYS = [
   UPDATE_SEEN_STORAGE_KEY,
   PRINT_SELECTION_STORAGE_KEY,
   LEGACY_FAVORITES_STORAGE_KEY,
-  UNDO_STORAGE_KEY
+  UNDO_STORAGE_KEY,
+  PRE_MERGE_STORAGE_KEY,
+  DELETION_REVIEW_STORAGE_KEY
 ];
 
 function shouldResetTemplateStorageOnStartup(fileName = getCurrentHtmlFileName()){
@@ -132,7 +136,8 @@ function freshStartFromSeed(){
 
 // Main persisted app data snapshot (categories/resources + metadata).
 let data = JSON.parse(localStorage.getItem(DATA_STORAGE_KEY) || "null");
-const RESOURCE_PACKAGE_SCHEMA_VERSION = 2;
+const LEGACY_RESOURCE_PACKAGE_SCHEMA_VERSION = 2;
+const RESOURCE_PACKAGE_SCHEMA_VERSION = 3;
 const TIP_TEXT = {
   user: "Click on a category to see its resources. Click a resource to see details. Click ⬜ to include it in the printed handout.",
   newAdminWelcome: "Welcome to you, new admin. Press Ctrl+Alt+A to enter admin mode",
@@ -158,6 +163,8 @@ normalizeDataCategoryFilterShape(data);
 normalizeDataVerifiedOnShape(data);
 normalizeChanges(data);
 normalizeLastLoadedPackageInfo(data);
+normalizeDeletionWorkflowData(data);
+applyDeletionTombstones(data);
 data.appVersion = APP_VERSION;
 data.resourcePackageSchemaVersion = RESOURCE_PACKAGE_SCHEMA_VERSION;
 

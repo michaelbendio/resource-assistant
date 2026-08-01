@@ -1,8 +1,13 @@
 {
-  "version": "2.2.8",
-  "date": "2026-07-25",
-  "message": "Show latest five App Changes",
+  "version": "2.2.9",
+  "date": "2026-07-31",
+  "message": "Review tagged deletions during package merge",
   "appChanges": [
+    {
+      "date": "2026-07-31",
+      "version": "2.2.9",
+      "message": "Review tagged deletions during package merge"
+    },
     {
       "date": "2026-07-25",
       "version": "2.2.8",
@@ -22,11 +27,6 @@
       "date": "2026-07-21",
       "version": "2.2.5",
       "message": "Keep print buttons visible"
-    },
-    {
-      "date": "2026-07-18",
-      "version": "2.2.4",
-      "message": "Clean legacy ghost categories."
     }
   ]
 }

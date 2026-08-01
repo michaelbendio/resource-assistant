@@ -499,6 +499,7 @@ textarea.information-editor { min-height:320px; resize:vertical; }
 .for-group-row { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
 .for-group-row.selected { background:#eef4ff; outline:2px solid #99b8e8; outline-offset:2px; }
 .for-group-row input[type="text"] { flex:1; min-width:0; }
+.deletion-tag-status { color:#9a3412; font-size:13px; font-weight:bold; white-space:nowrap; }
 
 .reference-modal {
   position:fixed;
@@ -537,6 +538,26 @@ textarea.information-editor { min-height:320px; resize:vertical; }
   padding:16px 18px 18px;
   overflow:auto;
 }
+.deletion-review-panel { width:min(860px,100%); }
+.deletion-review-list { display:grid; gap:10px; }
+.deletion-review-item {
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr);
+  gap:10px;
+  align-items:start;
+  padding:12px;
+  border:1px solid #dde6ef;
+  border-radius:6px;
+  background:#fff;
+}
+.deletion-review-item input { margin-top:3px; }
+.deletion-review-target { margin-bottom:4px; }
+.deletion-review-actions { margin-top:16px; }
+.deletion-report > h1 { margin-top:0; }
+.deletion-report-item { break-inside:avoid; page-break-inside:avoid; border-top:1px solid #999; margin-top:16px; padding-top:12px; }
+.deletion-report-item h2 { font-size:16px; }
+.deletion-report-decision { margin-top:14px; }
+.deletion-report-notes { min-height:54px; border-bottom:1px solid #777; }
 .reference-group { margin-top:14px; }
 .reference-group:first-child { margin-top:0; }
 .reference-group-title { font-weight:bold; margin-bottom:6px; }
@@ -873,8 +894,13 @@ textarea.information-editor { min-height:320px; resize:vertical; }
 
 <script id="app-release-data" type="application/json">
 {
-  "version": "2.2.8",
+  "version": "2.2.9",
   "changes": [
+    {
+      "date": "2026-07-31",
+      "version": "2.2.9",
+      "message": "Review tagged deletions during package merge"
+    },
     {
       "date": "2026-07-25",
       "version": "2.2.8",
@@ -894,11 +920,6 @@ textarea.information-editor { min-height:320px; resize:vertical; }
       "date": "2026-07-21",
       "version": "2.2.5",
       "message": "Keep print buttons visible"
-    },
-    {
-      "date": "2026-07-18",
-      "version": "2.2.4",
-      "message": "Clean legacy ghost categories."
     }
   ]
 }
@@ -1322,18 +1343,18 @@ function getAdminResourceBrowseList(){
 function buildAdminDeleteConfirmation(kind, name){
   if(kind === "resource"){
     return [
-      `Are you sure you want to delete the resource '${name}'?`,
+      `Tag the resource '${name}' for deletion?`,
       "",
-      "This removes it from all categories and the print selection.",
-      "Undo will be available in Admin to restore what you deleted."
+      "The resource will remain active until an admin reviews and approves the deletion after a package merge.",
+      "Undo will remove the deletion tag."
     ].join("\n");
   }
   if(kind === "category"){
     return [
-      `Are you sure you want to delete the category '${name}'?`,
+      `Tag the category '${name}' for deletion?`,
       "",
-      "Resources are not deleted, but they will no longer appear under this category.",
-      "Undo will be available in Admin to restore what you deleted."
+      "The category and its resources will remain active until an admin reviews and approves the deletion after a package merge.",
+      "Undo will remove the deletion tag."
     ].join("\n");
   }
   return "Are you sure?";
@@ -1564,13 +1585,17 @@ const PRINT_SELECTION_STORAGE_KEY = getStorageKey("PrintSelection");
 const LEGACY_FAVORITES_STORAGE_KEY = getStorageKey("Favorites");
 const TSO_NAME_STORAGE_KEY = getStorageKey("TsoName");
 const UNDO_STORAGE_KEY = getStorageKey("Undo");
+const PRE_MERGE_STORAGE_KEY = getStorageKey("PreMerge");
+const DELETION_REVIEW_STORAGE_KEY = getStorageKey("DeletionReview");
 const DISMISSED_TIPS_STORAGE_KEY = getStorageKey("DismissedTips");
 const NEW_ADMIN_TRAINING_PENDING_KEY = "tsoResourcesNewAdminTrainingPending";
 const STARTUP_STATE_STORAGE_KEYS = [
   UPDATE_SEEN_STORAGE_KEY,
   PRINT_SELECTION_STORAGE_KEY,
   LEGACY_FAVORITES_STORAGE_KEY,
-  UNDO_STORAGE_KEY
+  UNDO_STORAGE_KEY,
+  PRE_MERGE_STORAGE_KEY,
+  DELETION_REVIEW_STORAGE_KEY
 ];
 
 function shouldResetTemplateStorageOnStartup(fileName = getCurrentHtmlFileName()){
@@ -1644,7 +1669,8 @@ function freshStartFromSeed(){
 
 // Main persisted app data snapshot (categories/resources + metadata).
 let data = JSON.parse(localStorage.getItem(DATA_STORAGE_KEY) || "null");
-const RESOURCE_PACKAGE_SCHEMA_VERSION = 2;
+const LEGACY_RESOURCE_PACKAGE_SCHEMA_VERSION = 2;
+const RESOURCE_PACKAGE_SCHEMA_VERSION = 3;
 const TIP_TEXT = {
   user: "Click on a category to see its resources. Click a resource to see details. Click ⬜ to include it in the printed handout.",
   newAdminWelcome: "Welcome to you, new admin. Press Ctrl+Alt+A to enter admin mode",
@@ -1670,6 +1696,8 @@ normalizeDataCategoryFilterShape(data);
 normalizeDataVerifiedOnShape(data);
 normalizeChanges(data);
 normalizeLastLoadedPackageInfo(data);
+normalizeDeletionWorkflowData(data);
+applyDeletionTombstones(data);
 data.appVersion = APP_VERSION;
 data.resourcePackageSchemaVersion = RESOURCE_PACKAGE_SCHEMA_VERSION;
 
@@ -2392,8 +2420,8 @@ function showAdminHelp(options = {}){
               <li>Click <strong>GED</strong> to show your practice resource as a GED Type.</li>
               <li>Click <strong>Spanish speaking</strong> or <strong>Veterans</strong> or both. Your practice resource is for them.</li>
               <li>Click <strong>Admin</strong> in the blue bar again. Click <strong>Show change log</strong>. Click <strong>Save Resource Package</strong> and choose the location for the resource package. Remember where you put it.</li>
-              <li>Click <strong>Resources</strong>, select your practice resource, and click <strong>Delete</strong>. Press <kbd>Ctrl+Alt+A</kbd> to exit admin mode.</li>
-              <li>Under the category buttons, on the right side, click <strong>Merge Resources</strong>. Choose the resource package zip you saved. Your practice resource will be back in Education.</li>
+              <li>Click <strong>Resources</strong>, select your practice resource, and click <strong>Delete</strong>. The resource remains active and is labeled <strong>tagged for deletion</strong>. Click <strong>Undo tagged resource ... for deletion</strong> so the practice resource is no longer tagged. Press <kbd>Ctrl+Alt+A</kbd> to exit admin mode.</li>
+              <li>Under the category buttons, on the right side, click <strong>Merge Resources</strong>. Choose the resource package zip you saved.</li>
               <li>In the Education category, click the gray square on the left of your practice resource. Use the printer icon in the blue bar to print your practice resource.</li>
             </ol>
           </div>
@@ -2408,6 +2436,7 @@ function showAdminHelp(options = {}){
               <li>Go to the <strong>Categories</strong> screen.</li>
               <li>Click <strong>Merge Resources</strong>.</li>
               <li>Choose the latest resource package zip.</li>
+              <li>If tagged deletions are present, review their consequences and approve or keep each one.</li>
               <li>Wait for the merge to finish before making edits.</li>
             </ol>
             <p>Packages are merged using the time each category or resource was last changed. Editing an older copy can make outdated information appear newer and prevent the correct version from replacing it.</p>
@@ -2423,7 +2452,7 @@ function showAdminHelp(options = {}){
               <li>Click <strong>Show change log</strong> and review the listed changes.</li>
               <li>Click <strong>Save Resource Package</strong>. When supported by your browser, the save picker starts in the folder where you opened the merged resource package.</li>
               <li>Save the resource package zip.</li>
-              <li>Share that resource package zip through the normal distribution process.</li>
+              <li>If you are a resource missionary, send that resource package zip to the office admin. The admin merges it into the current office package before publication.</li>
             </ol>
             <p><strong>Save Resource Package</strong> commits any open editor changes, increases the package version, and exports the current data. Users see the changes after they merge the resource package into their TSO file.</p>
           </div>
@@ -2435,7 +2464,7 @@ function showAdminHelp(options = {}){
             <p>Use <strong>Categories</strong> to manage the sections users see on the main screen.</p>
             <p><strong>New</strong> creates a blank category. Enter the category label, add any Types for that category, describe the update, and click <strong>Done</strong>.</p>
             <p><strong>Types</strong> are category-specific choices that answer: what specific type of help does this resource offer within this category?</p>
-            <p><strong>Delete</strong> removes the selected category. It does not delete the resources in that category, but those resources will no longer appear there. The app asks for confirmation and gives you a chance to describe the deletion.</p>
+            <p><strong>Delete</strong> tags the selected category for deletion. The category and its resources remain active until an admin reviews and approves the deletion after merging the package.</p>
             <p>Categories are shown alphabetically.</p>
             <p>The category editor also shows <strong>Resources in this category</strong>. Click a resource name there to open it in the resource editor.</p>
             <p>Category labels must be unique.</p>
@@ -2451,7 +2480,7 @@ function showAdminHelp(options = {}){
               <li>Click a resource to select it.</li>
               <li>Click <strong>Edit</strong>, double-click the resource, or press <kbd>Enter</kbd> to edit it.</li>
               <li>Click <strong>New</strong> to create a resource.</li>
-              <li>Click <strong>Delete</strong> to remove the selected resource.</li>
+              <li>Click <strong>Delete</strong> to tag the selected resource for deletion. It remains active until an admin approves the deletion after merging the package.</li>
               <li>Turn on <strong>Show verified dates</strong> to show and sort by verification date.</li>
             </ul>
             <p>In the resource editor:</p>
@@ -2490,8 +2519,16 @@ function showAdminHelp(options = {}){
           <div class="admin-help-section-body">
             <p><strong>For</strong> manages the governed list of groups a resource can be for.</p>
             <p>Use <strong>For</strong> for cross-category people-served groups, such as veterans or families with children. Use <strong>Types</strong> for the specific service being offered.</p>
-            <p>Select a group to see which resources use it. <strong>Delete</strong> removes the selected group. Click <strong>Done</strong> to apply the change; the group is then removed from every resource that uses it.</p>
-            <p>Before deleting groups, make sure your resource data is current. If you have received a newer resource package, merge it first. If another admin later saves an older version of a resource, a merge can bring the deleted group back.</p>
+            <p>Select a group to see which resources use it. <strong>Delete</strong> tags the selected group for deletion; it remains active until an admin approves it after merging the package.</p>
+          </div>
+        </details>
+
+        <details>
+          <summary>Tagged deletions</summary>
+          <div class="admin-help-section-body">
+            <p>Delete actions tag resources, categories, Types, and For groups for deletion without removing them. Tagged items remain active and are labeled <strong>tagged for deletion</strong>.</p>
+            <p>After an admin merges a package containing deletion tags, the review opens immediately. It shows affected resources and can print a working list. The admin chooses which deletions to approve and can continue editing the merged data.</p>
+            <p><strong>Return to before merge</strong> restores the one snapshot saved immediately before the latest merge. It also discards edits made after that merge.</p>
           </div>
         </details>
 
@@ -2513,8 +2550,8 @@ function showAdminHelp(options = {}){
         <details>
           <summary>Undo</summary>
           <div class="admin-help-section-body">
-            <p>Undo is available only for destructive deletions: category deletion, resource deletion, and For group deletion.</p>
-            <p>Only the most recent deletion can be undone. Use <strong>Undo ...</strong> in Admin mode to restore the saved snapshot, or <strong>Clear undo</strong> to remove it.</p>
+            <p>Undo is available for deletion tagging and approval.</p>
+            <p>Only the most recent deletion action can be undone. Use <strong>Undo ...</strong> in Admin mode to restore the saved snapshot, or <strong>Clear undo</strong> to remove it.</p>
             <p>Normal edits are not undone this way. If you make a wrong normal edit, edit the item again and describe the correction.</p>
           </div>
         </details>
@@ -2910,9 +2947,9 @@ function renderSearchDetailView(){
 // ============================================================
 // UNDO SYSTEM
 // ============================================================
-// Undo is intentionally narrow: destructive admin deletes save one complete data
-// snapshot in localStorage. Restoring that snapshot is simpler and safer than
-// trying to reverse individual category, resource, or For-group mutations.
+// Undo is intentionally narrow: deletion tagging and approval save one complete
+// data snapshot in localStorage. Restoring that snapshot is simpler and safer
+// than trying to reverse individual taxonomy and resource mutations.
 
 function getUndoSnapshot(){
   try{
@@ -2941,14 +2978,9 @@ function setUndoSnapshot(message){
 function undoLastDeletion(){
   const snapshot = getUndoSnapshot();
   if(!snapshot || !snapshot.dataSnapshot) return;
-      data = snapshot.dataSnapshot;
-      normalizeDataInformationShape(data);
-      normalizeDataPDFShape(data);
-      normalizeLegacyPackageShape(data);
-      normalizeLegacyTagsShape(data);
-      normalizeDataVerifiedOnShape(data);
-      normalizeChanges(data);
+  data = normalizePackageData(snapshot.dataSnapshot);
   clearUndoSnapshot();
+  sanitizePrintSelection();
   persist();
   safeRender();
 }
@@ -3706,11 +3738,15 @@ function renderAdmin(){
   const undo = getUndoSnapshot();
   const undoButtonLabel = undo ? `Undo ${undo.message}` : "";
   const hasChangeLog = getRecentChanges().length > 0;
+  const preMerge = getPreMergeSnapshot();
+  const deletionReview = getOutstandingDeletionReview();
 
   container.innerHTML = `
     <div class="admin-sticky-bar">
       <div class="admin-sticky-package-actions">
         <button class="button primary" onclick="exportPackage()">Save Resource Package</button>
+        ${deletionReview ? `<button class="button" onclick="showDeletionReview()">Review tagged deletions</button>` : ""}
+        ${preMerge ? `<button class="button" onclick="restorePreMergeState()">Return to before merge</button>` : ""}
         ${hasChangeLog ? `
           <button class="button" onclick="showChangeLog()">Show change log</button>
           <button class="button" onclick="clearChangeLog()">Clear change log</button>
@@ -4350,6 +4386,8 @@ function normalizePackageData(nextData){
   normalizeDataPDFShape(nextData);
   normalizeLegacyPackageShape(nextData);
   normalizeLegacyTagsShape(nextData);
+  normalizeDeletionWorkflowData(nextData);
+  applyDeletionTombstones(nextData);
   normalizeDataForGroupsShape(nextData);
   normalizeDataCategoryFilterShape(nextData);
   normalizeCategoryMigrations(nextData);
@@ -4423,7 +4461,9 @@ function buildResourcePackageData(sourceData){
     categoryMigrations: source.categoryMigrations,
     forGroups: source.forGroups,
     resources: source.resources,
-    changes: source.changes
+    changes: source.changes,
+    deletionRequests: source.deletionRequests,
+    deletions: source.deletions
   };
 }
 
@@ -4445,6 +4485,8 @@ function mergeResourcePackages(localData, incomingData){
   applyCategoryMigrations(incoming, categoryMigrations);
   const categoryMerge = mergeItemsById(local.categories, incoming.categories, { kind:"categories" });
   const resourceMerge = mergeItemsById(local.resources, incoming.resources, { kind:"resources" });
+  const deletionRequests = mergeDeletionRecords(local.deletionRequests, incoming.deletionRequests, "requestedAt");
+  const deletions = mergeDeletionRecords(local.deletions, incoming.deletions, "deletedAt");
   // Resource text still follows the timestamp winner, but PDF attachments from
   // the incoming package are additive. This lets a package restore attachments
   // when the browser has an equal/newer copy of the resource with no PDF metadata.
@@ -4458,6 +4500,8 @@ function mergeResourcePackages(localData, incomingData){
     resources: resourceMerge.merged,
     changes: mergeChanges(local.changes, incoming.changes),
     forGroups: normalizeTaxonomyLabels([...(local.forGroups || []), ...(incoming.forGroups || [])]),
+    deletionRequests,
+    deletions,
     resourcePackageSchemaVersion: RESOURCE_PACKAGE_SCHEMA_VERSION
   };
   normalizePackageData(mergedData);
@@ -4683,8 +4727,19 @@ function validateImportData(imported){
     errors.push("Invalid 'appChanges' array");
   }
 
-  if(imported.resourcePackageSchemaVersion != null && imported.resourcePackageSchemaVersion !== RESOURCE_PACKAGE_SCHEMA_VERSION){
-    errors.push(`Unsupported resource package schema. Expected ${RESOURCE_PACKAGE_SCHEMA_VERSION}.`);
+  if(imported.resourcePackageSchemaVersion != null
+    && imported.resourcePackageSchemaVersion !== LEGACY_RESOURCE_PACKAGE_SCHEMA_VERSION
+    && imported.resourcePackageSchemaVersion !== RESOURCE_PACKAGE_SCHEMA_VERSION){
+    errors.push(
+      `Unsupported resource package schema. Expected ${LEGACY_RESOURCE_PACKAGE_SCHEMA_VERSION} or ${RESOURCE_PACKAGE_SCHEMA_VERSION}.`
+    );
+  }
+
+  if(imported.deletionRequests != null && !Array.isArray(imported.deletionRequests)){
+    errors.push("Invalid 'deletionRequests' array");
+  }
+  if(imported.deletions != null && !Array.isArray(imported.deletions)){
+    errors.push("Invalid 'deletions' array");
   }
 
   collectLegacyPackageFieldErrors(imported).forEach(error => errors.push(error));
@@ -4793,6 +4848,8 @@ async function mergeImportPackage(event){
       return;
     }
     normalizePackageData(imported);
+    const incomingDeletionRequests = cloneDataObject(imported.deletionRequests || []);
+    if(!savePreMergeSnapshot(file.name)) return;
     const importedChangeIds = new Set((imported.changes || []).map(entry => String(entry && entry.id || "")).filter(Boolean));
     const importedPackageVersion = normalizePackageVersionValue(imported.packageVersion);
     const currentPackageInfo = (data && data.lastLoadedPackageInfo && typeof data.lastLoadedPackageInfo === "object")
@@ -4803,6 +4860,12 @@ async function mergeImportPackage(event){
       .map(r => ({ resource:r, paths:collectPDFPathsFromResource(r) }))
       .filter(item => item.paths.length);
     const { mergedData, summary:mergeSummary } = mergeResourcePackages(data, imported);
+    const mergedPendingDeletionKeys = new Set((mergedData.deletionRequests || []).map(request => request.key));
+    saveDeletionReview(
+      file.name,
+      importedPackageVersion,
+      incomingDeletionRequests.filter(request => mergedPendingDeletionKeys.has(request.key))
+    );
     const mergedById = new Map((mergedData.resources || []).map(r => [String(r && r.id || ""), r]));
     const resourcesWithPdf = localResourcesWithPdf
       .filter(item => {
@@ -4879,6 +4942,7 @@ async function mergeImportPackage(event){
         ? "Resource package merged."
         : `No resource package updates were loaded from Resource Package ${importedPackageVersion}.`
     );
+    if(getOutstandingDeletionReview()) setTimeout(showDeletionReview, 0);
     return true;
   }catch(e){
     alert("Load failed: " + e.message);
@@ -4887,6 +4951,444 @@ async function mergeImportPackage(event){
     event.target.value = "";
     event.target.remove();
   }
+}
+
+// Source: src/js/95-deletion-workflow.js
+// ============================================================
+// DELETION REQUESTS AND MERGE REVIEW
+// ============================================================
+// A Delete action creates a request; it does not remove live data. An admin can
+// review requests immediately after a package merge, print their consequences,
+// and approve selected requests. Approved requests become compact tombstones so
+// an older resource package cannot recreate deleted records later.
+
+const DELETION_KINDS = new Set(["resource", "category", "type", "forGroup"]);
+
+function deletionLabelKey(value){
+  return String(value || "").trim().toLowerCase();
+}
+
+function buildDeletionKey(kind, targetId, categoryId, label){
+  const cleanKind = String(kind || "");
+  if(cleanKind === "resource" || cleanKind === "category"){
+    const id = String(targetId || "").trim();
+    return id ? `${cleanKind}:${id}` : "";
+  }
+  if(cleanKind === "type"){
+    const catId = String(categoryId || "").trim();
+    const labelKey = deletionLabelKey(label);
+    return catId && labelKey ? `type:${catId}:${labelKey}` : "";
+  }
+  if(cleanKind === "forGroup"){
+    const labelKey = deletionLabelKey(label);
+    return labelKey ? `forGroup:${labelKey}` : "";
+  }
+  return "";
+}
+
+function normalizeDeletionRecord(record, timeField = "requestedAt"){
+  if(!record || typeof record !== "object") return null;
+  const kind = String(record.kind || "");
+  if(!DELETION_KINDS.has(kind)) return null;
+  const targetId = String(record.targetId || "").trim();
+  const categoryId = String(record.categoryId || "").trim();
+  const label = String(record.label || "").trim();
+  const key = buildDeletionKey(kind, targetId, categoryId, label);
+  if(!key) return null;
+  const timestamp = Date.parse(String(record[timeField] || ""))
+    ? String(record[timeField])
+    : nowISO();
+  const normalized = { key, kind, label, [timeField]:timestamp };
+  if(targetId) normalized.targetId = targetId;
+  if(categoryId) normalized.categoryId = categoryId;
+  const description = String(record.description || "").trim();
+  if(description) normalized.description = description;
+  return normalized;
+}
+
+function mergeDeletionRecords(first, second, timeField = "requestedAt"){
+  const byKey = new Map();
+  [first, second].forEach(list => {
+    (Array.isArray(list) ? list : []).forEach(record => {
+      const normalized = normalizeDeletionRecord(record, timeField);
+      if(!normalized) return;
+      const current = byKey.get(normalized.key);
+      const currentTime = current ? Date.parse(current[timeField]) : -1;
+      const nextTime = Date.parse(normalized[timeField]);
+      if(!current || nextTime >= currentTime) byKey.set(normalized.key, normalized);
+    });
+  });
+  return Array.from(byKey.values());
+}
+
+function normalizeDeletionWorkflowData(packageData){
+  if(!packageData || typeof packageData !== "object") return;
+  packageData.deletions = mergeDeletionRecords([], packageData.deletions, "deletedAt");
+  const deletedKeys = new Set(packageData.deletions.map(record => record.key));
+  packageData.deletionRequests = mergeDeletionRecords([], packageData.deletionRequests, "requestedAt")
+    .filter(record => !deletedKeys.has(record.key));
+}
+
+function markDeletionAffectedRecord(record, timestamp){
+  if(!record || typeof record !== "object") return;
+  const previous = Date.parse(String(record.lastModified || ""));
+  const next = Date.parse(String(timestamp || ""));
+  if(!Number.isFinite(previous) || (Number.isFinite(next) && next > previous)){
+    record.lastModified = timestamp;
+  }
+}
+
+function applyDeletionTombstones(packageData, records = null){
+  if(!packageData || typeof packageData !== "object") return packageData;
+  if(!Array.isArray(packageData.categories)) packageData.categories = [];
+  if(!Array.isArray(packageData.resources)) packageData.resources = [];
+  if(!Array.isArray(packageData.forGroups)) packageData.forGroups = [];
+  const tombstones = mergeDeletionRecords([], records == null ? packageData.deletions : records, "deletedAt");
+
+  tombstones.forEach(tombstone => {
+    const modifiedAt = tombstone.deletedAt;
+    if(tombstone.kind === "resource"){
+      packageData.resources = packageData.resources.filter(resource =>
+        String(resource && resource.id || "") !== tombstone.targetId
+      );
+      return;
+    }
+
+    if(tombstone.kind === "category"){
+      packageData.categories = packageData.categories.filter(category =>
+        String(category && category.id || "") !== tombstone.targetId
+      );
+      packageData.resources.forEach(resource => {
+        const categories = Array.isArray(resource && resource.categories) ? resource.categories : [];
+        const hadCategory = categories.some(id => String(id) === tombstone.targetId);
+        const hadFilters = !!(resource && resource.categoryFilters
+          && Object.prototype.hasOwnProperty.call(resource.categoryFilters, tombstone.targetId));
+        if(!hadCategory && !hadFilters) return;
+        resource.categories = categories.filter(id => String(id) !== tombstone.targetId);
+        if(resource.categoryFilters && typeof resource.categoryFilters === "object"){
+          delete resource.categoryFilters[tombstone.targetId];
+        }
+        markDeletionAffectedRecord(resource, modifiedAt);
+      });
+      return;
+    }
+
+    if(tombstone.kind === "type"){
+      const typeKey = deletionLabelKey(tombstone.label);
+      const category = packageData.categories.find(item =>
+        String(item && item.id || "") === tombstone.categoryId
+      );
+      if(category){
+        category.filters = normalizeCategoryFilters(category.filters)
+          .filter(filter => deletionLabelKey(filter) !== typeKey);
+        markDeletionAffectedRecord(category, modifiedAt);
+      }
+      packageData.resources.forEach(resource => {
+        if(!resource || !resource.categoryFilters || typeof resource.categoryFilters !== "object") return;
+        const current = normalizeCategoryFilters(resource.categoryFilters[tombstone.categoryId]);
+        const next = current.filter(filter => deletionLabelKey(filter) !== typeKey);
+        if(next.length === current.length) return;
+        resource.categoryFilters[tombstone.categoryId] = next;
+        markDeletionAffectedRecord(resource, modifiedAt);
+      });
+      return;
+    }
+
+    if(tombstone.kind === "forGroup"){
+      const groupKey = deletionLabelKey(tombstone.label);
+      packageData.forGroups = normalizeTaxonomyLabels(packageData.forGroups)
+        .filter(group => deletionLabelKey(group) !== groupKey);
+      packageData.resources.forEach(resource => {
+        const current = normalizeTaxonomyLabels(resource && resource.forGroups);
+        const next = current.filter(group => deletionLabelKey(group) !== groupKey);
+        if(next.length === current.length) return;
+        resource.forGroups = next;
+        markDeletionAffectedRecord(resource, modifiedAt);
+      });
+    }
+  });
+  return packageData;
+}
+
+function createDeletionRequest(kind, options = {}){
+  return normalizeDeletionRecord({
+    kind,
+    targetId:options.targetId,
+    categoryId:options.categoryId,
+    label:options.label,
+    description:options.description,
+    requestedAt:options.requestedAt || nowISO()
+  }, "requestedAt");
+}
+
+function hasDeletionRequest(kind, options = {}){
+  const key = buildDeletionKey(kind, options.targetId, options.categoryId, options.label);
+  return !!key && (Array.isArray(data.deletionRequests) ? data.deletionRequests : [])
+    .some(request => request && request.key === key);
+}
+
+function tagDeletionRequests(requests, undoMessage){
+  const normalized = mergeDeletionRecords([], requests, "requestedAt");
+  if(!normalized.length) return false;
+  const existingKeys = new Set((Array.isArray(data.deletionRequests) ? data.deletionRequests : []).map(item => item.key));
+  const additions = normalized.filter(item => !existingKeys.has(item.key));
+  if(!additions.length){
+    showToast("Already tagged for deletion.");
+    return false;
+  }
+  setUndoSnapshot(undoMessage || "deletion tag");
+  data.deletionRequests = mergeDeletionRecords(data.deletionRequests, additions, "requestedAt");
+  normalizeDeletionWorkflowData(data);
+  persist();
+  showToast(additions.length === 1 ? "Tagged for deletion." : `${additions.length} items tagged for deletion.`);
+  safeRender();
+  return true;
+}
+
+function getDeletionImpact(request, sourceData = data){
+  const resources = Array.isArray(sourceData && sourceData.resources) ? sourceData.resources : [];
+  const categories = Array.isArray(sourceData && sourceData.categories) ? sourceData.categories : [];
+  let targetName = String(request && request.label || "").trim() || "(Unnamed)";
+  let affected = [];
+  if(request.kind === "resource"){
+    const resource = resources.find(item => String(item && item.id || "") === request.targetId);
+    if(resource) targetName = resource.name || targetName;
+    affected = resource ? [resource] : [];
+  }else if(request.kind === "category"){
+    const category = categories.find(item => String(item && item.id || "") === request.targetId);
+    if(category) targetName = category.label || targetName;
+    affected = resources.filter(resource =>
+      (Array.isArray(resource && resource.categories) && resource.categories.some(id => String(id) === request.targetId))
+      || !!(resource && resource.categoryFilters && Object.prototype.hasOwnProperty.call(resource.categoryFilters, request.targetId))
+    );
+  }else if(request.kind === "type"){
+    affected = resources.filter(resource => {
+      const values = resource && resource.categoryFilters && resource.categoryFilters[request.categoryId];
+      return normalizeCategoryFilters(values).some(value => deletionLabelKey(value) === deletionLabelKey(request.label));
+    });
+  }else if(request.kind === "forGroup"){
+    affected = resources.filter(resource =>
+      normalizeTaxonomyLabels(resource && resource.forGroups)
+        .some(group => deletionLabelKey(group) === deletionLabelKey(request.label))
+    );
+  }
+  return {
+    targetName,
+    affectedResources:affected
+      .slice()
+      .sort((a,b) => String(a && a.name || "").localeCompare(String(b && b.name || ""), undefined, { sensitivity:"base" }))
+  };
+}
+
+function getDeletionKindLabel(kind){
+  return ({ resource:"Resource", category:"Category", type:"Type", forGroup:"For group" })[kind] || "Item";
+}
+
+function savePreMergeSnapshot(fileName){
+  try{
+    localStorage.setItem(PRE_MERGE_STORAGE_KEY, JSON.stringify({
+      dataSnapshot:cloneDataObject(data),
+      fileName:String(fileName || "resource package"),
+      savedAt:nowISO()
+    }));
+    return true;
+  }catch(_err){
+    alert("The merge cannot begin because the pre-merge restore point could not be saved. Free browser storage and try again.");
+    return false;
+  }
+}
+
+function getPreMergeSnapshot(){
+  try{
+    const parsed = JSON.parse(localStorage.getItem(PRE_MERGE_STORAGE_KEY) || "null");
+    return parsed && parsed.dataSnapshot && typeof parsed.dataSnapshot === "object" ? parsed : null;
+  }catch(_err){
+    return null;
+  }
+}
+
+function restorePreMergeState(){
+  const snapshot = getPreMergeSnapshot();
+  if(!snapshot) return;
+  if(!confirm(`Return to the state before merging ${snapshot.fileName}?\n\nEdits made after that merge will also be discarded.`)) return;
+  data = normalizePackageData(cloneDataObject(snapshot.dataSnapshot));
+  localStorage.removeItem(PRE_MERGE_STORAGE_KEY);
+  localStorage.removeItem(DELETION_REVIEW_STORAGE_KEY);
+  clearUndoSnapshot();
+  sanitizePrintSelection();
+  persist();
+  closeDeletionReview();
+  showToast("Returned to the pre-merge state.");
+  safeRender();
+}
+
+function saveDeletionReview(fileName, packageVersion, incomingRequests){
+  const requests = mergeDeletionRecords([], incomingRequests, "requestedAt");
+  if(!requests.length){
+    localStorage.removeItem(DELETION_REVIEW_STORAGE_KEY);
+    return null;
+  }
+  const review = {
+    fileName:String(fileName || "resource package"),
+    packageVersion:normalizePackageVersionValue(packageVersion),
+    mergedAt:nowISO(),
+    requests
+  };
+  localStorage.setItem(DELETION_REVIEW_STORAGE_KEY, JSON.stringify(review));
+  return review;
+}
+
+function getDeletionReview(){
+  try{
+    const parsed = JSON.parse(localStorage.getItem(DELETION_REVIEW_STORAGE_KEY) || "null");
+    if(!parsed || typeof parsed !== "object") return null;
+    parsed.requests = mergeDeletionRecords([], parsed.requests, "requestedAt");
+    return parsed;
+  }catch(_err){
+    return null;
+  }
+}
+
+function getOutstandingDeletionReview(){
+  const review = getDeletionReview();
+  if(!review) return null;
+  const pendingKeys = new Set((Array.isArray(data.deletionRequests) ? data.deletionRequests : []).map(item => item.key));
+  review.requests = review.requests.filter(request => pendingKeys.has(request.key));
+  return review.requests.length ? review : null;
+}
+
+function closeDeletionReview(){
+  const modal = document.getElementById("deletionReviewModal");
+  if(modal) modal.remove();
+}
+
+function deletionImpactHTML(request){
+  const impact = getDeletionImpact(request);
+  const names = impact.affectedResources.map(resource => resource.name || "(Unnamed resource)");
+  const consequence = request.kind === "resource"
+    ? "The resource itself will be removed."
+    : names.length
+      ? `Affects ${names.length} ${names.length === 1 ? "resource" : "resources"}: ${names.join(", ")}`
+      : "No resources are currently affected.";
+  return `
+    <div class="deletion-review-target"><strong>${escapeHTML(getDeletionKindLabel(request.kind))}:</strong> ${escapeHTML(impact.targetName)}</div>
+    <div class="admin-note">${escapeHTML(consequence)}</div>
+    ${request.description ? `<div class="admin-note"><strong>Submitted note:</strong> ${escapeHTML(request.description)}</div>` : ""}
+  `;
+}
+
+function showDeletionReview(){
+  closeDeletionReview();
+  const review = getOutstandingDeletionReview();
+  if(!review){
+    showToast("There are no tagged deletions to review.");
+    safeRenderAdmin();
+    return;
+  }
+  const modal = document.createElement("div");
+  modal.id = "deletionReviewModal";
+  modal.className = "reference-modal";
+  modal.innerHTML = `
+    <div class="reference-modal-panel deletion-review-panel" role="dialog" aria-modal="true" aria-labelledby="deletionReviewTitle">
+      <div class="reference-modal-header">
+        <div>
+          <div id="deletionReviewTitle" class="reference-modal-title">Review tagged deletions</div>
+          <div class="reference-modal-subtitle">${escapeHTML(review.fileName)} · Resource Package ${escapeHTML(String(review.packageVersion))}</div>
+        </div>
+        <button class="button" type="button" id="deletionReviewCloseBtn">Close</button>
+      </div>
+      <div class="reference-modal-body">
+        <p>Review the consequences, then approve the deletions you want applied. Unchecked items will be kept.</p>
+        <div class="deletion-review-list">
+          ${review.requests.map(request => `
+            <label class="deletion-review-item">
+              <input type="checkbox" class="deletion-review-checkbox" data-deletion-key="${escapeHTML(request.key)}" checked>
+              <span>${deletionImpactHTML(request)}</span>
+            </label>
+          `).join("")}
+        </div>
+        <div class="admin-action-row deletion-review-actions">
+          <button class="button" type="button" id="deletionReviewPrintBtn">Print proposed deletions</button>
+          <span class="spacer"></span>
+          <button class="button primary" type="button" id="deletionReviewApproveBtn">Approve selected deletions</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  document.getElementById("deletionReviewCloseBtn").onclick = closeDeletionReview;
+  document.getElementById("deletionReviewPrintBtn").onclick = printProposedDeletions;
+  document.getElementById("deletionReviewApproveBtn").onclick = approveSelectedDeletions;
+  modal.addEventListener("click", event => {
+    if(event.target === modal) closeDeletionReview();
+  });
+}
+
+function approveSelectedDeletions(){
+  const review = getOutstandingDeletionReview();
+  if(!review) return;
+  const selectedKeys = new Set(Array.from(document.querySelectorAll(".deletion-review-checkbox:checked"))
+    .map(input => input.dataset.deletionKey));
+  const approved = review.requests.filter(request => selectedKeys.has(request.key));
+  const reviewedKeys = new Set(review.requests.map(request => request.key));
+  setUndoSnapshot(approved.length === 1 ? "approved deletion" : "approved deletions");
+  data.deletionRequests = (Array.isArray(data.deletionRequests) ? data.deletionRequests : [])
+    .filter(request => !reviewedKeys.has(request.key));
+  const approvedAt = nowISO();
+  const tombstones = approved.map(request => normalizeDeletionRecord({
+    ...request,
+    deletedAt:approvedAt
+  }, "deletedAt")).filter(Boolean);
+  data.deletions = mergeDeletionRecords(data.deletions, tombstones, "deletedAt");
+  tombstones.forEach(tombstone => {
+    const impact = getDeletionImpact(tombstone);
+    if(tombstone.kind === "resource"){
+      addChangeEntry(createChangeEntry("resource", "removed", tombstone.targetId, impact.targetName, "Approved tagged deletion."));
+    }else if(tombstone.kind === "category"){
+      addChangeEntry(createChangeEntry("category", "removed", tombstone.targetId, impact.targetName, "Approved tagged deletion."));
+    }
+  });
+  applyDeletionTombstones(data, tombstones);
+  normalizeDeletionWorkflowData(data);
+  sanitizePrintSelection();
+  persist();
+  closeDeletionReview();
+  showToast(approved.length
+    ? `${approved.length} ${approved.length === 1 ? "deletion" : "deletions"} approved.`
+    : "All proposed deletions were kept.");
+  safeRender();
+}
+
+function printProposedDeletions(){
+  const review = getOutstandingDeletionReview();
+  if(!review) return;
+  PrintWorkflow.queue = [];
+  PrintWorkflow.currentIndex = -1;
+  PrintWorkflow.openPreviewContent(container => {
+    const heading = document.createElement("section");
+    heading.className = "deletion-report";
+    heading.innerHTML = `
+      <h1>Proposed Deletions</h1>
+      <p><strong>Submitted package:</strong> ${escapeHTML(review.fileName)}</p>
+      <p><strong>Resource Package:</strong> ${escapeHTML(String(review.packageVersion))}</p>
+      <p><strong>Printed:</strong> ${escapeHTML(new Date().toLocaleString())}</p>
+    `;
+    review.requests.forEach((request, index) => {
+      const impact = getDeletionImpact(request);
+      const section = document.createElement("section");
+      section.className = "deletion-report-item";
+      const affectedNames = impact.affectedResources.map(resource => resource.name || "(Unnamed resource)");
+      section.innerHTML = `
+        <h2>${index + 1}. ${escapeHTML(getDeletionKindLabel(request.kind))}: ${escapeHTML(impact.targetName)}</h2>
+        <p><strong>Affected resources:</strong> ${affectedNames.length ? escapeHTML(affectedNames.join(", ")) : "None"}</p>
+        ${request.description ? `<p><strong>Submitted note:</strong> ${escapeHTML(request.description)}</p>` : ""}
+        <p class="deletion-report-decision">☐ Approve &nbsp;&nbsp;&nbsp; ☐ Keep</p>
+        <p class="deletion-report-notes"><strong>Notes:</strong></p>
+      `;
+      heading.appendChild(section);
+    });
+    container.appendChild(heading);
+  });
 }
 
 // Source: src/js/100-admin-editors.js
@@ -5627,9 +6129,21 @@ function applyCategoryDraft(idx, draft){
   // Apply validated category draft into canonical data model.
   const cat = data.categories[idx];
   if(!cat) return;
+  const previousFilters = normalizeCategoryFilters(cat.filters);
+  const nextFilters = normalizeCategoryFilters(draft.filters);
+  const nextKeys = new Set(nextFilters.map(deletionLabelKey));
+  const removedFilters = previousFilters.filter(filter => !nextKeys.has(deletionLabelKey(filter)));
+  if(removedFilters.length){
+    setUndoSnapshot(removedFilters.length === 1 ? "Type deletion tag" : "Type deletion tags");
+    const requests = removedFilters.map(filter => createDeletionRequest("type", {
+      categoryId:cat.id,
+      label:filter
+    }));
+    data.deletionRequests = mergeDeletionRecords(data.deletionRequests, requests, "requestedAt");
+  }
   cat.id = cat.id || draft.id || generateResourceId();
   cat.label = draft.label || cat.label;
-  cat.filters = normalizeCategoryFilters(draft.filters);
+  cat.filters = normalizeCategoryFilters([...nextFilters, ...removedFilters]);
   cat.lastModified = nowISO();
 }
 
@@ -5968,7 +6482,10 @@ function populateCategoryBrowseOptions(sel, pairs){
     btn.tabIndex = -1;
     btn.dataset.categoryIndex = String(i);
     btn.dataset.categoryId = String(c.id || "");
-    btn.textContent = String(c && c.label || "").trim() || "(Unnamed category)";
+    const label = String(c && c.label || "").trim() || "(Unnamed category)";
+    btn.textContent = hasDeletionRequest("category", { targetId:c.id })
+      ? `${label} — tagged for deletion`
+      : label;
     sel.appendChild(btn);
   });
 }
@@ -6075,7 +6592,7 @@ function promptCategoryDeleteDescription(cat, onSubmit){
     <div class="reference-modal-panel" role="dialog" aria-modal="true" aria-labelledby="categoryDeletePromptTitle" aria-describedby="categoryDeletePromptSubtitle">
       <div class="reference-modal-header">
         <div>
-          <div id="categoryDeletePromptTitle" class="reference-modal-title">Delete Category</div>
+          <div id="categoryDeletePromptTitle" class="reference-modal-title">Tag Category for Deletion</div>
           <div id="categoryDeletePromptSubtitle" class="reference-modal-subtitle">${escapeHTML(cat.label || "(unnamed)")}</div>
         </div>
       </div>
@@ -6085,7 +6602,7 @@ function promptCategoryDeleteDescription(cat, onSubmit){
         </label>
         <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px;">
           <button class="button" type="button" id="categoryDeleteCancelBtn">Cancel</button>
-          <button class="button danger" type="button" id="categoryDeleteConfirmBtn">Delete</button>
+          <button class="button danger" type="button" id="categoryDeleteConfirmBtn">Tag for deletion</button>
         </div>
       </div>
     </div>
@@ -6121,26 +6638,11 @@ function completeCategoryDelete(categoryId, updateDescription){
   const idx = data.categories.findIndex(cat => String(cat && cat.id || "") === String(categoryId || ""));
   const cat = data.categories[idx];
   if(!cat) return;
-  const changeDescription = getCategoryDeleteChangeDescription(updateDescription);
-  setUndoSnapshot(`deleted category "${cat.label}"`);
-
-  // remove category from resources too
-  data.resources.forEach(r=>{
-    if(Array.isArray(r.categories)){
-      r.categories = r.categories.filter(id => id !== cat.id);
-    }
-    if(r.categoryFilters && typeof r.categoryFilters === "object"){
-      delete r.categoryFilters[cat.id];
-    }
-  });
-
-  data.categories.splice(idx,1);
-  delete selectedCategoryFilters[cat.id];
-  addChangeEntry(createChangeEntry("category", "removed", cat.id, cat.label || "(Unnamed category)", changeDescription));
-  newCategoryIds.delete(cat.id);
-  selectedCategoryIndex = "";
-  persist();
-  showChangeLog();
+  tagDeletionRequests([createDeletionRequest("category", {
+    targetId:cat.id,
+    label:cat.label || "(Unnamed category)",
+    description:updateDescription
+  })], `tagged category "${cat.label}" for deletion`);
 }
 
 function deleteCategory(){
@@ -6238,11 +6740,19 @@ function editCategory(idx){
   if(deleteFilterBtn){
     deleteFilterBtn.addEventListener("click", () => {
       const selected = Array.from(document.querySelectorAll(".catFilterSelect:checked"));
-      selected.forEach(checkbox => {
-        const row = checkbox.closest(".category-filter-row");
-        if(row) row.remove();
-      });
-      if(selected.length) validateCategoryEditorState();
+      if(!selected.length) return;
+      const category = data.categories[editing && editing.kind === "category" ? editing.idx : -1];
+      if(!category) return;
+      const labels = selected
+        .map(checkbox => checkbox.closest(".category-filter-row"))
+        .map(row => row && row.querySelector(".catFilterInput") ? row.querySelector(".catFilterInput").value.trim() : "")
+        .filter(Boolean);
+      if(!labels.length) return;
+      if(!confirm(`Tag ${labels.length === 1 ? `the Type '${labels[0]}'` : `${labels.length} Types`} for deletion?\n\nResources will remain unchanged until an admin reviews and approves the deletion after a package merge.`)) return;
+      tagDeletionRequests(labels.map(label => createDeletionRequest("type", {
+        categoryId:category.id,
+        label
+      })), labels.length === 1 ? `tagged Type "${labels[0]}" for deletion` : "tagged Types for deletion");
     });
   }
   validateCategoryEditorState();
@@ -6257,6 +6767,13 @@ function addCategoryFilterRow(value){
     <input type="checkbox" class="catFilterSelect" aria-label="Select filter">
     <input type="text" class="catFilterInput" value="${escapeHTML(value || "")}" aria-label="Category filter">
   `;
+  const category = editing && editing.kind === "category" ? data.categories[editing.idx] : null;
+  if(category && value && hasDeletionRequest("type", { categoryId:category.id, label:value })){
+    const status = document.createElement("span");
+    status.className = "deletion-tag-status";
+    status.textContent = "tagged for deletion";
+    row.appendChild(status);
+  }
   const input = row.querySelector(".catFilterInput");
   if(input){
     input.addEventListener("input", () => {
@@ -6382,7 +6899,10 @@ function populateResourceBrowseOptions(sel, preferredResourceId){
     const verifiedLabel = isValidMMYY(r.verifiedOn)
       ? `${r.name || ""} \u2014 ${formatVerifiedOnForDisplay(r.verifiedOn)}`
       : (r.name || "");
-    btn.textContent = adminShowVerifiedDates ? verifiedLabel : (r.name || "");
+    const baseLabel = adminShowVerifiedDates ? verifiedLabel : (r.name || "");
+    btn.textContent = hasDeletionRequest("resource", { targetId:r.id })
+      ? `${baseLabel} — tagged for deletion`
+      : baseLabel;
     sel.appendChild(btn);
   });
 
@@ -6501,8 +7021,6 @@ function deleteResource(){
   if(!commitPendingEditsIfChanged()) return;
   if(!selectedResourceId) return;
 
-  const sortedIds = getAdminResourceBrowseList().map(r => String(r.id || ""));
-  const selectedPos = sortedIds.indexOf(selectedResourceId);
   const idx = getResourceIndexById(selectedResourceId);
   const res = data.resources[idx];
   if(!res) return;
@@ -6511,22 +7029,11 @@ function deleteResource(){
   if(!confirmDelete) return;
   const updateDescription = prompt("Describe this update (optional):", "");
   if(updateDescription === null) return;
-  setUndoSnapshot(`deleted resource "${res.name}"`);
-
-  data.resources.splice(idx,1);
-  addChangeEntry(createChangeEntry("resource", "removed", res.id, res.name || "(Unnamed resource)", updateDescription, { categoryIds:res.categories }));
-  newResourceIds.delete(res.id);
-  const remainingIds = getAdminResourceBrowseList().map(r => String(r.id || ""));
-  if(!remainingIds.length){
-    selectedResourceId = "";
-    adminResourceEditMode = false;
-  }else{
-    const nextPos = Math.min(Math.max(selectedPos, 0), remainingIds.length - 1);
-    selectedResourceId = remainingIds[nextPos];
-  }
-
-  persist();
-  safeRenderAdmin();
+  tagDeletionRequests([createDeletionRequest("resource", {
+    targetId:res.id,
+    label:res.name || "(Unnamed resource)",
+    description:updateDescription
+  })], `tagged resource "${res.name}" for deletion`);
 }
 
 function openResourceEditor(){
@@ -6999,27 +7506,13 @@ function applyForGroupsDraft(draft){
   const nextGroups = normalizeTaxonomyLabels(draft && draft.forGroups);
   const nextKeys = new Set(nextGroups.map(group => group.toLowerCase()));
   const removedGroups = previousGroups.filter(group => !nextKeys.has(group.toLowerCase()));
-  const removedKeys = new Set(removedGroups.map(group => group.toLowerCase()));
-
-  data.forGroups = nextGroups;
-  if(removedKeys.size){
-    const modifiedAt = nowISO();
-    (Array.isArray(data.resources) ? data.resources : []).forEach(resource => {
-      const current = normalizeTaxonomyLabels(resource && resource.forGroups);
-      const next = current.filter(group => !removedKeys.has(group.toLowerCase()));
-      if(next.length === current.length) return;
-      resource.forGroups = next;
-      resource.lastModified = modifiedAt;
-      addChangeEntry(createChangeEntry(
-        "resource",
-        "updated",
-        resource.id,
-        resource.name || "(Unnamed resource)",
-        `Removed For group${removedGroups.length === 1 ? "" : "s"}: ${removedGroups.join(", ")}.`,
-        { categoryIds:resource.categories }
-      ));
-    });
+  if(removedGroups.length){
+    setUndoSnapshot(removedGroups.length === 1 ? "For group deletion tag" : "For group deletion tags");
+    data.deletionRequests = mergeDeletionRecords(data.deletionRequests, removedGroups.map(group =>
+      createDeletionRequest("forGroup", { label:group })
+    ), "requestedAt");
   }
+  data.forGroups = normalizeTaxonomyLabels([...nextGroups, ...removedGroups]);
 }
 
 function validateForGroupsDraft(draft){
@@ -7066,6 +7559,12 @@ function addForGroupRow(value){
   row.innerHTML = `
     <input type="text" class="forGroupInput" value="${escapeHTML(value || "")}" aria-label="For group">
   `;
+  if(value && hasDeletionRequest("forGroup", { label:value })){
+    const status = document.createElement("span");
+    status.className = "deletion-tag-status";
+    status.textContent = "tagged for deletion";
+    row.appendChild(status);
+  }
   const input = row.querySelector(".forGroupInput");
   if(input){
     input.addEventListener("input", () => {
@@ -7148,10 +7647,11 @@ function renderAdminForGroups(container){
     deleteBtn.onclick = () => {
       const rows = Array.from(document.querySelectorAll(".for-group-row"));
       const row = rows[selectedForGroupIndex];
-      if(row) row.remove();
-      selectedForGroupIndex = Math.max(0, Math.min(selectedForGroupIndex, rows.length - 2));
-      selectForGroupRow(selectedForGroupIndex);
-      updateForGroupsEditorActionBar();
+      const input = row ? row.querySelector(".forGroupInput") : null;
+      const group = input ? input.value.trim() : "";
+      if(!group) return;
+      if(!confirm(`Tag the For group '${group}' for deletion?\n\nResources will remain unchanged until an admin reviews and approves the deletion after a package merge.`)) return;
+      tagDeletionRequests([createDeletionRequest("forGroup", { label:group })], `tagged For group "${group}" for deletion`);
     };
   }
   refreshForGroupDetails();

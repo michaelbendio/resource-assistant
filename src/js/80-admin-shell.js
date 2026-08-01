@@ -21,11 +21,15 @@ function renderAdmin(){
   const undo = getUndoSnapshot();
   const undoButtonLabel = undo ? `Undo ${undo.message}` : "";
   const hasChangeLog = getRecentChanges().length > 0;
+  const preMerge = getPreMergeSnapshot();
+  const deletionReview = getOutstandingDeletionReview();
 
   container.innerHTML = `
     <div class="admin-sticky-bar">
       <div class="admin-sticky-package-actions">
         <button class="button primary" onclick="exportPackage()">Save Resource Package</button>
+        ${deletionReview ? `<button class="button" onclick="showDeletionReview()">Review tagged deletions</button>` : ""}
+        ${preMerge ? `<button class="button" onclick="restorePreMergeState()">Return to before merge</button>` : ""}
         ${hasChangeLog ? `
           <button class="button" onclick="showChangeLog()">Show change log</button>
           <button class="button" onclick="clearChangeLog()">Clear change log</button>

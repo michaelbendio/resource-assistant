@@ -24,6 +24,7 @@ APP_JS_SOURCES = [
     "src/js/70-print.js",
     "src/js/80-admin-shell.js",
     "src/js/90-persistence-and-packages.js",
+    "src/js/95-deletion-workflow.js",
     "src/js/100-admin-editors.js",
     "src/js/110-shortcuts.js",
     "src/js/120-startup.js",

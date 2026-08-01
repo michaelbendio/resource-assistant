@@ -1,9 +1,9 @@
 // ============================================================
 // UNDO SYSTEM
 // ============================================================
-// Undo is intentionally narrow: destructive admin deletes save one complete data
-// snapshot in localStorage. Restoring that snapshot is simpler and safer than
-// trying to reverse individual category, resource, or For-group mutations.
+// Undo is intentionally narrow: deletion tagging and approval save one complete
+// data snapshot in localStorage. Restoring that snapshot is simpler and safer
+// than trying to reverse individual taxonomy and resource mutations.
 
 function getUndoSnapshot(){
   try{
@@ -32,14 +32,9 @@ function setUndoSnapshot(message){
 function undoLastDeletion(){
   const snapshot = getUndoSnapshot();
   if(!snapshot || !snapshot.dataSnapshot) return;
-      data = snapshot.dataSnapshot;
-      normalizeDataInformationShape(data);
-      normalizeDataPDFShape(data);
-      normalizeLegacyPackageShape(data);
-      normalizeLegacyTagsShape(data);
-      normalizeDataVerifiedOnShape(data);
-      normalizeChanges(data);
+  data = normalizePackageData(snapshot.dataSnapshot);
   clearUndoSnapshot();
+  sanitizePrintSelection();
   persist();
   safeRender();
 }
