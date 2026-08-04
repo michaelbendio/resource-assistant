@@ -29,8 +29,9 @@ python3 publish-tso-release
 ```
 
 This is the mandatory final release step. It builds production and debug outputs,
-runs the Python test suite, generates the Provo and Albuquerque files, and copies
-these two office files to `iCloud Drive/Documents/TSO`:
+runs the Python and headless-browser test suites, generates the Provo and
+Albuquerque files, and copies these two office files to
+`iCloud Drive/Documents/TSO`:
 
 ```text
 provo.html
@@ -60,6 +61,15 @@ build/tso-resources-debug.html
 ```
 
 Open the debug HTML file and press `Ctrl+Shift+T` to run the tests.
+
+Run the same tests automatically in an installed Edge, Chrome, or Chromium browser:
+
+```sh
+python3 run-browser-self-tests
+```
+
+Set `TSO_BROWSER` to the browser executable path if automatic discovery does not
+find the intended browser.
 
 ## Local TSO Resources file
 

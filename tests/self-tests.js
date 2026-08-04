@@ -10,6 +10,16 @@
 function runSelfTests(){
   const tests = [];
 
+  function withSelfTestHtmlFileName(fileName, callback){
+    const previousGetCurrentHtmlFileName = getCurrentHtmlFileName;
+    try{
+      getCurrentHtmlFileName = () => fileName;
+      return callback();
+    }finally{
+      getCurrentHtmlFileName = previousGetCurrentHtmlFileName;
+    }
+  }
+
   tests.push({
     name: "CHANGE LOG NORMALIZATION",
     fn: () => {
@@ -251,7 +261,7 @@ function runSelfTests(){
 
   tests.push({
     name: "ADMIN HAS TWO STICKY CONTROL BARS",
-    fn: () => {
+    fn: () => withSelfTestHtmlFileName("new.html", () => {
       const previousData = data;
       const previousView = view;
       const previousAdminTab = adminTab;
@@ -279,7 +289,7 @@ function runSelfTests(){
         adminTab = previousAdminTab;
         renderAdmin();
       }
-    }
+    })
   });
 
   tests.push({
@@ -367,8 +377,16 @@ function runSelfTests(){
         if(!appChangesList || appChangeItems.length !== Math.min(APP_CHANGE_LOG.length, 5)){
           throw new Error("app change log was not rendered as a five-item bulleted list");
         }
-        if(APP_CHANGE_LOG.length && appChangeItems[0].textContent.trim() !== "7/25/26 2.2.8 — Preserve latest resource package updates"){
-          throw new Error("latest app change did not use the required date, version, and message format");
+        if(APP_CHANGE_LOG.length){
+          const latestAppChange = APP_CHANGE_LOG[0];
+          const dateParts = String(latestAppChange.date || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+          const displayDate = dateParts
+            ? `${Number(dateParts[2])}/${Number(dateParts[3])}/${dateParts[1].slice(-2)}`
+            : String(latestAppChange.date || "");
+          const expectedText = `${displayDate} ${latestAppChange.version} — ${latestAppChange.message}`;
+          if(appChangeItems[0].textContent.trim() !== expectedText){
+            throw new Error("latest app change did not use the required date, version, and message format");
+          }
         }
         if(!/Resource data last modified:/.test(appView.textContent || "")){
           throw new Error("resource data modified label was missing");
@@ -1509,6 +1527,7 @@ function runSelfTests(){
       const previousSelectedCategoryIndex = selectedCategoryIndex;
       const previousEditing = editing;
       const previousEditorSnapshot = editorSnapshot;
+      const previousConfirm = window.confirm;
       try{
         data = {
           categories:[
@@ -1530,12 +1549,17 @@ function runSelfTests(){
         selectors[1].checked = true;
         const deleteBtn = document.getElementById("cat_filter_delete_btn");
         if(!deleteBtn) throw new Error("delete filter button was not rendered");
+        window.confirm = () => true;
         deleteBtn.click();
-        const remaining = Array.from(document.querySelectorAll(".catFilterInput")).map(input => input.value);
-        if(remaining.length !== 1 || remaining[0] !== "SNAP"){
-          throw new Error("checked category filters were not deleted");
+        const taggedKeys = new Set((data.deletionRequests || []).map(request => request.key));
+        if(!taggedKeys.has("type:food:food pantries") || !taggedKeys.has("type:food:meals")){
+          throw new Error("checked category filters were not tagged for deletion");
+        }
+        if(JSON.stringify(data.categories[0].filters) !== JSON.stringify(["Food Pantries", "Meals", "SNAP"])){
+          throw new Error("tagging category filters should keep them active until merge review");
         }
       }finally{
+        window.confirm = previousConfirm;
         data = previousData;
         adminTab = previousAdminTab;
         selectedCategoryIndex = previousSelectedCategoryIndex;
@@ -1778,7 +1802,7 @@ function runSelfTests(){
 
   tests.push({
     name: "NEW ADMIN TIP IS PROMINENT",
-    fn: () => {
+    fn: () => withSelfTestHtmlFileName("new.html", () => {
       const previousData = data;
       const previousView = view;
       const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
@@ -1810,7 +1834,7 @@ function runSelfTests(){
         if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
         else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoName);
       }
-    }
+    })
   });
 
   tests.push({
@@ -1858,7 +1882,7 @@ function runSelfTests(){
 
   tests.push({
     name: "NEW TEMPLATE SHOWS NEW ADMIN WELCOME TIP",
-    fn: () => {
+    fn: () => withSelfTestHtmlFileName("new.html", () => {
       const previousData = data;
       const previousView = view;
       const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
@@ -1886,12 +1910,12 @@ function runSelfTests(){
         if(previousTsoName === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
         else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoName);
       }
-    }
+    })
   });
 
   tests.push({
     name: "NEW ADMIN SETUP BUTTON POINTS TO TSO NAME",
-    fn: () => {
+    fn: () => withSelfTestHtmlFileName("new.html", () => {
       const previousData = data;
       const previousView = view;
       const previousAdminVisible = isAdminVisible;
@@ -1930,7 +1954,7 @@ function runSelfTests(){
         if(previousPendingTraining === null) localStorage.removeItem(NEW_ADMIN_TRAINING_PENDING_KEY);
         else localStorage.setItem(NEW_ADMIN_TRAINING_PENDING_KEY, previousPendingTraining);
       }
-    }
+    })
   });
 
   tests.push({
@@ -2038,7 +2062,7 @@ function runSelfTests(){
 
   tests.push({
     name: "ADMIN SETUP SAVES TSO NAME",
-    fn: () => {
+    fn: () => withSelfTestHtmlFileName("new.html", () => {
       const previousData = data;
       const previousView = view;
       const previousAdminTab = adminTab;
@@ -2084,7 +2108,7 @@ function runSelfTests(){
         if(previousPendingTraining === null) localStorage.removeItem(NEW_ADMIN_TRAINING_PENDING_KEY);
         else localStorage.setItem(NEW_ADMIN_TRAINING_PENDING_KEY, previousPendingTraining);
       }
-    }
+    })
   });
 
   tests.push({
@@ -2960,6 +2984,7 @@ function runSelfTests(){
       const previousEditing = editing;
       const previousEditorSnapshot = editorSnapshot;
       const previousStoredData = localStorage.getItem(DATA_STORAGE_KEY);
+      const previousConfirm = window.confirm;
       try{
         data = {
           categories:[],
@@ -3009,12 +3034,20 @@ function runSelfTests(){
         const row = womenInput.closest(".for-group-row");
         row.click();
         if(!row.classList.contains("selected")) throw new Error("clicking a For group row should select it");
+        window.confirm = () => true;
         deleteBtn.click();
-        doneBtn = document.getElementById("forGroupDoneBtn");
-        if(!doneBtn) throw new Error("For editor Done should show after Delete");
-        doneBtn.click();
-        if(data.forGroups.includes("Women")) throw new Error("Delete plus Done did not remove For group");
+        if(!data.forGroups.includes("Women")) throw new Error("tagging a For group should keep it active until merge review");
+        if(!(data.deletionRequests || []).some(request => request.key === "forGroup:women")){
+          throw new Error("selected For group was not tagged for deletion");
+        }
+        renderAdmin();
+        const taggedWomenInput = Array.from(document.querySelectorAll(".forGroupInput")).find(input => input.value === "Women");
+        const status = taggedWomenInput && taggedWomenInput.closest(".for-group-row").querySelector(".deletion-tag-status");
+        if(!status || status.textContent.trim() !== "tagged for deletion"){
+          throw new Error("tagged For group status was not rendered");
+        }
       }finally{
+        window.confirm = previousConfirm;
         data = previousData;
         adminTab = previousAdminTab;
         editing = previousEditing;
@@ -3128,8 +3161,8 @@ function runSelfTests(){
             { id:"health", label:"Health Care" }
           ],
           resources:[
-            { id:"bio", name:"BioLife Plasma", categories:["employment","employment","health"], informationText:"" },
-            { id:"talecris", name:"Talecris Plasma", categories:["employment"], informationText:"" }
+            { id:"bio", name:"BioLife Plasma", categories:["employment","employment","health"], phone:"555-0100", informationText:"" },
+            { id:"talecris", name:"Talecris Plasma", categories:["employment"], phone:"555-0101", informationText:"" }
           ]
         };
         const results = buildSearchResults("plasma");

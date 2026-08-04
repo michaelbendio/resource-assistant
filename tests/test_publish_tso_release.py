@@ -6,10 +6,12 @@ import importlib.machinery
 import importlib.util
 import io
 import json
+import sys
 import tempfile
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -32,6 +34,12 @@ def sample_html(version: str, storage_id: str, title: str) -> str:
 
 
 class PublishTsoReleaseTests(unittest.TestCase):
+    def test_build_and_test_runs_browser_self_tests(self) -> None:
+        with patch.object(publish_tso_release, "run") as run:
+            publish_tso_release.build_and_test()
+        commands = [call.args[0] for call in run.call_args_list]
+        self.assertIn([sys.executable, "run-browser-self-tests"], commands)
+
     def test_verify_html_accepts_expected_release_metadata(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "provo.html"

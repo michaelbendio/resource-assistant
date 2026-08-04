@@ -19,7 +19,15 @@ python3 build-tso-resources --with-tests
 ```
 
 The debug output is written to `build/tso-resources-debug.html`. Open it and press
-`Ctrl+Shift+T` to run the browser tests. Check generated files without rewriting:
+`Ctrl+Shift+T` to run the browser tests, or execute them automatically in an
+installed Edge, Chrome, or Chromium browser:
+
+```sh
+python3 run-browser-self-tests
+```
+
+Set `TSO_BROWSER` to a browser executable path when automatic discovery is not
+appropriate. Check generated files without rewriting:
 
 ```sh
 python3 build-tso-resources --check
@@ -39,12 +47,12 @@ production files with one command:
 python3 publish-tso-release
 ```
 
-The command builds and tests the app, generates the Provo and Albuquerque files,
-copies `provo.html` and `albuquerque.html` to `iCloud Drive/Documents/TSO`, and
-verifies the copied bytes, version, storage IDs, and titles. The generated
-`new.html` remains a local build artifact and is not copied to iCloud Drive. The
-command exits with an error if the release commit is not pushed, iCloud is
-unavailable, or any verification fails.
+The command builds the app, runs the Python and browser test suites, generates
+the Provo and Albuquerque files, copies `provo.html` and `albuquerque.html` to
+`iCloud Drive/Documents/TSO`, and verifies the copied bytes, version, storage
+IDs, and titles. The generated `new.html` remains a local build artifact and is
+not copied to iCloud Drive. The command exits with an error if the release
+commit is not pushed, iCloud is unavailable, or any verification fails.
 
 ## Make a local TSO Resources file
 

@@ -1,8 +1,13 @@
 {
   "version": "2.2.10",
   "date": "2026-08-04",
-  "message": "Remove obsolete Albuquerque resource JSON",
+  "message": "Preserve legacy For groups and enforce browser tests",
   "appChanges": [
+    {
+      "date": "2026-08-04",
+      "version": "2.2.10",
+      "message": "Preserve legacy For groups during package merges"
+    },
     {
       "date": "2026-08-04",
       "version": "2.2.10",

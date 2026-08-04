@@ -970,6 +970,11 @@ textarea.information-editor { min-height:320px; resize:vertical; }
     {
       "date": "2026-08-04",
       "version": "2.2.10",
+      "message": "Preserve legacy For groups during package merges"
+    },
+    {
+      "date": "2026-08-04",
+      "version": "2.2.10",
       "message": "Configure SharePoint publishing per office"
     },
     {
@@ -986,11 +991,6 @@ textarea.information-editor { min-height:320px; resize:vertical; }
       "date": "2026-07-25",
       "version": "2.2.8",
       "message": "Preserve latest resource package updates"
-    },
-    {
-      "date": "2026-07-24",
-      "version": "2.2.7",
-      "message": "Remove post-merge resource package deletion message"
     }
   ]
 }
@@ -4479,8 +4479,8 @@ function normalizePackageData(nextData){
   normalizeLegacyPackageShape(nextData);
   normalizeLegacyTagsShape(nextData);
   normalizeDeletionWorkflowData(nextData);
-  applyDeletionTombstones(nextData);
   normalizeDataForGroupsShape(nextData);
+  applyDeletionTombstones(nextData);
   normalizeDataCategoryFilterShape(nextData);
   normalizeCategoryMigrations(nextData);
   normalizeDataVerifiedOnShape(nextData);

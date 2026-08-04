@@ -23,6 +23,7 @@ RELEASE_PATHS = (
     "build-tso-resources",
     "make-local-tso",
     "publish-tso-release",
+    "run-browser-self-tests",
     "new.html",
     "src",
     "tests",
@@ -148,6 +149,7 @@ def build_and_test() -> None:
             "test_*.py",
         ]
     )
+    run([sys.executable, "run-browser-self-tests"])
 
 
 def generate_office_files() -> None:

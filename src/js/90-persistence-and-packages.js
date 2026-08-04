@@ -569,8 +569,8 @@ function normalizePackageData(nextData){
   normalizeLegacyPackageShape(nextData);
   normalizeLegacyTagsShape(nextData);
   normalizeDeletionWorkflowData(nextData);
-  applyDeletionTombstones(nextData);
   normalizeDataForGroupsShape(nextData);
+  applyDeletionTombstones(nextData);
   normalizeDataCategoryFilterShape(nextData);
   normalizeCategoryMigrations(nextData);
   normalizeDataVerifiedOnShape(nextData);
