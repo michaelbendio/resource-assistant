@@ -15,6 +15,12 @@ window.addEventListener("afterprint", () => {
 // used by public views, but writes through commitPendingEditsIfChanged() so
 // navigation does not silently discard form edits.
 
+function getSharePointPublishingButtonHTML(available = isSharePointPublishingAvailable()){
+  return available
+    ? `<button class="button" onclick="startSharePointPublishing()">Publish to SharePoint</button>`
+    : "";
+}
+
 function renderAdmin(){
   // Admin shell plus tab routing; detailed panels render in dedicated helpers below.
   const container = document.getElementById("adminView");
@@ -41,6 +47,7 @@ function renderAdmin(){
       </div>
       <div class="admin-toolbar-reference-actions admin-sticky-reference-actions">
         ${shouldShowChangeTsoNameButton() ? `<button class="button" onclick="showAdminSetup()">Change TSO Name</button>` : ""}
+        ${getSharePointPublishingButtonHTML()}
         <button class="button admin-toolbar-help" onclick="showAdminHelp()">Admin Help</button>
       </div>
     </div>

@@ -790,19 +790,15 @@ async function saveResourcePackageBlob(target, blob){
   downloadResourcePackageBlob(fileName, blob);
 }
 
-async function exportPackage(){
-  // Exports package ZIP: tso-resources.json + any referenced PDF blobs.
-  if(!commitPendingEditsIfChanged()) return;
-
+async function saveCurrentResourcePackage(target, options = {}){
+  const showSuccessToast = options.showSuccessToast !== false;
   if(typeof JSZip === "undefined"){
-    alert("ZIP support is unavailable. Reload the app and try again.");
-    return;
+    throw new Error("ZIP support is unavailable. Reload the app and try again.");
   }
 
   let previousPackageVersion;
   let packageVersionBumped = false;
   try{
-    const saveTarget = await beginResourcePackageSave();
     const zip = new JSZip();
     normalizePackageData(data);
     previousPackageVersion = data.packageVersion;
@@ -816,7 +812,7 @@ async function exportPackage(){
       if(!shouldSaveEmpty){
         data.packageVersion = previousPackageVersion;
         packageVersionBumped = false;
-        return;
+        return null;
       }
     }
     zip.file("tso-resources.json", JSON.stringify(packageData, null, 2));
@@ -834,12 +830,31 @@ async function exportPackage(){
       compression: "DEFLATE",
       compressionOptions: { level: 6 }
     });
-    await saveResourcePackageBlob(saveTarget, blob);
+    await saveResourcePackageBlob(target, blob);
     persist();
-    showToast(`Resource package saved (${resourceCount} ${resourceCount === 1 ? "resource" : "resources"})`);
+    if(showSuccessToast){
+      showToast(`Resource package saved (${resourceCount} ${resourceCount === 1 ? "resource" : "resources"})`);
+    }
+    return {
+      blob,
+      packageVersion:data.packageVersion,
+      resourceCount
+    };
+  }catch(err){
+    if(packageVersionBumped) data.packageVersion = previousPackageVersion;
+    throw err;
+  }
+}
+
+async function exportPackage(){
+  // Exports package ZIP: tso-resources.json + any referenced PDF blobs.
+  if(!commitPendingEditsIfChanged()) return;
+
+  try{
+    const saveTarget = await beginResourcePackageSave();
+    return await saveCurrentResourcePackage(saveTarget);
   }catch(err){
     if(err && err.name === "AbortError") return;
-    if(packageVersionBumped) data.packageVersion = previousPackageVersion;
     alert("Save failed: " + err.message);
   }
 }
@@ -993,7 +1008,7 @@ function validateImportData(imported){
   };
 }
 
-async function mergeImportPackage(event){
+async function mergeImportPackage(event, options = {}){
   // Imports package ZIP, validates JSON, merges data, then stores referenced PDFs.
   if(!commitPendingEditsIfChanged()){
     event.target.remove();
@@ -1031,7 +1046,13 @@ async function mergeImportPackage(event){
     }
     normalizePackageData(imported);
     const incomingDeletionRequests = cloneDataObject(imported.deletionRequests || []);
-    if(!savePreMergeSnapshot(file.name)) return;
+    const preparedChanges = options.preservePreparedChanges
+      ? cloneDataObject(Array.isArray(data && data.changes) ? data.changes : [])
+      : null;
+    const preparedPackageInfo = options.preservePreparedChanges && data && data.lastLoadedPackageInfo
+      ? cloneDataObject(data.lastLoadedPackageInfo)
+      : null;
+    if(!options.skipPreMergeSnapshot && !savePreMergeSnapshot(file.name)) return;
     const importedChangeIds = new Set((imported.changes || []).map(entry => String(entry && entry.id || "")).filter(Boolean));
     const importedPackageVersion = normalizePackageVersionValue(imported.packageVersion);
     const currentPackageInfo = (data && data.lastLoadedPackageInfo && typeof data.lastLoadedPackageInfo === "object")
@@ -1043,11 +1064,13 @@ async function mergeImportPackage(event){
       .filter(item => item.paths.length);
     const { mergedData, summary:mergeSummary } = mergeResourcePackages(data, imported);
     const mergedPendingDeletionKeys = new Set((mergedData.deletionRequests || []).map(request => request.key));
-    saveDeletionReview(
-      file.name,
-      importedPackageVersion,
-      incomingDeletionRequests.filter(request => mergedPendingDeletionKeys.has(request.key))
-    );
+    if(!options.skipDeletionReview){
+      saveDeletionReview(
+        file.name,
+        importedPackageVersion,
+        incomingDeletionRequests.filter(request => mergedPendingDeletionKeys.has(request.key))
+      );
+    }
     const mergedById = new Map((mergedData.resources || []).map(r => [String(r && r.id || ""), r]));
     const resourcesWithPdf = localResourcesWithPdf
       .filter(item => {
@@ -1073,7 +1096,9 @@ async function mergeImportPackage(event){
     const loadedChangeSummaries = loadedChanges.length
       ? loadedChanges.map(formatPackageChangeSummary)
       : buildPackageMergeSummary(mergeSummary);
-    if(shouldReplaceLatestPackageInfo(currentPackageInfo, importedPackageVersion)){
+    if(options.preservePreparedChanges){
+      data.lastLoadedPackageInfo = preparedPackageInfo;
+    }else if(shouldReplaceLatestPackageInfo(currentPackageInfo, importedPackageVersion)){
       const persistentChangeSummaries = !loadedChangeSummaries.length
         ? (imported.changes || []).map(formatPackageChangeSummary)
         : loadedChangeSummaries;
@@ -1086,9 +1111,9 @@ async function mergeImportPackage(event){
       data.lastLoadedPackageInfo = currentPackageInfo;
     }
     normalizeLastLoadedPackageInfo(data);
-    data.changes = [];
+    data.changes = options.preservePreparedChanges ? preparedChanges : [];
     persist();
-    if(loadedChangeSummaries.length){
+    if(!options.silent && loadedChangeSummaries.length){
       pendingRecentUpdates = [];
       recentUpdateDetail = null;
       showUpdateInfo = true;
@@ -1116,15 +1141,19 @@ async function mergeImportPackage(event){
         missingPdfPaths.map(path => `• ${path}`).join("\n")
       );
     }
-    if(warningBlocks.length){
+    if(warningBlocks.length && typeof options.onWarnings === "function"){
+      options.onWarnings(warningBlocks.slice());
+    }else if(warningBlocks.length){
       alert(warningBlocks.join("\n\n"));
     }
-    showToast(
-      loadedChangeSummaries.length
-        ? "Resource package merged."
-        : `No resource package updates were loaded from Resource Package ${importedPackageVersion}.`
-    );
-    if(getOutstandingDeletionReview()) setTimeout(showDeletionReview, 0);
+    if(!options.silent){
+      showToast(
+        loadedChangeSummaries.length
+          ? "Resource package merged."
+          : `No resource package updates were loaded from Resource Package ${importedPackageVersion}.`
+      );
+      if(getOutstandingDeletionReview()) setTimeout(showDeletionReview, 0);
+    }
     return true;
   }catch(e){
     alert("Load failed: " + e.message);

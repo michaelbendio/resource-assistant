@@ -434,6 +434,63 @@ function runSelfTests(){
   });
 
   tests.push({
+    name: "SHAREPOINT PUBLISHING TARGET AND DOWNLOAD DETECTION",
+    fn: () => {
+      const target = getSharePointPublishingTarget("provo");
+      if(!target) throw new Error("Provo publishing target missing");
+      if(target.packageFileName !== "provo-resource-package.zip") throw new Error("canonical package filename changed");
+      if(!target.packageViewUrl.includes("%2Fsites%2FWSR_TSO%2FProvo%20TSO%2Fprovo-resource-package.zip")){
+        throw new Error("canonical SharePoint package path missing");
+      }
+      if(getSharePointPublishingTarget("albuquerque")) throw new Error("unverified Albuquerque target should not be configured");
+      if(!isPublishingPackageFileName("provo-resource-package.zip", target.packageFileName)) throw new Error("canonical download name was rejected");
+      if(!isPublishingPackageFileName("provo-resource-package (2).zip", target.packageFileName)) throw new Error("Edge duplicate download name was rejected");
+      if(isPublishingPackageFileName("provo-resources.json", target.packageFileName)) throw new Error("non-ZIP filename was accepted");
+
+      const baseline = publishingFileSnapshot([
+        { name:"provo-resource-package.zip", lastModified:10, size:100 }
+      ]);
+      const unchanged = findNewPublishingDownload([
+        { name:"provo-resource-package.zip", lastModified:10, size:100 }
+      ], baseline);
+      if(unchanged) throw new Error("unchanged staged package looked like a new download");
+      const downloaded = findNewPublishingDownload([
+        { name:"provo-resource-package.zip", lastModified:10, size:100 },
+        { name:"provo-resource-package (1).zip", lastModified:20, size:120 }
+      ], baseline);
+      if(!downloaded || downloaded.name !== "provo-resource-package (1).zip"){
+        throw new Error("newest completed Edge download was not selected");
+      }
+    }
+  });
+
+  tests.push({
+    name: "SHAREPOINT PUBLISHING BUTTON AND PROGRESS COPY",
+    fn: () => {
+      const wrap = document.createElement("div");
+      wrap.innerHTML = `${getSharePointPublishingButtonHTML(true)}<button>Admin Help</button>`;
+      const labels = Array.from(wrap.querySelectorAll("button")).map(button => button.textContent.trim());
+      if(labels.join("|") !== "Publish to SharePoint|Admin Help"){
+        throw new Error("Publish to SharePoint was not immediately left of Admin Help");
+      }
+      if(getSharePointPublishingButtonHTML(false) !== "") throw new Error("unconfigured office showed publishing button");
+
+      const target = getSharePointPublishingTarget("provo");
+      const run = { target, state:"waiting", directoryName:"Downloads", warnings:[] };
+      if(!sharePointPublishingBodyHTML(run).includes("Downloading the current resource package")){
+        throw new Error("download progress copy missing");
+      }
+      run.state = "merging";
+      if(!sharePointPublishingBodyHTML(run).includes("Merging")) throw new Error("merge progress copy missing");
+      run.state = "complete";
+      run.outputFileName = target.packageFileName;
+      run.packageVersion = 8;
+      if(!sharePointPublishingBodyHTML(run).includes("Merge complete")) throw new Error("merge completion copy missing");
+      if(!sharePointPublishingBodyHTML(run).includes("Upload to SharePoint")) throw new Error("SharePoint upload prompt missing");
+    }
+  });
+
+  tests.push({
     name: "PACKAGE SAVE VERSION BUMP",
     fn: () => {
       if(getNextPackageVersionValue(undefined) !== 1) throw new Error("missing package version should start at 1");
@@ -3627,3 +3684,7 @@ window.addEventListener("keydown", (e) => {
   e.stopPropagation();
   safeCall("runSelfTests", () => runSelfTests());
 }, true);
+
+if(new URLSearchParams(location.search).get("self-tests") === "1"){
+  setTimeout(() => safeCall("runSelfTests", () => runSelfTests()), 0);
+}

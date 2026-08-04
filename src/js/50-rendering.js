@@ -593,6 +593,16 @@ function showAdminHelp(options = {}){
         </details>
 
         <details>
+          <summary>Publish to SharePoint</summary>
+          <div class="admin-help-section-body">
+            <p>The Provo office file shows <strong>Publish to SharePoint</strong> immediately to the left of <strong>Admin Help</strong>.</p>
+            <p>The first time, choose the folder where Edge saves downloads and grant read and write access. Open the current SharePoint package from the publishing panel, then click SharePoint's Download arrow.</p>
+            <p>TSO Resources detects the completed download, shows <strong>Merging</strong>, merges the canonical package with the prepared local data, reapplies approved deletions, and saves <code>provo-resource-package.zip</code>. When <strong>Merge complete</strong> appears, click <strong>Upload to SharePoint</strong>, upload that file, and choose <strong>Replace</strong>.</p>
+            <p>If Edge saves the download somewhere unexpected, use <strong>Select downloaded package</strong>. The final SharePoint replacement remains manual so SharePoint permissions authorize it.</p>
+          </div>
+        </details>
+
+        <details>
           <summary>Tagged deletions</summary>
           <div class="admin-help-section-body">
             <p>Delete actions tag resources, categories, Types, and For groups for deletion without removing them. Tagged items remain active and are labeled <strong>tagged for deletion</strong>.</p>

@@ -90,9 +90,17 @@ to discard the merge and every edit made after it.
 After a batch of edits, share the updated resources:
 
 1. Click `Show change log` and review the listed changes.
-2. Click `Save Resource Package`.
-3. Save the exported resource package ZIP file.
-4. Resource missionaries send that ZIP file to the office admin. The admin merges it into the current office package before saving the next package for publication.
+2. Resource missionaries click `Save Resource Package`, save the exported ZIP, and send it to the office admin.
+3. The office admin merges submitted packages and reviews tagged deletions.
+4. In the Provo office file, the admin clicks `Publish to SharePoint`, downloads the current canonical package when prompted, and waits for `Merge complete`.
+5. The admin clicks `Upload to SharePoint`, uploads `provo-resource-package.zip`, and chooses `Replace`.
+
+On first use, guided publishing asks the admin to authorize the folder where Edge
+saves downloads. TSO Resources watches that folder for the completed canonical
+package, merges it with the prepared local data, reapplies approved deletion
+tombstones, and saves the combined package automatically. SharePoint upload and
+replacement remain manual and are authorized by the signed-in user's SharePoint
+permissions.
 
 Delete actions tag resources, categories, Types, and For groups for deletion. The
 tagged item remains active until an admin merges the package and approves the
@@ -118,4 +126,4 @@ By default, the output uses the input filename with the other extension. Use
 ## Church-hosted direction
 
 See [`docs/church-hosting.md`](docs/church-hosting.md) for the SharePoint document-library
-workflow and the deferred publishing phase.
+and guided publishing workflow.
