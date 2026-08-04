@@ -1,7 +1,7 @@
 {
   "version": "2.2.10",
   "date": "2026-08-04",
-  "message": "Configure SharePoint publishing per office",
+  "message": "Remove obsolete Albuquerque resource JSON",
   "appChanges": [
     {
       "date": "2026-08-04",
