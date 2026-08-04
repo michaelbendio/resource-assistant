@@ -1,8 +1,13 @@
 {
   "version": "2.2.10",
   "date": "2026-08-04",
-  "message": "Add guided SharePoint publishing",
+  "message": "Configure SharePoint publishing per office",
   "appChanges": [
+    {
+      "date": "2026-08-04",
+      "version": "2.2.10",
+      "message": "Configure SharePoint publishing per office"
+    },
     {
       "date": "2026-08-04",
       "version": "2.2.10",

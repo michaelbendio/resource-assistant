@@ -29,19 +29,22 @@ merge of an older package cannot recreate those resources or taxonomy entries.
 
 ## Guided SharePoint publishing
 
-The Provo office file runs locally from the OneDrive shortcut, while SharePoint
+Each office file runs locally from its OneDrive shortcut, while SharePoint
 authentication remains in Edge. The **Publish to SharePoint** button therefore uses
 a guided local workflow instead of embedded Microsoft Graph authentication:
 
-1. On first use, the admin authorizes the folder where Edge saves downloads.
-2. The publishing panel opens the current canonical SharePoint ZIP.
-3. After the admin clicks SharePoint's Download arrow, the app detects the completed ZIP.
-4. The app displays **Merging**, merges the canonical package with prepared local data, reapplies deletion tombstones, incorporates referenced PDFs, and saves the combined canonical filename.
-5. The app displays **Merge complete** and opens the Provo SharePoint library when the admin chooses **Upload to SharePoint**.
-6. The admin uploads the saved ZIP and chooses **Replace**. After SharePoint succeeds, the admin confirms the replacement in the publishing panel.
+1. On first use on each computer, the admin selects or opens that office's canonical SharePoint ZIP, copies its complete address-bar URL, and pastes it into the publishing panel.
+2. The app accepts only an HTTPS URL on `churchofjesuschrist.sharepoint.com`, under the `WSR_TSO` site, whose selected ZIP filename matches the current office. It displays the parsed office, package, and containing folder for confirmation.
+3. The app saves that destination in office-scoped browser storage. The destination is not part of a resource package and therefore cannot be changed by package import or merge.
+4. The admin authorizes the folder where Edge saves downloads.
+5. The publishing panel opens the configured canonical SharePoint ZIP. After the admin clicks SharePoint's Download arrow, the app detects the completed ZIP.
+6. The app displays **Merging**, merges the canonical package with prepared local data, reapplies deletion tombstones, incorporates referenced PDFs, and saves the combined canonical filename.
+7. The app displays **Merge complete** and opens the configured office folder when the admin chooses **Upload to SharePoint**.
+8. The admin uploads the saved ZIP and chooses **Replace**. After SharePoint succeeds, the admin confirms the replacement in the publishing panel.
 
 The app never receives SharePoint credentials and cannot bypass SharePoint
 permissions. If Edge does not save into the authorized folder, the workflow falls
 back to a file picker. The browser cannot verify the final SharePoint upload, so the
 completion message records the administrator's confirmation rather than an API
-response.
+response. If an office moves its canonical package, the admin can use **Change
+SharePoint destination** and confirm a new selected-ZIP URL.

@@ -434,18 +434,76 @@ function runSelfTests(){
   });
 
   tests.push({
-    name: "SHAREPOINT PUBLISHING TARGET AND DOWNLOAD DETECTION",
+    name: "SHAREPOINT DESTINATION URL VALIDATION",
     fn: () => {
-      const target = getSharePointPublishingTarget("provo");
-      if(!target) throw new Error("Provo publishing target missing");
+      const provoUrl = "https://churchofjesuschrist.sharepoint.com/sites/WSR_TSO/Provo%20TSO/Forms/AllItems.aspx?id=%2Fsites%2FWSR_TSO%2FProvo%20TSO%2Fprovo-resource-package.zip&parent=%2Fsites%2FWSR_TSO%2FProvo%20TSO&share=tracking&CT=123";
+      const target = parseSharePointPublishingUrl(provoUrl, "provo-resource-package.zip", "Provo");
       if(target.packageFileName !== "provo-resource-package.zip") throw new Error("canonical package filename changed");
-      if(!target.packageViewUrl.includes("%2Fsites%2FWSR_TSO%2FProvo%20TSO%2Fprovo-resource-package.zip")){
-        throw new Error("canonical SharePoint package path missing");
+      if(target.parentPath !== "/sites/WSR_TSO/Provo TSO") throw new Error("SharePoint parent path was not parsed");
+      if(target.packageViewUrl.includes("share=") || target.packageViewUrl.includes("CT=")){
+        throw new Error("SharePoint tracking parameters were retained");
       }
-      if(getSharePointPublishingTarget("albuquerque")) throw new Error("unverified Albuquerque target should not be configured");
-      if(!isPublishingPackageFileName("provo-resource-package.zip", target.packageFileName)) throw new Error("canonical download name was rejected");
-      if(!isPublishingPackageFileName("provo-resource-package (2).zip", target.packageFileName)) throw new Error("Edge duplicate download name was rejected");
-      if(isPublishingPackageFileName("provo-resources.json", target.packageFileName)) throw new Error("non-ZIP filename was accepted");
+      if(!target.libraryUrl.includes("id=%2Fsites%2FWSR_TSO%2FProvo+TSO")){
+        throw new Error("containing SharePoint folder URL was not derived");
+      }
+
+      const mesaUrl = "https://churchofjesuschrist.sharepoint.com/sites/WSR_TSO/Mesa%20TSO/Forms/AllItems.aspx?id=%2Fsites%2FWSR_TSO%2FMesa%20TSO%2Fmesa-resource-package.zip&parent=%2Fsites%2FWSR_TSO%2FMesa%20TSO";
+      const mesaTarget = parseSharePointPublishingUrl(mesaUrl, "mesa-resource-package.zip", "Mesa");
+      if(mesaTarget.officeName !== "Mesa" || mesaTarget.packageFileName !== "mesa-resource-package.zip"){
+        throw new Error("Mesa destination was not accepted independently");
+      }
+
+      const rejected = [
+        provoUrl.replace("churchofjesuschrist.sharepoint.com", "example.com"),
+        provoUrl.replace("provo-resource-package.zip", "albuquerque-resource-package.zip"),
+        "https://churchofjesuschrist.sharepoint.com/sites/WSR_TSO/SitePages/Home.aspx"
+      ];
+      rejected.forEach(url => {
+        let failed = false;
+        try{
+          parseSharePointPublishingUrl(url, "provo-resource-package.zip", "Provo");
+        }catch(_err){
+          failed = true;
+        }
+        if(!failed) throw new Error(`unsafe SharePoint destination was accepted: ${url}`);
+      });
+    }
+  });
+
+  tests.push({
+    name: "SHAREPOINT DESTINATIONS ARE OFFICE SCOPED",
+    fn: () => {
+      const provoKey = getSharePointPublishingTargetStorageKey("provo");
+      const mesaKey = getSharePointPublishingTargetStorageKey("mesa");
+      const previousProvo = localStorage.getItem(provoKey);
+      const previousMesa = localStorage.getItem(mesaKey);
+      try{
+        localStorage.removeItem(provoKey);
+        localStorage.removeItem(mesaKey);
+        const provoTarget = parseSharePointPublishingUrl(
+          "https://churchofjesuschrist.sharepoint.com/sites/WSR_TSO/Provo%20TSO/Forms/AllItems.aspx?id=%2Fsites%2FWSR_TSO%2FProvo%20TSO%2Fprovo-resource-package.zip&parent=%2Fsites%2FWSR_TSO%2FProvo%20TSO",
+          "provo-resource-package.zip",
+          "Provo"
+        );
+        saveSharePointPublishingTarget(provoTarget, "provo");
+        if(!getSharePointPublishingTarget("provo")) throw new Error("Provo destination was not saved");
+        if(getSharePointPublishingTarget("mesa")) throw new Error("Provo destination leaked into Mesa storage");
+        if(provoKey === mesaKey) throw new Error("office destination keys were not scoped");
+      }finally{
+        if(previousProvo == null) localStorage.removeItem(provoKey);
+        else localStorage.setItem(provoKey, previousProvo);
+        if(previousMesa == null) localStorage.removeItem(mesaKey);
+        else localStorage.setItem(mesaKey, previousMesa);
+      }
+    }
+  });
+
+  tests.push({
+    name: "SHAREPOINT DOWNLOAD DETECTION",
+    fn: () => {
+      if(!isPublishingPackageFileName("provo-resource-package.zip", "provo-resource-package.zip")) throw new Error("canonical download name was rejected");
+      if(!isPublishingPackageFileName("provo-resource-package (2).zip", "provo-resource-package.zip")) throw new Error("Edge duplicate download name was rejected");
+      if(isPublishingPackageFileName("provo-resources.json", "provo-resource-package.zip")) throw new Error("non-ZIP filename was accepted");
 
       const baseline = publishingFileSnapshot([
         { name:"provo-resource-package.zip", lastModified:10, size:100 }
@@ -473,9 +531,20 @@ function runSelfTests(){
       if(labels.join("|") !== "Publish to SharePoint|Admin Help"){
         throw new Error("Publish to SharePoint was not immediately left of Admin Help");
       }
-      if(getSharePointPublishingButtonHTML(false) !== "") throw new Error("unconfigured office showed publishing button");
+      if(getSharePointPublishingButtonHTML(false) !== "") throw new Error("template showed publishing button");
+      if(!isSharePointPublishingAvailable("mesa") || isSharePointPublishingAvailable("new") || isSharePointPublishingAvailable("")){
+        throw new Error("publishing availability did not distinguish office files from the template");
+      }
 
-      const target = getSharePointPublishingTarget("provo");
+      const target = parseSharePointPublishingUrl(
+        "https://churchofjesuschrist.sharepoint.com/sites/WSR_TSO/Provo%20TSO/Forms/AllItems.aspx?id=%2Fsites%2FWSR_TSO%2FProvo%20TSO%2Fprovo-resource-package.zip&parent=%2Fsites%2FWSR_TSO%2FProvo%20TSO",
+        "provo-resource-package.zip",
+        "Provo"
+      );
+      const setupRun = { target:null, state:"destination-setup", destinationInput:"", errorMessage:"", warnings:[] };
+      if(!sharePointPublishingBodyHTML(setupRun).includes("SharePoint resource-package URL")){
+        throw new Error("first-use SharePoint destination setup was missing");
+      }
       const run = { target, state:"waiting", directoryName:"Downloads", warnings:[] };
       if(!sharePointPublishingBodyHTML(run).includes("Downloading the current resource package")){
         throw new Error("download progress copy missing");
@@ -486,6 +555,7 @@ function runSelfTests(){
       run.outputFileName = target.packageFileName;
       run.packageVersion = 8;
       if(!sharePointPublishingBodyHTML(run).includes("Merge complete")) throw new Error("merge completion copy missing");
+      if(!sharePointPublishingBodyHTML(run).includes("Provo TSO")) throw new Error("office-neutral completion copy did not use the configured office");
       if(!sharePointPublishingBodyHTML(run).includes("Upload to SharePoint")) throw new Error("SharePoint upload prompt missing");
     }
   });

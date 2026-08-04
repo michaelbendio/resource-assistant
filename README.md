@@ -92,15 +92,18 @@ After a batch of edits, share the updated resources:
 1. Click `Show change log` and review the listed changes.
 2. Resource missionaries click `Save Resource Package`, save the exported ZIP, and send it to the office admin.
 3. The office admin merges submitted packages and reviews tagged deletions.
-4. In the Provo office file, the admin clicks `Publish to SharePoint`, downloads the current canonical package when prompted, and waits for `Merge complete`.
-5. The admin clicks `Upload to SharePoint`, uploads `provo-resource-package.zip`, and chooses `Replace`.
+4. In the office-specific HTML file, the admin clicks `Publish to SharePoint`, downloads the current canonical package when prompted, and waits for `Merge complete`.
+5. The admin clicks `Upload to SharePoint`, uploads the saved canonical package, and chooses `Replace`.
 
-On first use, guided publishing asks the admin to authorize the folder where Edge
-saves downloads. TSO Resources watches that folder for the completed canonical
-package, merges it with the prepared local data, reapplies approved deletion
-tombstones, and saves the combined package automatically. SharePoint upload and
-replacement remain manual and are authorized by the signed-in user's SharePoint
-permissions.
+On first use on each computer, guided publishing asks the admin to paste the
+address-bar URL for that office's SharePoint resource-package ZIP. The app validates
+the WSR_TSO location, expected office package filename, and containing folder before
+saving the destination in office-scoped browser storage. The destination is never
+included in exported packages. The admin then authorizes the folder where Edge saves
+downloads. TSO Resources watches that folder for the completed canonical package,
+merges it with the prepared local data, reapplies approved deletion tombstones, and
+saves the combined package automatically. SharePoint upload and replacement remain
+manual and are authorized by the signed-in user's SharePoint permissions.
 
 Delete actions tag resources, categories, Types, and For groups for deletion. The
 tagged item remains active until an admin merges the package and approves the

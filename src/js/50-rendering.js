@@ -595,10 +595,12 @@ function showAdminHelp(options = {}){
         <details>
           <summary>Publish to SharePoint</summary>
           <div class="admin-help-section-body">
-            <p>The Provo office file shows <strong>Publish to SharePoint</strong> immediately to the left of <strong>Admin Help</strong>.</p>
-            <p>The first time, choose the folder where Edge saves downloads and grant read and write access. Open the current SharePoint package from the publishing panel, then click SharePoint's Download arrow.</p>
-            <p>TSO Resources detects the completed download, shows <strong>Merging</strong>, merges the canonical package with the prepared local data, reapplies approved deletions, and saves <code>provo-resource-package.zip</code>. When <strong>Merge complete</strong> appears, click <strong>Upload to SharePoint</strong>, upload that file, and choose <strong>Replace</strong>.</p>
+            <p>Every office-specific file shows <strong>Publish to SharePoint</strong> immediately to the left of <strong>Admin Help</strong>.</p>
+            <p>On each computer's first use, select or open this office's resource-package ZIP in SharePoint, copy its complete address-bar URL, and paste it into the publishing panel. Confirm the office, package, and SharePoint folder shown by TSO Resources.</p>
+            <p>Next, choose the folder where Edge saves downloads and grant read and write access. This SharePoint destination and folder authorization are stored only for this office on this computer; they are never included in a resource package.</p>
+            <p>Open the current SharePoint package from the publishing panel and click SharePoint's Download arrow. TSO Resources detects the completed download, shows <strong>Merging</strong>, merges the canonical package with the prepared local data, reapplies approved deletions, and saves the configured package filename. When <strong>Merge complete</strong> appears, click <strong>Upload to SharePoint</strong>, upload that file, and choose <strong>Replace</strong>.</p>
             <p>If Edge saves the download somewhere unexpected, use <strong>Select downloaded package</strong>. The final SharePoint replacement remains manual so SharePoint permissions authorize it.</p>
+            <p>Use <strong>Change SharePoint destination</strong> only if this office's package moves to a different SharePoint folder.</p>
           </div>
         </details>
 
