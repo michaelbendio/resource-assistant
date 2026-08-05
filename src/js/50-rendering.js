@@ -632,7 +632,7 @@ function showAdminHelp(options = {}){
           <summary>Undo</summary>
           <div class="admin-help-section-body">
             <p>Undo is available for deletion tagging and approval.</p>
-            <p>Only the most recent deletion action can be undone. Use <strong>Undo ...</strong> in Admin mode to restore the saved snapshot, or <strong>Clear undo</strong> to remove it.</p>
+            <p>Only the most recent deletion action can be undone, and Undo expires when another change is saved so newer work cannot be discarded. Use <strong>Undo ...</strong> in Admin mode to restore the saved snapshot, or <strong>Clear undo</strong> to remove it.</p>
             <p>Normal edits are not undone this way. If you make a wrong normal edit, edit the item again and describe the correction.</p>
           </div>
         </details>

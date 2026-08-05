@@ -18,6 +18,7 @@ function persist(){
   data.appVersion = APP_VERSION;
   data.lastModified = nowISO();
   localStorage.setItem(DATA_STORAGE_KEY, JSON.stringify(data));
+  updateUndoSnapshotAfterPersist();
 }
 
 function openAssetsDB(){

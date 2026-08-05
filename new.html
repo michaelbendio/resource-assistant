@@ -965,8 +965,13 @@ textarea.information-editor { min-height:320px; resize:vertical; }
 
 <script id="app-release-data" type="application/json">
 {
-  "version": "2.2.10",
+  "version": "2.2.11",
   "changes": [
+    {
+      "date": "2026-08-05",
+      "version": "2.2.11",
+      "message": "Protect newer edits when tagging or undoing deletions"
+    },
     {
       "date": "2026-08-04",
       "version": "2.2.10",
@@ -986,11 +991,6 @@ textarea.information-editor { min-height:320px; resize:vertical; }
       "date": "2026-07-31",
       "version": "2.2.9",
       "message": "Review tagged deletions during package merge"
-    },
-    {
-      "date": "2026-07-25",
-      "version": "2.2.8",
-      "message": "Preserve latest resource package updates"
     }
   ]
 }
@@ -2636,7 +2636,7 @@ function showAdminHelp(options = {}){
           <summary>Undo</summary>
           <div class="admin-help-section-body">
             <p>Undo is available for deletion tagging and approval.</p>
-            <p>Only the most recent deletion action can be undone. Use <strong>Undo ...</strong> in Admin mode to restore the saved snapshot, or <strong>Clear undo</strong> to remove it.</p>
+            <p>Only the most recent deletion action can be undone, and Undo expires when another change is saved so newer work cannot be discarded. Use <strong>Undo ...</strong> in Admin mode to restore the saved snapshot, or <strong>Clear undo</strong> to remove it.</p>
             <p>Normal edits are not undone this way. If you make a wrong normal edit, edit the item again and describe the correction.</p>
           </div>
         </details>
@@ -3033,8 +3033,8 @@ function renderSearchDetailView(){
 // UNDO SYSTEM
 // ============================================================
 // Undo is intentionally narrow: deletion tagging and approval save one complete
-// data snapshot in localStorage. Restoring that snapshot is simpler and safer
-// than trying to reverse individual taxonomy and resource mutations.
+// data snapshot in localStorage. The snapshot expires as soon as another change
+// is persisted so restoring it cannot silently discard newer work.
 
 function getUndoSnapshot(){
   try{
@@ -3056,13 +3056,33 @@ function clearUndoSnapshot(){
 function setUndoSnapshot(message){
   localStorage.setItem(UNDO_STORAGE_KEY, JSON.stringify({
     dataSnapshot: JSON.parse(JSON.stringify(data)),
-    message: String(message || "")
+    message: String(message || ""),
+    awaitingPostActionPersist:true
   }));
 }
 
-function undoLastDeletion(){
+function updateUndoSnapshotAfterPersist(){
   const snapshot = getUndoSnapshot();
-  if(!snapshot || !snapshot.dataSnapshot) return;
+  if(!snapshot) return;
+  if(snapshot.awaitingPostActionPersist){
+    delete snapshot.awaitingPostActionPersist;
+    localStorage.setItem(UNDO_STORAGE_KEY, JSON.stringify(snapshot));
+    return;
+  }
+  clearUndoSnapshot();
+}
+
+function undoLastDeletion(){
+  const hadSnapshot = !!getUndoSnapshot();
+  if(!commitPendingEditsIfChanged()) return;
+  const snapshot = getUndoSnapshot();
+  if(!snapshot || !snapshot.dataSnapshot){
+    if(hadSnapshot){
+      showToast("Undo is no longer available because newer changes were saved.");
+      safeRender();
+    }
+    return;
+  }
   data = normalizePackageData(snapshot.dataSnapshot);
   clearUndoSnapshot();
   sanitizePrintSelection();
@@ -3928,6 +3948,7 @@ function persist(){
   data.appVersion = APP_VERSION;
   data.lastModified = nowISO();
   localStorage.setItem(DATA_STORAGE_KEY, JSON.stringify(data));
+  updateUndoSnapshotAfterPersist();
 }
 
 function openAssetsDB(){
@@ -6774,7 +6795,7 @@ function deleteCategory(){
   if(idx === -1) return;
   const cat = data.categories[idx];
   if(!cat) return;
-  if((!editing || editing.kind !== "category" || editing.idx !== idx) && !commitPendingEditsIfChanged()) return;
+  if(!commitPendingEditsIfChanged()) return;
 
   const confirmDelete = confirm(buildAdminDeleteConfirmation("category", cat.label || "(unnamed)"));
   if(!confirmDelete) return;
@@ -6862,6 +6883,7 @@ function editCategory(idx){
     deleteFilterBtn.addEventListener("click", () => {
       const selected = Array.from(document.querySelectorAll(".catFilterSelect:checked"));
       if(!selected.length) return;
+      if(!commitPendingEditsIfChanged()) return;
       const category = data.categories[editing && editing.kind === "category" ? editing.idx : -1];
       if(!category) return;
       const labels = selected
@@ -7771,6 +7793,7 @@ function renderAdminForGroups(container){
       const input = row ? row.querySelector(".forGroupInput") : null;
       const group = input ? input.value.trim() : "";
       if(!group) return;
+      if(!commitPendingEditsIfChanged()) return;
       if(!confirm(`Tag the For group '${group}' for deletion?\n\nResources will remain unchanged until an admin reviews and approves the deletion after a package merge.`)) return;
       tagDeletionRequests([createDeletionRequest("forGroup", { label:group })], `tagged For group "${group}" for deletion`);
     };

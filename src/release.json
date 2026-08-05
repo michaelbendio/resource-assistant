@@ -1,8 +1,13 @@
 {
-  "version": "2.2.10",
-  "date": "2026-08-04",
-  "message": "Preserve legacy For groups and enforce browser tests",
+  "version": "2.2.11",
+  "date": "2026-08-05",
+  "message": "Protect edits during deletion and publishing tests",
   "appChanges": [
+    {
+      "date": "2026-08-05",
+      "version": "2.2.11",
+      "message": "Protect newer edits when tagging or undoing deletions"
+    },
     {
       "date": "2026-08-04",
       "version": "2.2.10",

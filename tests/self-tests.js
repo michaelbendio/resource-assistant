@@ -7,7 +7,7 @@
 // Tests temporarily replace global state and then restore it, so each test must
 // save every global it mutates in a finally block.
 
-function runSelfTests(){
+async function runSelfTests(){
   const tests = [];
 
   function withSelfTestHtmlFileName(fileName, callback){
@@ -575,6 +575,185 @@ function runSelfTests(){
       if(!sharePointPublishingBodyHTML(run).includes("Merge complete")) throw new Error("merge completion copy missing");
       if(!sharePointPublishingBodyHTML(run).includes("Provo TSO")) throw new Error("office-neutral completion copy did not use the configured office");
       if(!sharePointPublishingBodyHTML(run).includes("Upload to SharePoint")) throw new Error("SharePoint upload prompt missing");
+    }
+  });
+
+  tests.push({
+    name: "SHAREPOINT PUBLISHING MERGES CURRENT CANONICAL PACKAGE",
+    fn: async () => {
+      const previousData = data;
+      const previousEditing = editing;
+      const previousStoredData = localStorage.getItem(DATA_STORAGE_KEY);
+      const previousUndo = localStorage.getItem(UNDO_STORAGE_KEY);
+      const previousPublishRun = sharePointPublishRun;
+      const previousLastOpenedHandle = lastOpenedResourcePackageHandle;
+      const previousSafeRender = safeRender;
+      const previousRenderPublishingModal = renderSharePointPublishingModal;
+      const previousGetPDF = getPDF;
+      const previousSavePDF = savePDF;
+      const previousAlert = window.alert;
+      try{
+        const localPdfPath = "pdfs/prepared-local.pdf";
+        const canonicalPdfPath = "pdfs/current-canonical.pdf";
+        const assets = new Map([
+          [localPdfPath, new Blob(["prepared PDF"], { type:"application/pdf" })]
+        ]);
+        getPDF = async path => assets.get(path) || null;
+        savePDF = async (path, blob) => { assets.set(path, blob); };
+        safeRender = () => {};
+        renderSharePointPublishingModal = () => {};
+        window.alert = message => { throw new Error(`unexpected alert: ${message}`); };
+        localStorage.removeItem(UNDO_STORAGE_KEY);
+        editing = null;
+        data = {
+          packageVersion:11,
+          categories:[{ id:"prepared", label:"Prepared", filters:[], lastModified:"2026-08-04T17:00:00.000Z" }],
+          forGroups:["Families"],
+          resources:[
+            {
+              id:"prepared-local",
+              name:"Prepared Local Resource",
+              categories:["prepared"],
+              categoryFilters:{ prepared:[] },
+              forGroups:["Families"],
+              informationText:"Prepared by Admin A",
+              pdfs:[{ name:"prepared-local.pdf", path:localPdfPath }],
+              lastModified:"2026-08-04T17:00:00.000Z"
+            },
+            {
+              id:"retired",
+              name:"Retired Resource",
+              categories:[],
+              categoryFilters:{},
+              forGroups:[],
+              informationText:"",
+              lastModified:"2026-08-01T12:00:00.000Z"
+            }
+          ],
+          changes:[createChangeEntry(
+            "resource",
+            "added",
+            "prepared-local",
+            "Prepared Local Resource",
+            "Prepared by Admin A"
+          )],
+          deletionRequests:[],
+          deletions:[]
+        };
+
+        const canonicalData = {
+          resourcePackageSchemaVersion:RESOURCE_PACKAGE_SCHEMA_VERSION,
+          appVersion:APP_VERSION,
+          packageVersion:12,
+          categories:[{ id:"canonical", label:"Canonical", filters:[], lastModified:"2026-08-04T18:00:00.000Z" }],
+          forGroups:["Veterans"],
+          resources:[{
+            id:"current-canonical",
+            name:"Current Canonical Resource",
+            categories:["canonical"],
+            categoryFilters:{ canonical:[] },
+            forGroups:["Veterans"],
+            informationText:"Published by Admin B",
+            pdfs:[{ name:"current-canonical.pdf", path:canonicalPdfPath }],
+            lastModified:"2026-08-04T18:00:00.000Z"
+          }],
+          changes:[createChangeEntry(
+            "resource",
+            "added",
+            "current-canonical",
+            "Current Canonical Resource",
+            "Published by Admin B"
+          )],
+          deletionRequests:[],
+          deletions:[{
+            kind:"resource",
+            targetId:"retired",
+            label:"Retired Resource",
+            deletedAt:"2026-08-04T18:00:00.000Z"
+          }]
+        };
+        const incomingZip = new JSZip();
+        incomingZip.file("tso-resources.json", JSON.stringify(canonicalData));
+        incomingZip.file(canonicalPdfPath, new Blob(["canonical PDF"], { type:"application/pdf" }));
+        const incomingBlob = await incomingZip.generateAsync({ type:"blob" });
+        const incomingFile = new File([incomingBlob], "provo-resource-package (1).zip", {
+          type:"application/zip",
+          lastModified:Date.now()
+        });
+
+        let savedBlob = null;
+        const outputHandle = {
+          kind:"file",
+          name:"provo-resource-package.zip",
+          async createWritable(){
+            return {
+              async write(blob){ savedBlob = blob; },
+              async close(){},
+              async abort(){}
+            };
+          }
+        };
+        const directoryHandle = {
+          kind:"directory",
+          name:"Downloads",
+          async getFileHandle(name){
+            if(name !== "provo-resource-package.zip") throw new Error(`unexpected output name ${name}`);
+            return outputHandle;
+          }
+        };
+        sharePointPublishRun = {
+          state:"ready",
+          target:{ packageFileName:"provo-resource-package.zip" },
+          directoryHandle,
+          directoryName:"Downloads",
+          warnings:[]
+        };
+
+        await mergeAndSaveSharePointPackage({
+          name:incomingFile.name,
+          file:incomingFile,
+          lastModified:incomingFile.lastModified,
+          size:incomingFile.size
+        });
+
+        if(sharePointPublishRun.state !== "complete"){
+          throw new Error(`publishing ended in '${sharePointPublishRun.state}' instead of complete`);
+        }
+        if(!savedBlob) throw new Error("merged canonical package was not written");
+        const savedZip = await JSZip.loadAsync(savedBlob);
+        const savedJsonFile = savedZip.file("tso-resources.json");
+        if(!savedJsonFile) throw new Error("saved package omitted tso-resources.json");
+        const savedData = JSON.parse(await savedJsonFile.async("string"));
+        const savedIds = new Set(savedData.resources.map(resource => resource.id));
+        if(savedData.packageVersion !== 13) throw new Error(`expected Package 13, got ${savedData.packageVersion}`);
+        if(!savedIds.has("prepared-local") || !savedIds.has("current-canonical")){
+          throw new Error("prepared or current canonical resource was lost");
+        }
+        if(savedIds.has("retired")) throw new Error("canonical tombstone did not remove the retired resource");
+        if(!savedData.deletions.some(record => record.key === "resource:retired")){
+          throw new Error("canonical tombstone was not retained");
+        }
+        if(savedData.changes.length !== 1 || savedData.changes[0].targetId !== "prepared-local"){
+          throw new Error("prepared change log was not preserved for publication");
+        }
+        if(!savedZip.file(localPdfPath) || !savedZip.file(canonicalPdfPath)){
+          throw new Error("prepared or canonical PDF was omitted from the saved package");
+        }
+      }finally{
+        window.alert = previousAlert;
+        getPDF = previousGetPDF;
+        savePDF = previousSavePDF;
+        safeRender = previousSafeRender;
+        renderSharePointPublishingModal = previousRenderPublishingModal;
+        sharePointPublishRun = previousPublishRun;
+        lastOpenedResourcePackageHandle = previousLastOpenedHandle;
+        editing = previousEditing;
+        data = previousData;
+        if(previousStoredData == null) localStorage.removeItem(DATA_STORAGE_KEY);
+        else localStorage.setItem(DATA_STORAGE_KEY, previousStoredData);
+        if(previousUndo == null) localStorage.removeItem(UNDO_STORAGE_KEY);
+        else localStorage.setItem(UNDO_STORAGE_KEY, previousUndo);
+      }
     }
   });
 
@@ -1293,9 +1472,18 @@ function runSelfTests(){
         if(!sel) throw new Error("category selector was not rendered");
         setCategoryBrowseSelection(sel, "0");
         editCategory(0);
+        const labelInput = document.getElementById("cat_label");
+        const updateInput = document.getElementById("cat_update_description");
+        labelInput.value = "Veterans Assistance";
+        labelInput.dispatchEvent(new Event("input", { bubbles:true }));
+        updateInput.value = "Renamed before tagging the category";
+        updateInput.dispatchEvent(new Event("input", { bubbles:true }));
         deleteCategory();
         const modal = document.getElementById("categoryDeletePrompt");
         if(!modal) throw new Error("category delete prompt did not render for index 0");
+        if(!modal.textContent.includes("Veterans Assistance")){
+          throw new Error("category deletion tagging discarded another pending category edit");
+        }
         const confirmBtn = document.getElementById("categoryDeleteConfirmBtn");
         if(!confirmBtn) throw new Error("category delete confirm button missing");
         confirmBtn.click();
@@ -1528,6 +1716,8 @@ function runSelfTests(){
       const previousEditing = editing;
       const previousEditorSnapshot = editorSnapshot;
       const previousConfirm = window.confirm;
+      const previousStoredData = localStorage.getItem(DATA_STORAGE_KEY);
+      const previousUndo = localStorage.getItem(UNDO_STORAGE_KEY);
       try{
         data = {
           categories:[
@@ -1545,6 +1735,12 @@ function runSelfTests(){
         if(selectors.some(selector => selector.type !== "checkbox")){
           throw new Error("category filter selectors should be checkboxes");
         }
+        const labelInput = document.getElementById("cat_label");
+        const updateInput = document.getElementById("cat_update_description");
+        labelInput.value = "Food Assistance";
+        labelInput.dispatchEvent(new Event("input", { bubbles:true }));
+        updateInput.value = "Renamed before tagging Types";
+        updateInput.dispatchEvent(new Event("input", { bubbles:true }));
         selectors[0].checked = true;
         selectors[1].checked = true;
         const deleteBtn = document.getElementById("cat_filter_delete_btn");
@@ -1558,6 +1754,9 @@ function runSelfTests(){
         if(JSON.stringify(data.categories[0].filters) !== JSON.stringify(["Food Pantries", "Meals", "SNAP"])){
           throw new Error("tagging category filters should keep them active until merge review");
         }
+        if(data.categories[0].label !== "Food Assistance"){
+          throw new Error("Type deletion tagging discarded another pending category edit");
+        }
       }finally{
         window.confirm = previousConfirm;
         data = previousData;
@@ -1565,6 +1764,10 @@ function runSelfTests(){
         selectedCategoryIndex = previousSelectedCategoryIndex;
         editing = previousEditing;
         editorSnapshot = previousEditorSnapshot;
+        if(previousStoredData == null) localStorage.removeItem(DATA_STORAGE_KEY);
+        else localStorage.setItem(DATA_STORAGE_KEY, previousStoredData);
+        if(previousUndo == null) localStorage.removeItem(UNDO_STORAGE_KEY);
+        else localStorage.setItem(UNDO_STORAGE_KEY, previousUndo);
         renderAdmin();
       }
     }
@@ -2469,10 +2672,12 @@ function runSelfTests(){
     name: "DELETION REVIEW PRINT APPROVE AND UNDO",
     fn: () => {
       const previousData = data;
+      const previousEditing = editing;
       const previousStoredData = localStorage.getItem(DATA_STORAGE_KEY);
       const previousReview = localStorage.getItem(DELETION_REVIEW_STORAGE_KEY);
       const previousUndo = localStorage.getItem(UNDO_STORAGE_KEY);
       try{
+        editing = null;
         data = {
           packageVersion:11,
           categories:[{ id:"food", label:"Food", filters:[] }],
@@ -2508,11 +2713,59 @@ function runSelfTests(){
       }finally{
         closeDeletionReview();
         PrintWorkflow.close();
+        editing = previousEditing;
         data = previousData;
         if(previousStoredData == null) localStorage.removeItem(DATA_STORAGE_KEY);
         else localStorage.setItem(DATA_STORAGE_KEY, previousStoredData);
         if(previousReview == null) localStorage.removeItem(DELETION_REVIEW_STORAGE_KEY);
         else localStorage.setItem(DELETION_REVIEW_STORAGE_KEY, previousReview);
+        if(previousUndo == null) localStorage.removeItem(UNDO_STORAGE_KEY);
+        else localStorage.setItem(UNDO_STORAGE_KEY, previousUndo);
+      }
+    }
+  });
+
+  tests.push({
+    name: "DELETION UNDO EXPIRES AFTER A NEWER SAVE",
+    fn: () => {
+      const previousData = data;
+      const previousEditing = editing;
+      const previousStoredData = localStorage.getItem(DATA_STORAGE_KEY);
+      const previousUndo = localStorage.getItem(UNDO_STORAGE_KEY);
+      try{
+        editing = null;
+        localStorage.removeItem(UNDO_STORAGE_KEY);
+        data = {
+          categories:[],
+          forGroups:[],
+          resources:[{
+            id:"sample",
+            name:"Sample Resource",
+            categories:[],
+            categoryFilters:{},
+            forGroups:[],
+            informationText:""
+          }],
+          changes:[],
+          deletionRequests:[],
+          deletions:[]
+        };
+        setUndoSnapshot("deletion tag");
+        data.deletionRequests = [createDeletionRequest("resource", {
+          targetId:"sample",
+          label:"Sample Resource"
+        })];
+        persist();
+        if(!getUndoSnapshot()) throw new Error("fresh deletion Undo was not retained");
+
+        data.resources[0].name = "Newer Saved Name";
+        persist();
+        if(getUndoSnapshot()) throw new Error("deletion Undo remained after a newer saved edit");
+      }finally{
+        editing = previousEditing;
+        data = previousData;
+        if(previousStoredData == null) localStorage.removeItem(DATA_STORAGE_KEY);
+        else localStorage.setItem(DATA_STORAGE_KEY, previousStoredData);
         if(previousUndo == null) localStorage.removeItem(UNDO_STORAGE_KEY);
         else localStorage.setItem(UNDO_STORAGE_KEY, previousUndo);
       }
@@ -2985,6 +3238,7 @@ function runSelfTests(){
       const previousEditorSnapshot = editorSnapshot;
       const previousStoredData = localStorage.getItem(DATA_STORAGE_KEY);
       const previousConfirm = window.confirm;
+      const previousUndo = localStorage.getItem(UNDO_STORAGE_KEY);
       try{
         data = {
           categories:[],
@@ -3028,6 +3282,11 @@ function runSelfTests(){
         if(data.forGroups.includes("Seniors")) throw new Error("Cancel saved a draft For group");
 
         renderAdmin();
+        newBtn = document.getElementById("forGroupNewBtn");
+        newBtn.click();
+        inputs = Array.from(document.querySelectorAll(".forGroupInput"));
+        inputs[inputs.length - 1].value = "Caregivers";
+        inputs[inputs.length - 1].dispatchEvent(new Event("input", { bubbles:true }));
         deleteBtn = document.getElementById("forGroupDeleteBtn");
         const womenInput = Array.from(document.querySelectorAll(".forGroupInput")).find(input => input.value === "Women");
         if(!womenInput) throw new Error("saved For group was not rendered for deletion");
@@ -3039,6 +3298,9 @@ function runSelfTests(){
         if(!data.forGroups.includes("Women")) throw new Error("tagging a For group should keep it active until merge review");
         if(!(data.deletionRequests || []).some(request => request.key === "forGroup:women")){
           throw new Error("selected For group was not tagged for deletion");
+        }
+        if(!data.forGroups.includes("Caregivers")){
+          throw new Error("For group deletion tagging discarded another pending group");
         }
         renderAdmin();
         const taggedWomenInput = Array.from(document.querySelectorAll(".forGroupInput")).find(input => input.value === "Women");
@@ -3054,6 +3316,8 @@ function runSelfTests(){
         editorSnapshot = previousEditorSnapshot;
         if(previousStoredData === null) localStorage.removeItem(DATA_STORAGE_KEY);
         else localStorage.setItem(DATA_STORAGE_KEY, previousStoredData);
+        if(previousUndo === null) localStorage.removeItem(UNDO_STORAGE_KEY);
+        else localStorage.setItem(UNDO_STORAGE_KEY, previousUndo);
       }
     }
   });
@@ -3745,19 +4009,25 @@ function runSelfTests(){
     }
   });
 
-  const results = tests.map(test => {
-    try{
-      test.fn();
-      return { ok:true, name:test.name, message:"" };
-    }catch(err){
-      return { ok:false, name:test.name, message:(err && err.message) ? err.message : String(err) };
-    }
-  });
-
   const panel = document.getElementById("selfTestPanel");
   const resultsEl = document.getElementById("selfTestResults");
-  if(panel && resultsEl){
+  if(resultsEl){
     resultsEl.innerHTML = "";
+    resultsEl.dataset.selfTestsComplete = "false";
+    delete resultsEl.dataset.selfTestCount;
+  }
+
+  const results = [];
+  for(const test of tests){
+    try{
+      await test.fn();
+      results.push({ ok:true, name:test.name, message:"" });
+    }catch(err){
+      results.push({ ok:false, name:test.name, message:(err && err.message) ? err.message : String(err) });
+    }
+  }
+
+  if(panel && resultsEl){
     results.forEach(result => {
       const row = document.createElement("div");
       row.textContent = result.ok
@@ -3765,6 +4035,8 @@ function runSelfTests(){
         : `✖ FAIL ${result.name}: ${result.message}`;
       resultsEl.appendChild(row);
     });
+    resultsEl.dataset.selfTestCount = String(results.length);
+    resultsEl.dataset.selfTestsComplete = "true";
     panel.style.display = "block";
   }
 

@@ -1259,7 +1259,7 @@ function deleteCategory(){
   if(idx === -1) return;
   const cat = data.categories[idx];
   if(!cat) return;
-  if((!editing || editing.kind !== "category" || editing.idx !== idx) && !commitPendingEditsIfChanged()) return;
+  if(!commitPendingEditsIfChanged()) return;
 
   const confirmDelete = confirm(buildAdminDeleteConfirmation("category", cat.label || "(unnamed)"));
   if(!confirmDelete) return;
@@ -1347,6 +1347,7 @@ function editCategory(idx){
     deleteFilterBtn.addEventListener("click", () => {
       const selected = Array.from(document.querySelectorAll(".catFilterSelect:checked"));
       if(!selected.length) return;
+      if(!commitPendingEditsIfChanged()) return;
       const category = data.categories[editing && editing.kind === "category" ? editing.idx : -1];
       if(!category) return;
       const labels = selected
@@ -2256,6 +2257,7 @@ function renderAdminForGroups(container){
       const input = row ? row.querySelector(".forGroupInput") : null;
       const group = input ? input.value.trim() : "";
       if(!group) return;
+      if(!commitPendingEditsIfChanged()) return;
       if(!confirm(`Tag the For group '${group}' for deletion?\n\nResources will remain unchanged until an admin reviews and approves the deletion after a package merge.`)) return;
       tagDeletionRequests([createDeletionRequest("forGroup", { label:group })], `tagged For group "${group}" for deletion`);
     };

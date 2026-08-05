@@ -2,8 +2,8 @@
 // UNDO SYSTEM
 // ============================================================
 // Undo is intentionally narrow: deletion tagging and approval save one complete
-// data snapshot in localStorage. Restoring that snapshot is simpler and safer
-// than trying to reverse individual taxonomy and resource mutations.
+// data snapshot in localStorage. The snapshot expires as soon as another change
+// is persisted so restoring it cannot silently discard newer work.
 
 function getUndoSnapshot(){
   try{
@@ -25,13 +25,33 @@ function clearUndoSnapshot(){
 function setUndoSnapshot(message){
   localStorage.setItem(UNDO_STORAGE_KEY, JSON.stringify({
     dataSnapshot: JSON.parse(JSON.stringify(data)),
-    message: String(message || "")
+    message: String(message || ""),
+    awaitingPostActionPersist:true
   }));
 }
 
-function undoLastDeletion(){
+function updateUndoSnapshotAfterPersist(){
   const snapshot = getUndoSnapshot();
-  if(!snapshot || !snapshot.dataSnapshot) return;
+  if(!snapshot) return;
+  if(snapshot.awaitingPostActionPersist){
+    delete snapshot.awaitingPostActionPersist;
+    localStorage.setItem(UNDO_STORAGE_KEY, JSON.stringify(snapshot));
+    return;
+  }
+  clearUndoSnapshot();
+}
+
+function undoLastDeletion(){
+  const hadSnapshot = !!getUndoSnapshot();
+  if(!commitPendingEditsIfChanged()) return;
+  const snapshot = getUndoSnapshot();
+  if(!snapshot || !snapshot.dataSnapshot){
+    if(hadSnapshot){
+      showToast("Undo is no longer available because newer changes were saved.");
+      safeRender();
+    }
+    return;
+  }
   data = normalizePackageData(snapshot.dataSnapshot);
   clearUndoSnapshot();
   sanitizePrintSelection();

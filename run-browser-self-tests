@@ -23,11 +23,18 @@ class SelfTestResultsParser(HTMLParser):
         self.results_depth = 0
         self.current_row: list[str] | None = None
         self.rows: list[str] = []
+        self.results_complete = False
+        self.expected_count: int | None = None
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         attributes = dict(attrs)
         if not self.results_depth and attributes.get("id") == "selfTestResults":
             self.results_depth = 1
+            self.results_complete = attributes.get("data-self-tests-complete") == "true"
+            try:
+                self.expected_count = int(attributes.get("data-self-test-count", ""))
+            except (TypeError, ValueError):
+                self.expected_count = None
             return
         if not self.results_depth:
             return
@@ -113,9 +120,25 @@ def find_browser(explicit: Path | None = None) -> Path:
 
 
 def parse_self_test_rows(document: str) -> list[str]:
+    rows, _complete = parse_self_test_results(document)
+    return rows
+
+
+def parse_self_test_results(document: str) -> tuple[list[str], bool]:
     parser = SelfTestResultsParser()
     parser.feed(document)
-    return parser.rows
+    complete = (
+        parser.results_complete
+        and parser.expected_count is not None
+        and parser.expected_count == len(parser.rows)
+    )
+    return parser.rows, complete
+
+
+def decode_browser_output(value: bytes | str | None) -> str:
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return value or ""
 
 
 def run_browser_self_tests(browser: Path, timeout: int) -> list[str]:
@@ -148,19 +171,23 @@ def run_browser_self_tests(browser: Path, timeout: int) -> list[str]:
                 timeout=timeout,
             )
         except subprocess.TimeoutExpired as error:
+            document = decode_browser_output(error.stdout)
+            rows, complete = parse_self_test_results(document)
+            if complete:
+                return rows
             raise RuntimeError(
                 f"Browser self-tests did not finish within {timeout} seconds. "
                 "A browser prompt may be blocking the test suite."
             ) from error
 
-    document = completed.stdout.decode("utf-8", errors="replace")
-    rows = parse_self_test_rows(document)
+    document = decode_browser_output(completed.stdout)
+    rows, complete = parse_self_test_results(document)
     if completed.returncode != 0:
-        stderr = completed.stderr.decode("utf-8", errors="replace").strip()
+        stderr = decode_browser_output(completed.stderr).strip()
         detail = f"\n{stderr[-2000:]}" if stderr else ""
         raise RuntimeError(f"Browser exited with status {completed.returncode}.{detail}")
-    if not rows:
-        raise RuntimeError("Browser self-tests produced no results.")
+    if not complete:
+        raise RuntimeError("Browser self-tests did not produce a complete result set.")
     return rows
 
 
