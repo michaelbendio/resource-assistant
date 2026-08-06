@@ -38,21 +38,25 @@ The ordered application sources are listed in `build-tso-resources`. The build
 inlines the CSS, seed JSON, JSZip, and application JavaScript so the result remains
 a portable single HTML file.
 
-## Publish a production release
+## Verify an application release
 
-After the approved release commit has been pushed, publish and verify all active
-production files with one command:
+Build both outputs, run every Python and browser test, and verify `new.html` and
+its embedded release metadata with one platform-neutral command:
 
 ```sh
-python3 publish-tso-release
+python3 verify-tso-release
 ```
 
-The command builds the app, runs the Python and browser test suites, generates
-the Provo and Albuquerque files, copies `provo.html` and `albuquerque.html` to
-`iCloud Drive/Documents/TSO`, and verifies the copied bytes, version, storage
-IDs, and titles. The generated `new.html` remains a local build artifact and is
-not copied to iCloud Drive. The command exits with an error if the release
-commit is not pushed, iCloud is unavailable, or any verification fails.
+The verifier does not know office names and does not publish anything. Before an
+approved release is reported complete, push its commit and run:
+
+```sh
+python3 verify-tso-release --require-pushed
+```
+
+That additional check requires a clean worktree, confirms that `HEAD` matches
+its upstream branch, and checks that the commit subject matches
+`src/release.json`.
 
 ## Make a local TSO Resources file
 
@@ -63,12 +67,20 @@ python3 make-local-tso albuquerque
 ```
 
 The helper first rebuilds `new.html`, then creates `albuquerque.html`, sets the
-local storage id to `albuquerque`, and sets the page title to
-`Albuquerque TSO Resources`. It refuses to overwrite the master template. On a
-Mac with iCloud Drive enabled, it also copies the finished file to
-`iCloud Drive/Documents/TSO` so it appears in Files on synced iPhones and iPads.
-Use `--no-icloud-copy` to skip that copy or `--icloud-dir PATH` to select another
-synced directory.
+local storage ID to `albuquerque`, and sets the page title to
+`Albuquerque TSO Resources`. It refuses to overwrite the master template. The
+same command works for a future office such as `mesa`; there is no central
+office registry.
+
+Generation does not copy the office file anywhere. To copy one generated file
+to an explicitly selected sync folder or removable drive, run:
+
+```sh
+python3 copy-local-tso albuquerque.html /path/to/destination
+```
+
+The helper validates the office identity and release metadata, performs an
+atomic copy, and verifies byte parity.
 
 Click the TSO Resources title in an office-specific file to see the app's Git
 selected commit dates and messages from the last 14 days alongside the latest

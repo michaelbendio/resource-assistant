@@ -1,0 +1,124 @@
+#!/usr/bin/env python3
+"""Copy one generated office HTML file to an explicit destination directory."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import html as html_module
+import json
+import os
+import re
+import shutil
+import sys
+import tempfile
+from pathlib import Path
+
+
+class CopyError(RuntimeError):
+    """Raised when an office file cannot be safely copied."""
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def office_file_identity(path: Path) -> tuple[str, str, str]:
+    if not path.is_file():
+        raise CopyError(f"Office file was not found: {path}")
+    try:
+        document = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as error:
+        raise CopyError(f"Office file is not UTF-8 HTML: {path}") from error
+
+    storage_match = re.search(
+        r'<meta\s+name=["\']tso-storage-id["\']\s+content=["\']([^"\']*)["\']\s*>',
+        document,
+        flags=re.IGNORECASE,
+    )
+    storage_id = storage_match.group(1).strip() if storage_match else ""
+    if not storage_id:
+        raise CopyError(f"Refusing to copy the starter template as an office file: {path}")
+
+    title_match = re.search(r"<title>(.*?)</title>", document, flags=re.IGNORECASE | re.DOTALL)
+    title = html_module.unescape(title_match.group(1).strip()) if title_match else ""
+    if not title or title == "<New> TSO Resources":
+        raise CopyError(f"Office file does not have an office-specific title: {path}")
+
+    release_match = re.search(
+        r'<script\s+id="app-release-data"\s+type="application/json">\s*(.*?)\s*</script>',
+        document,
+        flags=re.DOTALL,
+    )
+    if not release_match:
+        raise CopyError(f"Office file is missing app-release-data: {path}")
+    try:
+        release = json.loads(release_match.group(1))
+    except json.JSONDecodeError as error:
+        raise CopyError(f"Office file has invalid app-release-data: {path}") from error
+    version = str(release.get("version", "")).strip() if isinstance(release, dict) else ""
+    if not re.fullmatch(r"\d+\.\d+\.\d+", version):
+        raise CopyError(f"Office file does not have a valid app version: {path}")
+    return storage_id, title, version
+
+
+def copy_office_file(source: Path, destination_dir: Path) -> Path:
+    if not source.is_file():
+        raise CopyError(f"Office file was not found: {source}")
+    if source.suffix.lower() != ".html":
+        raise CopyError(f"Office file must use the .html extension: {source}")
+
+    office_file_identity(source)
+    destination_dir.mkdir(parents=True, exist_ok=True)
+    destination = destination_dir / source.name
+    if source.resolve() == destination.resolve():
+        raise CopyError("Source and destination office files are the same path.")
+
+    temporary_file = tempfile.NamedTemporaryFile(
+        prefix=f".{source.name}.",
+        suffix=".copying",
+        dir=destination_dir,
+        delete=False,
+    )
+    temporary_path = Path(temporary_file.name)
+    temporary_file.close()
+    try:
+        shutil.copy2(source, temporary_path)
+        os.replace(temporary_path, destination)
+    finally:
+        temporary_path.unlink(missing_ok=True)
+
+    if source.read_bytes() != destination.read_bytes():
+        raise CopyError(f"Copied office file differs from its source: {destination}")
+    office_file_identity(destination)
+    return destination
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("source", type=Path, help="Generated office HTML file")
+    parser.add_argument("destination", type=Path, help="Explicit destination directory")
+    args = parser.parse_args()
+
+    source = args.source.expanduser()
+    destination_dir = args.destination.expanduser()
+    try:
+        storage_id, title, version = office_file_identity(source)
+        destination = copy_office_file(source, destination_dir)
+    except (CopyError, OSError) as error:
+        print(f"OFFICE COPY FAILED: {error}", file=sys.stderr)
+        return 1
+
+    print(
+        f"COPIED {source.name} -> {destination} "
+        f"(storage id {storage_id!r}, title {title!r}, version {version}, sha256 {sha256(destination)})"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

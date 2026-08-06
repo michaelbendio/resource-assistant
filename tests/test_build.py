@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 import unittest
 from pathlib import Path
 
@@ -13,12 +14,12 @@ ROOT = Path(__file__).resolve().parent.parent
 class BuildTests(unittest.TestCase):
     def test_generated_outputs_are_current(self) -> None:
         subprocess.run(
-            ["python3", "build-tso-resources", "--check"],
+            [sys.executable, "build-tso-resources", "--check"],
             cwd=ROOT,
             check=True,
         )
         subprocess.run(
-            ["python3", "build-tso-resources", "--with-tests", "--check"],
+            [sys.executable, "build-tso-resources", "--with-tests", "--check"],
             cwd=ROOT,
             check=True,
         )

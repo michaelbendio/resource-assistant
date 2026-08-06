@@ -1,8 +1,13 @@
 {
-  "version": "2.2.11",
-  "date": "2026-08-05",
-  "message": "Protect edits during deletion and publishing tests",
+  "version": "2.2.12",
+  "date": "2026-08-06",
+  "message": "Separate release verification from office publication",
   "appChanges": [
+    {
+      "date": "2026-08-06",
+      "version": "2.2.12",
+      "message": "Separate application verification from office publication"
+    },
     {
       "date": "2026-08-05",
       "version": "2.2.11",

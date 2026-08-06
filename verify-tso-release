@@ -1,0 +1,221 @@
+#!/usr/bin/env python3
+"""Build, test, and verify an office-neutral TSO Resources app release."""
+
+from __future__ import annotations
+
+import argparse
+from datetime import datetime
+import hashlib
+import json
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parent
+RELEASE_JSON = ROOT / "src" / "release.json"
+PRODUCTION_HTML = ROOT / "new.html"
+DEBUG_HTML = ROOT / "build" / "tso-resources-debug.html"
+STARTER_STORAGE_TAG = '<meta name="tso-storage-id" content="">'
+STARTER_TITLE_TAG = "<title>&lt;New&gt; TSO Resources</title>"
+
+
+class ReleaseError(RuntimeError):
+    """Raised when the application release cannot be verified."""
+
+
+def run(command: list[str]) -> None:
+    print("+", subprocess.list2cmdline(command), flush=True)
+    subprocess.run(command, cwd=ROOT, check=True)
+
+
+def capture(command: list[str]) -> str:
+    return subprocess.run(
+        command,
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+
+def require_date(value: object, description: str) -> str:
+    normalized = str(value or "").strip()
+    try:
+        datetime.strptime(normalized, "%Y-%m-%d")
+    except ValueError as error:
+        raise ReleaseError(f"{description} must use YYYY-MM-DD format.") from error
+    return normalized
+
+
+def require_version(value: object, description: str) -> str:
+    normalized = str(value or "").strip()
+    if not re.fullmatch(r"\d+\.\d+\.\d+", normalized):
+        raise ReleaseError(f"{description} must use major.minor.patch format.")
+    return normalized
+
+
+def require_message(value: object, description: str) -> str:
+    normalized = str(value or "").strip()
+    if not normalized:
+        raise ReleaseError(f"{description} must not be blank.")
+    return normalized
+
+
+def load_release(path: Path = RELEASE_JSON) -> dict[str, object]:
+    try:
+        release = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        raise ReleaseError(f"{path} is not valid JSON: {error}") from error
+    if not isinstance(release, dict):
+        raise ReleaseError(f"{path} must contain one JSON object.")
+
+    app_changes = release.get("appChanges")
+    if not isinstance(app_changes, list):
+        raise ReleaseError(f"{path} appChanges must be an array.")
+
+    normalized_changes: list[dict[str, str]] = []
+    for index, change in enumerate(app_changes):
+        description = f"{path} appChanges[{index}]"
+        if not isinstance(change, dict):
+            raise ReleaseError(f"{description} must be an object.")
+        normalized_changes.append(
+            {
+                "date": require_date(change.get("date"), f"{description}.date"),
+                "version": require_version(change.get("version"), f"{description}.version"),
+                "message": require_message(change.get("message"), f"{description}.message"),
+            }
+        )
+
+    return {
+        "version": require_version(release.get("version"), f"{path} version"),
+        "date": require_date(release.get("date"), f"{path} date"),
+        "message": require_message(release.get("message"), f"{path} message"),
+        "appChanges": normalized_changes,
+    }
+
+
+def expected_release_payload(release: dict[str, object]) -> dict[str, object]:
+    return {
+        "version": release["version"],
+        "changes": list(release["appChanges"])[:5],
+    }
+
+
+def extract_release_payload(html: str, path: Path) -> dict[str, object]:
+    match = re.search(
+        r'<script\s+id="app-release-data"\s+type="application/json">\s*(.*?)\s*</script>',
+        html,
+        flags=re.DOTALL,
+    )
+    if not match:
+        raise ReleaseError(f"{path} is missing app-release-data.")
+    try:
+        payload = json.loads(match.group(1))
+    except json.JSONDecodeError as error:
+        raise ReleaseError(f"{path} has invalid app-release-data.") from error
+    if not isinstance(payload, dict):
+        raise ReleaseError(f"{path} app-release-data must be an object.")
+    return payload
+
+
+def verify_new_html(path: Path, release: dict[str, object]) -> None:
+    if not path.is_file():
+        raise ReleaseError(f"Production output is missing: {path}")
+    html = path.read_text(encoding="utf-8")
+    if STARTER_STORAGE_TAG not in html:
+        raise ReleaseError(f"{path} does not have the blank starter storage ID.")
+    if STARTER_TITLE_TAG not in html:
+        raise ReleaseError(f"{path} does not have the starter page title.")
+
+    actual_payload = extract_release_payload(html, path)
+    expected_payload = expected_release_payload(release)
+    if actual_payload != expected_payload:
+        raise ReleaseError(
+            f"{path} release metadata does not exactly match {RELEASE_JSON}."
+        )
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def verify_git_release_state(release_message: str) -> None:
+    if capture(["git", "status", "--porcelain", "--untracked-files=all"]):
+        raise ReleaseError("The worktree has uncommitted changes; commit and push them first.")
+
+    try:
+        head = capture(["git", "rev-parse", "HEAD"])
+        upstream = capture(["git", "rev-parse", "@{upstream}"])
+    except subprocess.CalledProcessError as error:
+        raise ReleaseError("The current branch does not have a readable upstream branch.") from error
+    if head != upstream:
+        raise ReleaseError("The current release commit has not been pushed to its upstream branch.")
+
+    subject = capture(["git", "log", "-1", "--format=%s"])
+    if subject != release_message:
+        raise ReleaseError(
+            "src/release.json message does not match the current commit subject."
+        )
+
+
+def build_and_test() -> None:
+    commands = [
+        [sys.executable, "build-tso-resources"],
+        [sys.executable, "build-tso-resources", "--with-tests"],
+        [
+            sys.executable,
+            "-m",
+            "unittest",
+            "discover",
+            "-s",
+            "tests",
+            "-p",
+            "test_*.py",
+        ],
+        [sys.executable, "run-browser-self-tests"],
+        [sys.executable, "build-tso-resources", "--check"],
+        [sys.executable, "build-tso-resources", "--with-tests", "--check"],
+    ]
+    for command in commands:
+        run(command)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--require-pushed",
+        action="store_true",
+        help="Also require a clean worktree, pushed HEAD, and matching commit subject.",
+    )
+    args = parser.parse_args()
+
+    try:
+        release = load_release()
+        if args.require_pushed:
+            verify_git_release_state(str(release["message"]))
+        build_and_test()
+        release = load_release()
+        verify_new_html(PRODUCTION_HTML, release)
+        if not DEBUG_HTML.is_file():
+            raise ReleaseError(f"Debug output is missing: {DEBUG_HTML}")
+        if args.require_pushed:
+            verify_git_release_state(str(release["message"]))
+    except (OSError, ReleaseError, subprocess.CalledProcessError) as error:
+        print(f"RELEASE VERIFICATION FAILED: {error}", file=sys.stderr)
+        return 1
+
+    print(
+        f"RELEASE VERIFIED: version {release['version']}; "
+        f"new.html sha256 {sha256(PRODUCTION_HTML)}"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

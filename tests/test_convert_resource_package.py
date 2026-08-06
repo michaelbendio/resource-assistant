@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 import tempfile
 import unittest
 import zipfile
@@ -23,7 +24,7 @@ class ConvertResourcePackageTests(unittest.TestCase):
 
     def run_helper(self, *arguments: str, check: bool = True) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
-            ["python3", str(HELPER), *arguments],
+            [sys.executable, str(HELPER), *arguments],
             cwd=ROOT,
             check=check,
             capture_output=True,
