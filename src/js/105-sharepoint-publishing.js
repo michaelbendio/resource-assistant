@@ -19,6 +19,15 @@ function getSharePointPublishingTargetStorageKey(storageId = STORAGE_KEY_PREFIX)
   return `${normalizeStorageId(storageId)}SharePointPublishingTarget`;
 }
 
+function getStoredSharePointPublishingUrl(storageId = STORAGE_KEY_PREFIX){
+  try{
+    const stored = JSON.parse(localStorage.getItem(getSharePointPublishingTargetStorageKey(storageId)) || "null");
+    return stored && typeof stored === "object" ? String(stored.packageViewUrl || "") : "";
+  }catch(_err){
+    return "";
+  }
+}
+
 function getSharePointPublishingOfficeName(storageId = STORAGE_KEY_PREFIX){
   const normalized = normalizeStorageId(storageId);
   if(normalized === STORAGE_KEY_PREFIX){
@@ -346,6 +355,41 @@ async function pollForSharePointPackageDownload(){
   run.pollTimer = setTimeout(pollForSharePointPackageDownload, SHAREPOINT_PUBLISHING_POLL_MS);
 }
 
+function summarizePreparedPublication(preparedData, canonicalData){
+  const preparedResources = Array.isArray(preparedData && preparedData.resources) ? preparedData.resources : [];
+  const canonicalResources = new Map(
+    (Array.isArray(canonicalData && canonicalData.resources) ? canonicalData.resources : [])
+      .map(resource => [String(resource && resource.id || ""), resource])
+      .filter(([id]) => id)
+  );
+  const canonicallyDeletedResourceIds = new Set(
+    mergeDeletionRecords([], canonicalData && canonicalData.deletions, "deletedAt")
+      .filter(record => record.kind === "resource")
+      .map(record => record.targetId)
+  );
+  let resourcesAdded = 0;
+  let resourcesUpdated = 0;
+  preparedResources.forEach(resource => {
+    const id = String(resource && resource.id || "");
+    if(!id || canonicallyDeletedResourceIds.has(id)) return;
+    const canonical = canonicalResources.get(id);
+    if(!canonical){
+      resourcesAdded += 1;
+      return;
+    }
+    const choice = chooseMergeObject(resource, canonical);
+    if(choice.item === resource && objectsDiffer(resource, canonical)) resourcesUpdated += 1;
+  });
+
+  const canonicalDeletionKeys = new Set(
+    mergeDeletionRecords([], canonicalData && canonicalData.deletions, "deletedAt")
+      .map(record => record.key)
+  );
+  const approvedDeletions = mergeDeletionRecords([], preparedData && preparedData.deletions, "deletedAt")
+    .filter(record => !canonicalDeletionKeys.has(record.key)).length;
+  return { resourcesAdded, resourcesUpdated, approvedDeletions };
+}
+
 async function mergeAndSaveSharePointPackage(downloaded){
   const run = sharePointPublishRun;
   if(!run || !downloaded || !downloaded.file) return;
@@ -358,7 +402,7 @@ async function mergeAndSaveSharePointPackage(downloaded){
 
   try{
     const warnings = [];
-    const merged = await mergeImportPackage({
+    const mergeResult = await mergeImportPackage({
       target: {
         files:[downloaded.file],
         value:"",
@@ -366,12 +410,11 @@ async function mergeAndSaveSharePointPackage(downloaded){
       }
     }, {
       preservePreparedChanges:true,
-      skipPreMergeSnapshot:true,
       skipDeletionReview:true,
       silent:true,
       onWarnings:blocks => warnings.push(...blocks)
     });
-    if(!merged) throw new Error("The downloaded resource package could not be merged.");
+    if(!mergeResult) throw new Error("The downloaded resource package could not be merged.");
 
     const outputHandle = run.directoryHandle && typeof run.directoryHandle.getFileHandle === "function"
       ? await run.directoryHandle.getFileHandle(run.target.packageFileName, { create:true })
@@ -389,6 +432,24 @@ async function mergeAndSaveSharePointPackage(downloaded){
     const saved = await saveCurrentResourcePackage(saveTarget, { showSuccessToast:false });
     if(!saved) throw new Error("Publishing was canceled before the merged package was saved.");
 
+    const savedAt = nowISO();
+    const publishedChanges = summarizePreparedPublication(preparedDataSnapshot, mergeResult.importedData);
+    let publicationRecord = null;
+    try{
+      publicationRecord = PublicationHistoryStore.recordSaved({
+        savedAt,
+        packageVersion:saved.packageVersion,
+        fileName:run.target.packageFileName,
+        resourceCount:saved.resourceCount,
+        ...publishedChanges,
+        sharePointFolder:String(run.target.parentPath || ""),
+        sharePointLibraryUrl:String(run.target.libraryUrl || "")
+      });
+    }catch(err){
+      warnings.push(
+        `The package was saved, but its local publishing-history entry could not be recorded: ${err && err.message ? err.message : err}`
+      );
+    }
     if(outputHandle) lastOpenedResourcePackageHandle = outputHandle;
     setSharePointPublishingState("complete", {
       outputFileName:run.target.packageFileName,
@@ -397,6 +458,11 @@ async function mergeAndSaveSharePointPackage(downloaded){
         : "your browser's Downloads folder",
       packageVersion:saved.packageVersion,
       resourceCount:saved.resourceCount,
+      savedAt,
+      resourcesAdded:publishedChanges.resourcesAdded,
+      resourcesUpdated:publishedChanges.resourcesUpdated,
+      approvedDeletions:publishedChanges.approvedDeletions,
+      publicationId:publicationRecord && publicationRecord.id || "",
       warnings
     });
   }catch(err){
@@ -450,12 +516,24 @@ async function checkAgainForSharePointDownload(){
 
 function confirmSharePointPackageUploaded(){
   if(!sharePointPublishRun) return;
-  localStorage.removeItem(PRE_MERGE_STORAGE_KEY);
+  const confirmedAt = nowISO();
+  let historyRecorded = false;
+  if(sharePointPublishRun.publicationId){
+    try{
+      historyRecorded = !!PublicationHistoryStore.confirmReplaced(
+        sharePointPublishRun.publicationId,
+        confirmedAt
+      );
+    }catch(_err){}
+  }
   const undo = getUndoSnapshot();
   if(undo && /^approved deletion/i.test(String(undo.message || ""))){
     clearUndoSnapshot();
   }
-  setSharePointPublishingState("uploaded");
+  setSharePointPublishingState("uploaded", {
+    replacementRecordedAt:confirmedAt,
+    historyRecorded
+  });
   safeRenderAdmin();
 }
 
@@ -524,7 +602,7 @@ function cancelSharePointPublishingDestinationChange(){
 
 function restartSharePointPublishing(){
   clearSharePointPublishingTimer();
-  const target = getSharePointPublishingTarget();
+  const target = OfficeContext.sharePointTarget;
   if(!isSharePointPublishingAvailable()){
     sharePointPublishRun = null;
     return;
@@ -686,19 +764,31 @@ function sharePointPublishingBodyHTML(run){
     const outputLocation = escapeHTML(run.outputLocation || run.directoryName || "publishing folder");
     return `
       <div class="sharepoint-publish-status sharepoint-publish-success" role="status">Merge complete</div>
-      <p><strong>${escapeHTML(run.outputFileName || target.packageFileName)}</strong> was saved in <strong>${outputLocation}</strong> as Resource Package ${escapeHTML(String(run.packageVersion))}.</p>
+      <dl class="sharepoint-publish-destination publication-summary">
+        <div><dt>Saved package</dt><dd>Resource Package ${escapeHTML(String(run.packageVersion))}</dd></div>
+        <div><dt>Filename</dt><dd><code>${escapeHTML(run.outputFileName || target.packageFileName)}</code></dd></div>
+        <div><dt>Save time</dt><dd>${escapeHTML(formatLocalDateTime(run.savedAt))}</dd></div>
+        <div><dt>Saved in</dt><dd>${outputLocation}</dd></div>
+        <div><dt>Resources added</dt><dd>${escapeHTML(String(run.resourcesAdded || 0))}</dd></div>
+        <div><dt>Resources updated</dt><dd>${escapeHTML(String(run.resourcesUpdated || 0))}</dd></div>
+        <div><dt>Approved deletions</dt><dd>${escapeHTML(String(run.approvedDeletions || 0))}</dd></div>
+        <div><dt>SharePoint destination</dt><dd><code>${escapeHTML(target.parentPath || target.libraryUrl || "Configured office folder")}</code></dd></div>
+      </dl>
       ${warningHTML}
       <p>Upload that file to the <strong>${escapeHTML(officeName)} TSO</strong> SharePoint folder and choose <strong>Replace</strong> when SharePoint asks.</p>
       <a class="button primary" href="${escapeHTML(target.libraryUrl)}" target="_blank" rel="noopener">Upload to SharePoint</a>
-      <button class="button" type="button" onclick="confirmSharePointPackageUploaded()">I replaced the SharePoint file</button>
+      <button class="button" type="button" onclick="confirmSharePointPackageUploaded()">I replaced the package</button>
+      <p class="sharepoint-publish-note">TSO Resources cannot independently verify the SharePoint upload. This button records the administrator's confirmation locally.</p>
     `;
   }
   if(run.state === "uploaded"){
     return `
-      <div class="sharepoint-publish-status sharepoint-publish-success" role="status">Resource package uploaded</div>
-      <p>The administrator confirmed that SharePoint replaced <strong>${escapeHTML(target.packageFileName)}</strong> for <strong>${escapeHTML(officeName)} TSO</strong>.</p>
+      <div class="sharepoint-publish-status sharepoint-publish-success" role="status">SharePoint replacement recorded</div>
+      <p>The administrator recorded replacing <strong>${escapeHTML(target.packageFileName)}</strong> for <strong>${escapeHTML(officeName)} TSO</strong> at ${escapeHTML(formatLocalDateTime(run.replacementRecordedAt))}.</p>
+      <p class="sharepoint-publish-note">This is a local administrative record. TSO Resources cannot independently verify that SharePoint completed the upload.</p>
+      ${run.historyRecorded ? "" : `<p class="sharepoint-publish-warning">The confirmation could not be attached to local publishing history.</p>`}
       <button class="button" type="button" onclick="restartSharePointPublishing()">Publish again</button>
-      <button class="button" type="button" onclick="beginChangeSharePointPublishingDestination()">Change SharePoint destination</button>
+      <button class="button" type="button" onclick="showAdminSetup()">Office Setup and history</button>
     `;
   }
   return `

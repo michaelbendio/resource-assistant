@@ -27,7 +27,7 @@ function renderAdmin(){
   const undo = getUndoSnapshot();
   const undoButtonLabel = undo ? `Undo ${undo.message}` : "";
   const hasChangeLog = getRecentChanges().length > 0;
-  const preMerge = getPreMergeSnapshot();
+  const recoveryPoints = getRecoveryPoints();
   const deletionReview = getOutstandingDeletionReview();
 
   container.innerHTML = `
@@ -35,7 +35,7 @@ function renderAdmin(){
       <div class="admin-sticky-package-actions">
         <button class="button primary" onclick="exportPackage()">Save Resource Package</button>
         ${deletionReview ? `<button class="button" onclick="showDeletionReview()">Review tagged deletions</button>` : ""}
-        ${preMerge ? `<button class="button" onclick="restorePreMergeState()">Return to before merge</button>` : ""}
+        ${recoveryPoints.length ? `<button class="button" onclick="showRecoveryPoints()">Recovery points (${recoveryPoints.length})</button>` : ""}
         ${hasChangeLog ? `
           <button class="button" onclick="showChangeLog()">Show change log</button>
           <button class="button" onclick="clearChangeLog()">Clear change log</button>
@@ -46,7 +46,7 @@ function renderAdmin(){
         ` : ""}
       </div>
       <div class="admin-toolbar-reference-actions admin-sticky-reference-actions">
-        ${shouldShowChangeTsoNameButton() ? `<button class="button" onclick="showAdminSetup()">Change TSO Name</button>` : ""}
+        <button class="button" onclick="showAdminSetup()">Office Setup</button>
         ${getSharePointPublishingButtonHTML()}
         <button class="button admin-toolbar-help" onclick="showAdminHelp()">Admin Help</button>
       </div>

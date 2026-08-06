@@ -61,7 +61,6 @@ const STARTUP_STATE_STORAGE_KEYS = [
   PRINT_SELECTION_STORAGE_KEY,
   LEGACY_FAVORITES_STORAGE_KEY,
   UNDO_STORAGE_KEY,
-  PRE_MERGE_STORAGE_KEY,
   DELETION_REVIEW_STORAGE_KEY
 ];
 
@@ -74,6 +73,7 @@ function runStartupStateReset(fileName = getCurrentHtmlFileName()){
   if(shouldResetTemplateStorageOnStartup(fileName)){
     localStorage.removeItem(DATA_STORAGE_KEY);
     localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+    localStorage.removeItem(PRE_MERGE_STORAGE_KEY);
   }
   sessionStorage.clear();
 }
@@ -88,6 +88,7 @@ function clearCurrentLocalState(){
   clearTemporaryLocalState();
   localStorage.removeItem(DATA_STORAGE_KEY);
   localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+  localStorage.removeItem(PRE_MERGE_STORAGE_KEY);
   localStorage.removeItem(DISMISSED_TIPS_STORAGE_KEY);
   localStorage.removeItem(NEW_ADMIN_TRAINING_PENDING_KEY);
 }
@@ -139,7 +140,7 @@ let data = JSON.parse(localStorage.getItem(DATA_STORAGE_KEY) || "null");
 const TIP_TEXT = {
   user: "Click on a category to see its resources. Click a resource to see details. Click ⬜ to include it in the printed handout.",
   newAdminWelcome: "Welcome to you, new admin. Press Ctrl+Alt+A to enter admin mode",
-  newAdminMode: "Click \"Change TSO Name\" to name this TSO Resources. Then close this tab or window and rename new.html to the changed name, keeping the .html extension. Open it and enter admin mode again."
+  newAdminMode: "Click \"Office Setup\" to name this TSO Resources. Then close this tab or window and rename new.html to the changed name, keeping the .html extension. Open it and enter admin mode again."
 };
 const DEFAULT_RESOURCE_PACKAGE_FILENAME = "tso-resources.json";
 const CATEGORY_REMINDER_TEXT = "Report bugs or request enhancments to Elder Bendio (michaelbendio@gmail.com)"

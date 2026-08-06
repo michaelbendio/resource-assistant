@@ -1,8 +1,13 @@
 {
-  "version": "2.2.13",
+  "version": "2.2.14",
   "date": "2026-08-06",
-  "message": "Formalize resource package migration pipeline",
+  "message": "Add office setup, publishing history, and recovery",
   "appChanges": [
+    {
+      "date": "2026-08-06",
+      "version": "2.2.14",
+      "message": "Add office setup, publication summaries, history, and five recovery points"
+    },
     {
       "date": "2026-08-06",
       "version": "2.2.13",

@@ -680,6 +680,55 @@ textarea.information-editor { min-height:320px; resize:vertical; }
 .admin-setup-panel input { width:100%; box-sizing:border-box; margin-top:4px; }
 .admin-setup-note { color:#555; font-size:16px; margin:6px 0 12px; }
 .admin-setup-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:12px; }
+.office-setup-panel { width:min(860px,100%); }
+.office-setup-status {
+  margin-bottom:16px;
+  padding:12px 14px;
+  border:1px solid #c8d6e6;
+  border-radius:8px;
+  background:#f7fbff;
+}
+.office-setup-status.complete { border-color:#82b994; background:#effaf2; color:#145c2d; }
+.office-setup-status.incomplete { border-color:#d8b35e; background:#fff8e7; color:#6b4b00; }
+.office-setup-status p { margin:6px 0; }
+.office-setup-status ul { margin:8px 0 0 20px; padding:0; }
+.office-setup-details { margin-top:10px; }
+.office-setup-folder-row {
+  display:flex;
+  justify-content:space-between;
+  gap:16px;
+  align-items:center;
+  margin:12px 0;
+  padding:12px 14px;
+  border:1px solid #dde6ef;
+  border-radius:8px;
+}
+.office-publication-history-section { margin-top:22px; padding-top:16px; border-top:1px solid #c8d6e6; }
+.office-publication-history-section h3 { margin:0 0 6px; }
+.office-publication-history { display:grid; gap:8px; }
+.office-publication-entry,
+.recovery-point-entry {
+  display:flex;
+  justify-content:space-between;
+  gap:14px;
+  padding:11px 12px;
+  border:1px solid #dde6ef;
+  border-radius:7px;
+  background:#fff;
+}
+.office-publication-entry { flex-direction:column; gap:3px; }
+.office-publication-entry span,
+.recovery-point-entry span { display:block; color:#555; }
+.publication-summary { margin-top:14px; }
+.recovery-points-panel { width:min(820px,100%); }
+.recovery-points-list { display:grid; gap:10px; }
+.recovery-point-entry > div { min-width:0; }
+.recovery-point-entry .button { flex:0 0 auto; align-self:center; }
+@media (max-width:600px){
+  .office-setup-folder-row,
+  .recovery-point-entry { align-items:stretch; flex-direction:column; }
+  .sharepoint-publish-destination div { grid-template-columns:1fr; gap:2px; }
+}
 .setup-mockup {
   border:1px solid #dde6ef;
   border-radius:6px;

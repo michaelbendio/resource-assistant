@@ -125,11 +125,13 @@ async function runSelfTests(){
       const previousStartupValues = STARTUP_STATE_STORAGE_KEYS.map(key => [key, localStorage.getItem(key)]);
       const previousTsoNameValue = localStorage.getItem(TSO_NAME_STORAGE_KEY);
       const previousDataValue = localStorage.getItem(DATA_STORAGE_KEY);
+      const previousRecoveryValue = localStorage.getItem(PRE_MERGE_STORAGE_KEY);
       const previousSessionValue = sessionStorage.getItem("newSelfTestSessionValue");
       try{
         STARTUP_STATE_STORAGE_KEYS.forEach(key => localStorage.setItem(key, "stale"));
         localStorage.setItem(TSO_NAME_STORAGE_KEY, "Keep Name");
         localStorage.setItem(DATA_STORAGE_KEY, JSON.stringify({ resources:[{ id:"keep-resource" }] }));
+        localStorage.setItem(PRE_MERGE_STORAGE_KEY, "keep-recovery-history");
         sessionStorage.setItem("newSelfTestSessionValue", "stale");
         runStartupStateReset("provo.html");
         const unclearedKey = STARTUP_STATE_STORAGE_KEYS.find(key => localStorage.getItem(key) !== null);
@@ -139,6 +141,9 @@ async function runSelfTests(){
         }
         if(!/keep-resource/.test(localStorage.getItem(DATA_STORAGE_KEY) || "")){
           throw new Error("startup reset should keep saved resources");
+        }
+        if(localStorage.getItem(PRE_MERGE_STORAGE_KEY) !== "keep-recovery-history"){
+          throw new Error("office startup should retain recovery history");
         }
         if(sessionStorage.getItem("newSelfTestSessionValue") !== null){
           throw new Error("startup reset did not clear sessionStorage");
@@ -152,6 +157,8 @@ async function runSelfTests(){
         else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoNameValue);
         if(previousDataValue === null) localStorage.removeItem(DATA_STORAGE_KEY);
         else localStorage.setItem(DATA_STORAGE_KEY, previousDataValue);
+        if(previousRecoveryValue === null) localStorage.removeItem(PRE_MERGE_STORAGE_KEY);
+        else localStorage.setItem(PRE_MERGE_STORAGE_KEY, previousRecoveryValue);
         if(previousSessionValue === null) sessionStorage.removeItem("newSelfTestSessionValue");
         else sessionStorage.setItem("newSelfTestSessionValue", previousSessionValue);
       }
@@ -163,9 +170,11 @@ async function runSelfTests(){
     fn: () => {
       const previousDataValue = localStorage.getItem(DATA_STORAGE_KEY);
       const previousTsoNameValue = localStorage.getItem(TSO_NAME_STORAGE_KEY);
+      const previousRecoveryValue = localStorage.getItem(PRE_MERGE_STORAGE_KEY);
       try{
         localStorage.setItem(DATA_STORAGE_KEY, JSON.stringify({ resources:[{ id:"stale-resource" }] }));
         localStorage.setItem(TSO_NAME_STORAGE_KEY, "Stale TSO");
+        localStorage.setItem(PRE_MERGE_STORAGE_KEY, "stale recovery");
         runStartupStateReset("new.html");
         if(localStorage.getItem(DATA_STORAGE_KEY) !== null){
           throw new Error("new.html startup should clear stale saved resources");
@@ -173,11 +182,16 @@ async function runSelfTests(){
         if(localStorage.getItem(TSO_NAME_STORAGE_KEY) !== null){
           throw new Error("new.html startup should clear stale TSO name");
         }
+        if(localStorage.getItem(PRE_MERGE_STORAGE_KEY) !== null){
+          throw new Error("new.html startup should clear stale recovery history");
+        }
       }finally{
         if(previousDataValue === null) localStorage.removeItem(DATA_STORAGE_KEY);
         else localStorage.setItem(DATA_STORAGE_KEY, previousDataValue);
         if(previousTsoNameValue === null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
         else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoNameValue);
+        if(previousRecoveryValue === null) localStorage.removeItem(PRE_MERGE_STORAGE_KEY);
+        else localStorage.setItem(PRE_MERGE_STORAGE_KEY, previousRecoveryValue);
       }
     }
   });
@@ -276,7 +290,7 @@ async function runSelfTests(){
         if(getComputedStyle(packageBar).position !== "sticky") throw new Error("package bar should be sticky");
         if(getComputedStyle(modeBar).position !== "sticky") throw new Error("mode bar should be sticky");
         const packageLabels = Array.from(packageBar.querySelectorAll("button")).map(button => button.textContent.trim());
-        ["Save Resource Package", "Change TSO Name", "Admin Help"].forEach(label => {
+        ["Save Resource Package", "Office Setup", "Admin Help"].forEach(label => {
           if(!packageLabels.includes(label)) throw new Error(`${label} was not in the package bar`);
         });
         const modeLabels = Array.from(modeBar.querySelectorAll("button")).map(button => button.textContent.trim());
@@ -440,13 +454,29 @@ async function runSelfTests(){
   });
 
   tests.push({
-    name: "CHANGE TSO NAME BUTTON IS TEMPLATE ONLY",
+    name: "OFFICE SETUP STATUS IS EXPLICIT",
     fn: () => {
-      if(!shouldShowChangeTsoNameButton(true)){
-        throw new Error("new template should show Change TSO Name");
+      const incomplete = evaluateOfficeSetupStatus({
+        storageId:"new",
+        tsoName:"",
+        expectedPackageFileName:"tso-resource-package.zip",
+        target:null,
+        directoryHandle:null,
+        directoryPermission:"denied"
+      });
+      if(incomplete.complete || incomplete.issues.length < 4){
+        throw new Error("incomplete office setup did not explain missing configuration");
       }
-      if(shouldShowChangeTsoNameButton(false)){
-        throw new Error("renamed file should hide Change TSO Name");
+      const complete = evaluateOfficeSetupStatus({
+        storageId:"mesa",
+        tsoName:"Mesa",
+        expectedPackageFileName:"mesa-resource-package.zip",
+        target:{ packageFileName:"mesa-resource-package.zip" },
+        directoryHandle:{ kind:"directory", name:"Downloads" },
+        directoryPermission:"granted"
+      });
+      if(!complete.complete || complete.issues.length){
+        throw new Error("valid office setup was not complete");
       }
     }
   });
@@ -572,9 +602,65 @@ async function runSelfTests(){
       run.state = "complete";
       run.outputFileName = target.packageFileName;
       run.packageVersion = 8;
+      run.savedAt = "2026-08-06T12:00:00.000Z";
+      run.resourcesAdded = 2;
+      run.resourcesUpdated = 3;
+      run.approvedDeletions = 1;
       if(!sharePointPublishingBodyHTML(run).includes("Merge complete")) throw new Error("merge completion copy missing");
       if(!sharePointPublishingBodyHTML(run).includes("Provo TSO")) throw new Error("office-neutral completion copy did not use the configured office");
       if(!sharePointPublishingBodyHTML(run).includes("Upload to SharePoint")) throw new Error("SharePoint upload prompt missing");
+      const completionText = sharePointPublishingBodyHTML(run);
+      ["Save time", "Resources added", "Resources updated", "Approved deletions", "SharePoint destination", "I replaced the package"]
+        .forEach(label => {
+          if(!completionText.includes(label)) throw new Error(`publication summary omitted ${label}`);
+        });
+      if(!completionText.includes("cannot independently verify")){
+        throw new Error("manual SharePoint verification limitation was omitted");
+      }
+    }
+  });
+
+  tests.push({
+    name: "PUBLICATION HISTORY IS OFFICE SCOPED AND MANUALLY CONFIRMED",
+    fn: () => {
+      const provoKey = getPublicationHistoryStorageKey("provo");
+      const mesaKey = getPublicationHistoryStorageKey("mesa");
+      const previousProvo = localStorage.getItem(provoKey);
+      const previousMesa = localStorage.getItem(mesaKey);
+      try{
+        localStorage.removeItem(provoKey);
+        localStorage.removeItem(mesaKey);
+        const record = PublicationHistoryStore.recordSaved({
+          savedAt:"2026-08-06T12:00:00.000Z",
+          packageVersion:14,
+          fileName:"provo-resource-package.zip",
+          resourceCount:20,
+          resourcesAdded:2,
+          resourcesUpdated:3,
+          approvedDeletions:1,
+          sharePointFolder:"/sites/WSR_TSO/Provo TSO"
+        }, "provo");
+        if(PublicationHistoryStore.load("mesa").length){
+          throw new Error("Provo publishing history leaked into Mesa");
+        }
+        const confirmed = PublicationHistoryStore.confirmReplaced(
+          record.id,
+          "2026-08-06T12:10:00.000Z",
+          "provo"
+        );
+        if(!confirmed || confirmed.replacedAt !== "2026-08-06T12:10:00.000Z"){
+          throw new Error("manual package replacement was not recorded");
+        }
+        const html = officePublicationHistoryHTML(PublicationHistoryStore.load("provo"));
+        if(!html.includes("Replacement recorded") || !html.includes("provo-resource-package.zip")){
+          throw new Error("publication history did not render confirmation and filename");
+        }
+      }finally{
+        if(previousProvo == null) localStorage.removeItem(provoKey);
+        else localStorage.setItem(provoKey, previousProvo);
+        if(previousMesa == null) localStorage.removeItem(mesaKey);
+        else localStorage.setItem(mesaKey, previousMesa);
+      }
     }
   });
 
@@ -585,6 +671,9 @@ async function runSelfTests(){
       const previousEditing = editing;
       const previousStoredData = localStorage.getItem(DATA_STORAGE_KEY);
       const previousUndo = localStorage.getItem(UNDO_STORAGE_KEY);
+      const previousRecovery = localStorage.getItem(PRE_MERGE_STORAGE_KEY);
+      const publicationHistoryKey = getPublicationHistoryStorageKey();
+      const previousPublicationHistory = localStorage.getItem(publicationHistoryKey);
       const previousPublishRun = sharePointPublishRun;
       const previousLastOpenedHandle = lastOpenedResourcePackageHandle;
       const previousSafeRender = safeRender;
@@ -604,6 +693,8 @@ async function runSelfTests(){
         renderSharePointPublishingModal = () => {};
         window.alert = message => { throw new Error(`unexpected alert: ${message}`); };
         localStorage.removeItem(UNDO_STORAGE_KEY);
+        localStorage.removeItem(PRE_MERGE_STORAGE_KEY);
+        localStorage.removeItem(publicationHistoryKey);
         editing = null;
         data = {
           packageVersion:11,
@@ -719,6 +810,20 @@ async function runSelfTests(){
         if(sharePointPublishRun.state !== "complete"){
           throw new Error(`publishing ended in '${sharePointPublishRun.state}' instead of complete`);
         }
+        if(sharePointPublishRun.resourcesAdded !== 1 || sharePointPublishRun.resourcesUpdated !== 0
+          || sharePointPublishRun.approvedDeletions !== 0 || !sharePointPublishRun.savedAt){
+          throw new Error(
+            `publishing summary was added=${sharePointPublishRun.resourcesAdded}, ` +
+            `updated=${sharePointPublishRun.resourcesUpdated}, deletions=${sharePointPublishRun.approvedDeletions}, ` +
+            `savedAt=${sharePointPublishRun.savedAt}`
+          );
+        }
+        if(getRecoveryPoints().length !== 1){
+          throw new Error("guided publishing did not retain a pre-merge recovery point");
+        }
+        if(PublicationHistoryStore.load().length !== 1 || !sharePointPublishRun.publicationId){
+          throw new Error("saved publication was not recorded locally");
+        }
         if(!savedBlob) throw new Error("merged canonical package was not written");
         const savedZip = await JSZip.loadAsync(savedBlob);
         const savedJsonFile = savedZip.file("tso-resources.json");
@@ -739,6 +844,14 @@ async function runSelfTests(){
         if(!savedZip.file(localPdfPath) || !savedZip.file(canonicalPdfPath)){
           throw new Error("prepared or canonical PDF was omitted from the saved package");
         }
+        confirmSharePointPackageUploaded();
+        const recorded = PublicationHistoryStore.load()[0];
+        if(sharePointPublishRun.state !== "uploaded" || !recorded.replacedAt){
+          throw new Error("manual SharePoint replacement confirmation was not recorded");
+        }
+        if(getRecoveryPoints().length !== 1){
+          throw new Error("replacement confirmation removed recovery history");
+        }
       }finally{
         window.alert = previousAlert;
         getPDF = previousGetPDF;
@@ -753,6 +866,10 @@ async function runSelfTests(){
         else localStorage.setItem(DATA_STORAGE_KEY, previousStoredData);
         if(previousUndo == null) localStorage.removeItem(UNDO_STORAGE_KEY);
         else localStorage.setItem(UNDO_STORAGE_KEY, previousUndo);
+        if(previousRecovery == null) localStorage.removeItem(PRE_MERGE_STORAGE_KEY);
+        else localStorage.setItem(PRE_MERGE_STORAGE_KEY, previousRecovery);
+        if(previousPublicationHistory == null) localStorage.removeItem(publicationHistoryKey);
+        else localStorage.setItem(publicationHistoryKey, previousPublicationHistory);
       }
     }
   });
@@ -2123,13 +2240,15 @@ async function runSelfTests(){
   });
 
   tests.push({
-    name: "NEW ADMIN SETUP BUTTON POINTS TO TSO NAME",
+    name: "NEW ADMIN OFFICE SETUP BUTTON IS AVAILABLE",
     fn: () => withSelfTestHtmlFileName("new.html", () => {
       const previousData = data;
       const previousView = view;
       const previousAdminVisible = isAdminVisible;
       const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
       const previousPendingTraining = localStorage.getItem(NEW_ADMIN_TRAINING_PENDING_KEY);
+      const sharePointTargetKey = getSharePointPublishingTargetStorageKey();
+      const previousSharePointTarget = localStorage.getItem(sharePointTargetKey);
       try{
         data = { categories:[{ id:"food", label:"Food" }], resources:[], changes:[] };
         view = "admin";
@@ -2139,9 +2258,9 @@ async function runSelfTests(){
         closeReferenceModal();
         render();
         const toolbarButtons = Array.from(document.querySelectorAll("#adminView .admin-toolbar-reference-actions button"));
-        const setupButton = toolbarButtons.find(button => button.textContent.trim() === "Change TSO Name");
+        const setupButton = toolbarButtons.find(button => button.textContent.trim() === "Office Setup");
         if(!setupButton){
-          throw new Error("new template should show Change TSO Name");
+          throw new Error("new template should show Office Setup");
         }
         const tip = document.querySelector("#adminView .red-tip");
         if(!tip) throw new Error("new admin setup tip was not rendered");
@@ -2162,6 +2281,8 @@ async function runSelfTests(){
         else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoName);
         if(previousPendingTraining === null) localStorage.removeItem(NEW_ADMIN_TRAINING_PENDING_KEY);
         else localStorage.setItem(NEW_ADMIN_TRAINING_PENDING_KEY, previousPendingTraining);
+        if(previousSharePointTarget === null) localStorage.removeItem(sharePointTargetKey);
+        else localStorage.setItem(sharePointTargetKey, previousSharePointTarget);
       }
     })
   });
@@ -2278,6 +2399,8 @@ async function runSelfTests(){
       const previousAdminVisible = isAdminVisible;
       const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
       const previousPendingTraining = localStorage.getItem(NEW_ADMIN_TRAINING_PENDING_KEY);
+      const sharePointTargetKey = getSharePointPublishingTargetStorageKey();
+      const previousSharePointTarget = localStorage.getItem(sharePointTargetKey);
       try{
         data = { categories:[{ id:"food", label:"Food" }], resources:[], changes:[], lastModified:nowISO() };
         view = "admin";
@@ -2288,7 +2411,7 @@ async function runSelfTests(){
         render();
         showAdminSetup();
         const nameInput = document.getElementById("adminSetupTsoName");
-        const saveBtn = document.getElementById("adminSetupSaveName");
+        const saveBtn = document.getElementById("officeSetupSave");
         nameInput.value = "Provo";
         saveBtn.click();
         if(getTsoName() !== "Provo") throw new Error("TSO name was not saved");
@@ -2299,8 +2422,10 @@ async function runSelfTests(){
           throw new Error("saving TSO name from new.html should queue one-time renamed training");
         }
         const modal = document.getElementById("referenceModal");
-        if(!modal || !(modal.textContent || "").includes("After the blue bar looks right, click Close.")){
-          throw new Error("setup modal should tell admin to click Close after the blue bar looks right");
+        const modalText = modal && modal.textContent || "";
+        if(!modal || !modalText.includes("Storage ID") || !modalText.includes("Test Configuration")
+          || !modalText.includes("Download-folder authorization")){
+          throw new Error("office setup modal omitted required configuration fields");
         }
         modal.querySelector(".reference-modal-close").click();
         if(!modal.classList.contains("hidden")){
@@ -2316,6 +2441,8 @@ async function runSelfTests(){
         else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousTsoName);
         if(previousPendingTraining === null) localStorage.removeItem(NEW_ADMIN_TRAINING_PENDING_KEY);
         else localStorage.setItem(NEW_ADMIN_TRAINING_PENDING_KEY, previousPendingTraining);
+        if(previousSharePointTarget === null) localStorage.removeItem(sharePointTargetKey);
+        else localStorage.setItem(sharePointTargetKey, previousSharePointTarget);
       }
     })
   });
@@ -2945,7 +3072,7 @@ async function runSelfTests(){
   });
 
   tests.push({
-    name: "PRE-MERGE RESTORE POINT",
+    name: "PRE-MERGE RECOVERY POINT IS RETAINED AFTER RESTORE",
     fn: () => {
       const previousData = data;
       const previousStoredData = localStorage.getItem(DATA_STORAGE_KEY);
@@ -2954,6 +3081,7 @@ async function runSelfTests(){
       const previousUndo = localStorage.getItem(UNDO_STORAGE_KEY);
       const previousConfirm = window.confirm;
       try{
+        localStorage.removeItem(PRE_MERGE_STORAGE_KEY);
         data = {
           packageVersion:11,
           categories:[],
@@ -2968,7 +3096,7 @@ async function runSelfTests(){
         if(!data.resources.some(resource => resource.id === "before") || data.resources.some(resource => resource.id === "after")){
           throw new Error("pre-merge state was not restored");
         }
-        if(getPreMergeSnapshot()) throw new Error("used pre-merge restore point was not cleared");
+        if(getRecoveryPoints().length !== 1) throw new Error("restored recovery point should remain available");
       }finally{
         window.confirm = previousConfirm;
         data = previousData;
@@ -2980,6 +3108,144 @@ async function runSelfTests(){
         else localStorage.setItem(DELETION_REVIEW_STORAGE_KEY, previousReview);
         if(previousUndo == null) localStorage.removeItem(UNDO_STORAGE_KEY);
         else localStorage.setItem(UNDO_STORAGE_KEY, previousUndo);
+      }
+    }
+  });
+
+  tests.push({
+    name: "RECOVERY STORE RETAINS FIVE LABELED POINTS",
+    fn: () => {
+      const previousData = data;
+      const previousStoredData = localStorage.getItem(DATA_STORAGE_KEY);
+      const previousSnapshot = localStorage.getItem(PRE_MERGE_STORAGE_KEY);
+      const previousReview = localStorage.getItem(DELETION_REVIEW_STORAGE_KEY);
+      const previousUndo = localStorage.getItem(UNDO_STORAGE_KEY);
+      const previousConfirm = window.confirm;
+      try{
+        localStorage.removeItem(PRE_MERGE_STORAGE_KEY);
+        for(let index = 0; index < 6; index += 1){
+          data = {
+            packageVersion:index,
+            categories:[],
+            forGroups:[],
+            resources:[{
+              id:`snapshot-${index}`,
+              name:`Snapshot ${index}`,
+              categories:[],
+              categoryFilters:{},
+              forGroups:[],
+              informationText:""
+            }],
+            changes:[], deletionRequests:[], deletions:[]
+          };
+          if(!savePreMergeSnapshot(`package-${index}.zip`)) throw new Error("recovery point save failed");
+        }
+        const points = getRecoveryPoints();
+        if(points.length !== 5) throw new Error(`expected five recovery points, got ${points.length}`);
+        if(points[0].fileName !== "package-5.zip" || points.some(point => !point.savedAt)){
+          throw new Error("recovery points were not labeled newest first");
+        }
+        const selected = points.find(point => point.fileName === "package-2.zip");
+        if(!selected) throw new Error("expected retained recovery point was missing");
+        data.resources = [{ id:"current", name:"Current", categories:[], categoryFilters:{}, forGroups:[], informationText:"" }];
+        window.confirm = () => true;
+        restoreRecoveryPoint(selected.id);
+        if(!data.resources.some(resource => resource.id === "snapshot-2")){
+          throw new Error("selected recovery point was not restored");
+        }
+        if(getRecoveryPoints().length !== 5) throw new Error("restore removed recovery history");
+        if(!recoveryPointLabel(selected).includes("package-2.zip")
+          || !recoveryPointLabel(selected).includes("Resource Package 2")){
+          throw new Error("recovery label omitted source filename or package version");
+        }
+      }finally{
+        window.confirm = previousConfirm;
+        data = previousData;
+        if(previousStoredData == null) localStorage.removeItem(DATA_STORAGE_KEY);
+        else localStorage.setItem(DATA_STORAGE_KEY, previousStoredData);
+        if(previousSnapshot == null) localStorage.removeItem(PRE_MERGE_STORAGE_KEY);
+        else localStorage.setItem(PRE_MERGE_STORAGE_KEY, previousSnapshot);
+        if(previousReview == null) localStorage.removeItem(DELETION_REVIEW_STORAGE_KEY);
+        else localStorage.setItem(DELETION_REVIEW_STORAGE_KEY, previousReview);
+        if(previousUndo == null) localStorage.removeItem(UNDO_STORAGE_KEY);
+        else localStorage.setItem(UNDO_STORAGE_KEY, previousUndo);
+      }
+    }
+  });
+
+  tests.push({
+    name: "LEGACY SINGLE RECOVERY POINT REMAINS USABLE",
+    fn: () => {
+      const previousSnapshot = localStorage.getItem(PRE_MERGE_STORAGE_KEY);
+      try{
+        localStorage.setItem(PRE_MERGE_STORAGE_KEY, JSON.stringify({
+          dataSnapshot:{
+            packageVersion:9,
+            categories:[],
+            resources:[],
+            forGroups:[],
+            changes:[],
+            deletionRequests:[],
+            deletions:[]
+          },
+          fileName:"legacy-package.zip",
+          savedAt:"2026-07-01T12:00:00.000Z"
+        }));
+        const first = getRecoveryPoints();
+        const second = getRecoveryPoints();
+        if(first.length !== 1 || first[0].fileName !== "legacy-package.zip" || first[0].packageVersion !== 9){
+          throw new Error("legacy recovery point was not read");
+        }
+        if(first[0].id !== second[0].id){
+          throw new Error("legacy recovery point did not receive a stable ID");
+        }
+      }finally{
+        if(previousSnapshot == null) localStorage.removeItem(PRE_MERGE_STORAGE_KEY);
+        else localStorage.setItem(PRE_MERGE_STORAGE_KEY, previousSnapshot);
+      }
+    }
+  });
+
+  tests.push({
+    name: "UNSAFE RECOVERY POINT DOES NOT REPLACE CURRENT DATA",
+    fn: () => {
+      const previousData = data;
+      const previousSnapshot = localStorage.getItem(PRE_MERGE_STORAGE_KEY);
+      const previousConfirm = window.confirm;
+      const previousAlert = window.alert;
+      let alertText = "";
+      try{
+        data = {
+          packageVersion:1,
+          categories:[],
+          resources:[{ id:"current", name:"Current", categories:[], categoryFilters:{}, forGroups:[], informationText:"" }],
+          forGroups:[], changes:[], deletionRequests:[], deletions:[]
+        };
+        localStorage.setItem(PRE_MERGE_STORAGE_KEY, JSON.stringify({
+          schemaVersion:RECOVERY_POINT_SCHEMA_VERSION,
+          recoveryPoints:[{
+            id:"unsafe-recovery",
+            dataSnapshot:{ resourcePackageSchemaVersion:99, categories:[], resources:[] },
+            fileName:"future-package.zip",
+            savedAt:"2026-07-01T12:00:00.000Z",
+            packageVersion:99
+          }]
+        }));
+        window.confirm = () => true;
+        window.alert = message => { alertText = String(message); };
+        restoreRecoveryPoint("unsafe-recovery");
+        if(!data.resources.some(resource => resource.id === "current")){
+          throw new Error("unsafe recovery point replaced current data");
+        }
+        if(!alertText.includes("could not be restored safely") || !alertText.includes("unsupported")){
+          throw new Error("unsafe recovery point did not explain the failure");
+        }
+      }finally{
+        data = previousData;
+        window.confirm = previousConfirm;
+        window.alert = previousAlert;
+        if(previousSnapshot == null) localStorage.removeItem(PRE_MERGE_STORAGE_KEY);
+        else localStorage.setItem(PRE_MERGE_STORAGE_KEY, previousSnapshot);
       }
     }
   });

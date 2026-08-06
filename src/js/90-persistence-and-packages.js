@@ -1020,7 +1020,11 @@ async function mergeImportPackage(event, options = {}){
       );
       if(getOutstandingDeletionReview()) setTimeout(showDeletionReview, 0);
     }
-    return true;
+    return {
+      mergeSummary,
+      importedPackageVersion,
+      importedData:cloneDataObject(imported)
+    };
   }catch(e){
     alert("Load failed: " + formatResourcePackageError(e));
   }finally{

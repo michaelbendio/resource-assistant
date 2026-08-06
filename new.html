@@ -690,6 +690,55 @@ textarea.information-editor { min-height:320px; resize:vertical; }
 .admin-setup-panel input { width:100%; box-sizing:border-box; margin-top:4px; }
 .admin-setup-note { color:#555; font-size:16px; margin:6px 0 12px; }
 .admin-setup-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:12px; }
+.office-setup-panel { width:min(860px,100%); }
+.office-setup-status {
+  margin-bottom:16px;
+  padding:12px 14px;
+  border:1px solid #c8d6e6;
+  border-radius:8px;
+  background:#f7fbff;
+}
+.office-setup-status.complete { border-color:#82b994; background:#effaf2; color:#145c2d; }
+.office-setup-status.incomplete { border-color:#d8b35e; background:#fff8e7; color:#6b4b00; }
+.office-setup-status p { margin:6px 0; }
+.office-setup-status ul { margin:8px 0 0 20px; padding:0; }
+.office-setup-details { margin-top:10px; }
+.office-setup-folder-row {
+  display:flex;
+  justify-content:space-between;
+  gap:16px;
+  align-items:center;
+  margin:12px 0;
+  padding:12px 14px;
+  border:1px solid #dde6ef;
+  border-radius:8px;
+}
+.office-publication-history-section { margin-top:22px; padding-top:16px; border-top:1px solid #c8d6e6; }
+.office-publication-history-section h3 { margin:0 0 6px; }
+.office-publication-history { display:grid; gap:8px; }
+.office-publication-entry,
+.recovery-point-entry {
+  display:flex;
+  justify-content:space-between;
+  gap:14px;
+  padding:11px 12px;
+  border:1px solid #dde6ef;
+  border-radius:7px;
+  background:#fff;
+}
+.office-publication-entry { flex-direction:column; gap:3px; }
+.office-publication-entry span,
+.recovery-point-entry span { display:block; color:#555; }
+.publication-summary { margin-top:14px; }
+.recovery-points-panel { width:min(820px,100%); }
+.recovery-points-list { display:grid; gap:10px; }
+.recovery-point-entry > div { min-width:0; }
+.recovery-point-entry .button { flex:0 0 auto; align-self:center; }
+@media (max-width:600px){
+  .office-setup-folder-row,
+  .recovery-point-entry { align-items:stretch; flex-direction:column; }
+  .sharepoint-publish-destination div { grid-template-columns:1fr; gap:2px; }
+}
 .setup-mockup {
   border:1px solid #dde6ef;
   border-radius:6px;
@@ -965,8 +1014,13 @@ textarea.information-editor { min-height:320px; resize:vertical; }
 
 <script id="app-release-data" type="application/json">
 {
-  "version": "2.2.13",
+  "version": "2.2.14",
   "changes": [
+    {
+      "date": "2026-08-06",
+      "version": "2.2.14",
+      "message": "Add office setup, publication summaries, history, and five recovery points"
+    },
     {
       "date": "2026-08-06",
       "version": "2.2.13",
@@ -986,11 +1040,6 @@ textarea.information-editor { min-height:320px; resize:vertical; }
       "date": "2026-08-04",
       "version": "2.2.10",
       "message": "Preserve legacy For groups during package merges"
-    },
-    {
-      "date": "2026-08-04",
-      "version": "2.2.10",
-      "message": "Configure SharePoint publishing per office"
     }
   ]
 }
@@ -2308,7 +2357,6 @@ const STARTUP_STATE_STORAGE_KEYS = [
   PRINT_SELECTION_STORAGE_KEY,
   LEGACY_FAVORITES_STORAGE_KEY,
   UNDO_STORAGE_KEY,
-  PRE_MERGE_STORAGE_KEY,
   DELETION_REVIEW_STORAGE_KEY
 ];
 
@@ -2321,6 +2369,7 @@ function runStartupStateReset(fileName = getCurrentHtmlFileName()){
   if(shouldResetTemplateStorageOnStartup(fileName)){
     localStorage.removeItem(DATA_STORAGE_KEY);
     localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+    localStorage.removeItem(PRE_MERGE_STORAGE_KEY);
   }
   sessionStorage.clear();
 }
@@ -2335,6 +2384,7 @@ function clearCurrentLocalState(){
   clearTemporaryLocalState();
   localStorage.removeItem(DATA_STORAGE_KEY);
   localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+  localStorage.removeItem(PRE_MERGE_STORAGE_KEY);
   localStorage.removeItem(DISMISSED_TIPS_STORAGE_KEY);
   localStorage.removeItem(NEW_ADMIN_TRAINING_PENDING_KEY);
 }
@@ -2386,7 +2436,7 @@ let data = JSON.parse(localStorage.getItem(DATA_STORAGE_KEY) || "null");
 const TIP_TEXT = {
   user: "Click on a category to see its resources. Click a resource to see details. Click ⬜ to include it in the printed handout.",
   newAdminWelcome: "Welcome to you, new admin. Press Ctrl+Alt+A to enter admin mode",
-  newAdminMode: "Click \"Change TSO Name\" to name this TSO Resources. Then close this tab or window and rename new.html to the changed name, keeping the .html extension. Open it and enter admin mode again."
+  newAdminMode: "Click \"Office Setup\" to name this TSO Resources. Then close this tab or window and rename new.html to the changed name, keeping the .html extension. Open it and enter admin mode again."
 };
 const DEFAULT_RESOURCE_PACKAGE_FILENAME = "tso-resources.json";
 const CATEGORY_REMINDER_TEXT = "Report bugs or request enhancments to Elder Bendio (michaelbendio@gmail.com)"
@@ -2891,10 +2941,6 @@ function getCategoryTipId(){
   return "user";
 }
 
-function shouldShowChangeTsoNameButton(isTemplateFile = isNewTemplateFile()){
-  return !!isTemplateFile;
-}
-
 function printAdminHelp(){
   const modal = document.getElementById("referenceModal");
   if(!modal || modal.classList.contains("hidden")) return;
@@ -2968,57 +3014,7 @@ if(topbar){
 }
 
 function showAdminSetup(){
-  const modal = getReferenceModal();
-  modal.innerHTML = `
-    <div class="reference-modal-panel" role="dialog" aria-modal="true" aria-labelledby="adminSetupTitle">
-      <div class="reference-modal-header">
-        <div id="adminSetupTitle" class="reference-modal-title">Admin Setup</div>
-        <button class="button reference-modal-close" type="button">Close</button>
-      </div>
-      <div class="reference-modal-body admin-setup-panel">
-        <label for="adminSetupTsoName">What is the name of your TSO?
-          <input id="adminSetupTsoName" type="text" value="${escapeHTML(getTsoName())}" placeholder="Example: Provo">
-        </label>
-        <p class="admin-setup-note">This name appears in the blue title bar. You can change it and save again until it looks right.</p>
-        <div class="admin-setup-actions">
-          <button class="button primary" type="button" id="adminSetupSaveName">Save TSO Name</button>
-        </div>
-        <p class="admin-setup-note">After the blue bar looks right, click Close.</p>
-      </div>
-    </div>
-  `;
-
-  const closeBtn = modal.querySelector(".reference-modal-close");
-  const nameInput = document.getElementById("adminSetupTsoName");
-  const saveBtn = document.getElementById("adminSetupSaveName");
-
-  function saveName(){
-    const nextName = String(nameInput ? nameInput.value : "").trim();
-    if(nextName){
-      localStorage.setItem(TSO_NAME_STORAGE_KEY, nextName);
-      if(isNewTemplateFile()) markRenamedAdminTrainingPending(nextName);
-    }else{
-      localStorage.removeItem(TSO_NAME_STORAGE_KEY);
-      if(isNewTemplateFile()) localStorage.removeItem(NEW_ADMIN_TRAINING_PENDING_KEY);
-    }
-    refreshAppTitle();
-    safeRender();
-    showToast("TSO name saved.");
-  }
-
-  if(closeBtn) closeBtn.addEventListener("click", () => {
-    closeReferenceModal();
-  });
-  if(saveBtn) saveBtn.addEventListener("click", saveName);
-  if(nameInput){
-    nameInput.addEventListener("keydown", event => {
-      if(event.key !== "Enter") return;
-      event.preventDefault();
-      saveName();
-    });
-  }
-  modal.classList.remove("hidden");
-  if(nameInput) nameInput.focus();
+  showOfficeSetup();
 }
 
 function showUserHelp(){
@@ -3224,14 +3220,21 @@ function showAdminHelp(options = {}){
         </details>
 
         <details>
+          <summary>Office Setup</summary>
+          <div class="admin-help-section-body">
+            <p><strong>Office Setup</strong> gathers the TSO name, this file's storage ID, expected package filename, SharePoint package URL, and download-folder authorization in one place.</p>
+            <p>Use <strong>Test Configuration</strong> until the panel says <strong>Setup complete</strong>. The settings and publishing history belong only to this office file on this computer and are never exported in a resource package.</p>
+          </div>
+        </details>
+
+        <details>
           <summary>Publish to SharePoint</summary>
           <div class="admin-help-section-body">
             <p>Every office-specific file shows <strong>Publish to SharePoint</strong> immediately to the left of <strong>Admin Help</strong>.</p>
-            <p>On each computer's first use, select or open this office's resource-package ZIP in SharePoint, copy its complete address-bar URL, and paste it into the publishing panel. Confirm the office, package, and SharePoint folder shown by TSO Resources.</p>
-            <p>Next, choose the folder where Edge saves downloads and grant read and write access. This SharePoint destination and folder authorization are stored only for this office on this computer; they are never included in a resource package.</p>
-            <p>Open the current SharePoint package from the publishing panel and click SharePoint's Download arrow. TSO Resources detects the completed download, shows <strong>Merging</strong>, merges the canonical package with the prepared local data, reapplies approved deletions, and saves the configured package filename. When <strong>Merge complete</strong> appears, click <strong>Upload to SharePoint</strong>, upload that file, and choose <strong>Replace</strong>.</p>
-            <p>If Edge saves the download somewhere unexpected, use <strong>Select downloaded package</strong>. The final SharePoint replacement remains manual so SharePoint permissions authorize it.</p>
-            <p>Use <strong>Change SharePoint destination</strong> only if this office's package moves to a different SharePoint folder.</p>
+            <p>Complete <strong>Office Setup</strong> first. Then open the current SharePoint package from the publishing panel and click SharePoint's Download arrow. TSO Resources detects the completed download, shows <strong>Merging</strong>, merges the canonical package with the prepared local data, reapplies approved deletions, and saves the configured package filename.</p>
+            <p>After <strong>Merge complete</strong>, review the saved package version, filename, save time, resource changes, approved deletions, and SharePoint destination. Click <strong>Upload to SharePoint</strong>, upload the file, and choose <strong>Replace</strong>.</p>
+            <p>After SharePoint finishes, click <strong>I replaced the package</strong>. This records the administrator's confirmation in local publishing history; TSO Resources cannot independently verify the upload.</p>
+            <p>If Edge saves the download somewhere unexpected, use <strong>Select downloaded package</strong>. Change the destination or folder in <strong>Office Setup</strong> if the office workflow moves.</p>
           </div>
         </details>
 
@@ -3240,7 +3243,8 @@ function showAdminHelp(options = {}){
           <div class="admin-help-section-body">
             <p>Delete actions tag resources, categories, Types, and For groups for deletion without removing them. Tagged items remain active and are labeled <strong>tagged for deletion</strong>.</p>
             <p>After an admin merges a package containing deletion tags, the review opens immediately. It shows affected resources and can print a working list. The admin chooses which deletions to approve and can continue editing the merged data.</p>
-            <p><strong>Return to before merge</strong> restores the one snapshot saved immediately before the latest merge. It also discards edits made after that merge.</p>
+            <p><strong>Recovery points</strong> retains the five newest pre-merge snapshots, including guided SharePoint merges. Each is labeled with save time, package version, and source filename.</p>
+            <p>Select <strong>Restore</strong> only after checking the label. Restoring discards current edits made after that point but retains the recovery history.</p>
           </div>
         </details>
 
@@ -4476,7 +4480,7 @@ function renderAdmin(){
   const undo = getUndoSnapshot();
   const undoButtonLabel = undo ? `Undo ${undo.message}` : "";
   const hasChangeLog = getRecentChanges().length > 0;
-  const preMerge = getPreMergeSnapshot();
+  const recoveryPoints = getRecoveryPoints();
   const deletionReview = getOutstandingDeletionReview();
 
   container.innerHTML = `
@@ -4484,7 +4488,7 @@ function renderAdmin(){
       <div class="admin-sticky-package-actions">
         <button class="button primary" onclick="exportPackage()">Save Resource Package</button>
         ${deletionReview ? `<button class="button" onclick="showDeletionReview()">Review tagged deletions</button>` : ""}
-        ${preMerge ? `<button class="button" onclick="restorePreMergeState()">Return to before merge</button>` : ""}
+        ${recoveryPoints.length ? `<button class="button" onclick="showRecoveryPoints()">Recovery points (${recoveryPoints.length})</button>` : ""}
         ${hasChangeLog ? `
           <button class="button" onclick="showChangeLog()">Show change log</button>
           <button class="button" onclick="clearChangeLog()">Clear change log</button>
@@ -4495,7 +4499,7 @@ function renderAdmin(){
         ` : ""}
       </div>
       <div class="admin-toolbar-reference-actions admin-sticky-reference-actions">
-        ${shouldShowChangeTsoNameButton() ? `<button class="button" onclick="showAdminSetup()">Change TSO Name</button>` : ""}
+        <button class="button" onclick="showAdminSetup()">Office Setup</button>
         ${getSharePointPublishingButtonHTML()}
         <button class="button admin-toolbar-help" onclick="showAdminHelp()">Admin Help</button>
       </div>
@@ -5577,7 +5581,11 @@ async function mergeImportPackage(event, options = {}){
       );
       if(getOutstandingDeletionReview()) setTimeout(showDeletionReview, 0);
     }
-    return true;
+    return {
+      mergeSummary,
+      importedPackageVersion,
+      importedData:cloneDataObject(imported)
+    };
   }catch(e){
     alert("Load failed: " + formatResourcePackageError(e));
   }finally{
@@ -5670,42 +5678,179 @@ function getDeletionKindLabel(kind){
   return ({ resource:"Resource", category:"Category", type:"Type", forGroup:"For group" })[kind] || "Item";
 }
 
+const RECOVERY_POINT_SCHEMA_VERSION = 2;
+const RECOVERY_POINT_LIMIT = 5;
+
+function normalizeRecoveryPoint(point){
+  if(!point || typeof point !== "object" || Array.isArray(point)) return null;
+  if(!point.dataSnapshot || typeof point.dataSnapshot !== "object" || Array.isArray(point.dataSnapshot)) return null;
+  const savedAt = Date.parse(String(point.savedAt || "")) ? String(point.savedAt) : nowISO();
+  const fileName = String(point.fileName || "resource package").trim() || "resource package";
+  return {
+    id:String(point.id || stablePDFIdFromPath(`${savedAt}:${fileName}`, "recovery")),
+    dataSnapshot:cloneDataObject(point.dataSnapshot),
+    fileName,
+    savedAt,
+    packageVersion:normalizePackageVersionValue(
+      point.packageVersion != null ? point.packageVersion : point.dataSnapshot.packageVersion
+    )
+  };
+}
+
+const AdminRecoveryStore = Object.freeze({
+  load(){
+    try{
+      const parsed = JSON.parse(localStorage.getItem(PRE_MERGE_STORAGE_KEY) || "null");
+      const points = parsed && Array.isArray(parsed.recoveryPoints)
+        ? parsed.recoveryPoints
+        : (parsed && parsed.dataSnapshot ? [parsed] : []);
+      return points
+        .map(normalizeRecoveryPoint)
+        .filter(Boolean)
+        .sort((a, b) => String(b.savedAt).localeCompare(String(a.savedAt)))
+        .slice(0, RECOVERY_POINT_LIMIT);
+    }catch(_err){
+      return [];
+    }
+  },
+
+  save(points){
+    const normalized = (Array.isArray(points) ? points : [])
+      .map(normalizeRecoveryPoint)
+      .filter(Boolean)
+      .sort((a, b) => String(b.savedAt).localeCompare(String(a.savedAt)))
+      .slice(0, RECOVERY_POINT_LIMIT);
+    let candidates = normalized.slice();
+    let lastError = null;
+    while(candidates.length){
+      try{
+        localStorage.setItem(PRE_MERGE_STORAGE_KEY, JSON.stringify({
+          schemaVersion:RECOVERY_POINT_SCHEMA_VERSION,
+          recoveryPoints:candidates
+        }));
+        return candidates;
+      }catch(err){
+        lastError = err;
+        if(candidates.length <= 3) break;
+        candidates = candidates.slice(0, -1);
+      }
+    }
+    if(!normalized.length){
+      localStorage.removeItem(PRE_MERGE_STORAGE_KEY);
+      return [];
+    }
+    throw lastError || new Error("Recovery points could not be saved.");
+  },
+
+  add(fileName, snapshot = data){
+    const savedAt = nowISO();
+    const point = normalizeRecoveryPoint({
+      id:`recovery:${savedAt}:${Math.random().toString(16).slice(2, 10)}`,
+      dataSnapshot:snapshot,
+      fileName,
+      savedAt,
+      packageVersion:snapshot && snapshot.packageVersion
+    });
+    const existing = this.load().filter(item => item.id !== point.id);
+    return this.save([point, ...existing])[0];
+  },
+
+  find(recoveryId){
+    const id = String(recoveryId || "");
+    return this.load().find(point => point.id === id) || null;
+  }
+});
+
 function savePreMergeSnapshot(fileName){
   try{
-    localStorage.setItem(PRE_MERGE_STORAGE_KEY, JSON.stringify({
-      dataSnapshot:cloneDataObject(data),
-      fileName:String(fileName || "resource package"),
-      savedAt:nowISO()
-    }));
+    AdminRecoveryStore.add(String(fileName || "resource package"));
     return true;
   }catch(_err){
-    alert("The merge cannot begin because the pre-merge restore point could not be saved. Free browser storage and try again.");
+    alert("The merge cannot begin because at least three recovery points could not be retained. Free browser storage and try again.");
     return false;
   }
 }
 
-function getPreMergeSnapshot(){
-  try{
-    const parsed = JSON.parse(localStorage.getItem(PRE_MERGE_STORAGE_KEY) || "null");
-    return parsed && parsed.dataSnapshot && typeof parsed.dataSnapshot === "object" ? parsed : null;
-  }catch(_err){
-    return null;
-  }
+function getRecoveryPoints(){
+  return AdminRecoveryStore.load();
 }
 
-function restorePreMergeState(){
-  const snapshot = getPreMergeSnapshot();
+function getPreMergeSnapshot(){
+  return getRecoveryPoints()[0] || null;
+}
+
+function recoveryPointLabel(point){
+  return `${formatLocalDateTime(point && point.savedAt)} · Resource Package ${String(point && point.packageVersion)} · ${String(point && point.fileName || "resource package")}`;
+}
+
+function restoreRecoveryPoint(recoveryId){
+  const snapshot = AdminRecoveryStore.find(recoveryId);
   if(!snapshot) return;
-  if(!confirm(`Return to the state before merging ${snapshot.fileName}?\n\nEdits made after that merge will also be discarded.`)) return;
-  data = normalizePackageData(cloneDataObject(snapshot.dataSnapshot));
-  localStorage.removeItem(PRE_MERGE_STORAGE_KEY);
+  if(!confirm(
+    `Restore this recovery point?\n\n${recoveryPointLabel(snapshot)}\n\n` +
+    "Current edits made after this point will be discarded. The recovery history itself will be retained."
+  )) return;
+  let restoredData;
+  try{
+    restoredData = processResourcePackageData(cloneDataObject(snapshot.dataSnapshot), {
+      sourceName:`Recovery point for ${snapshot.fileName}`
+    }).data;
+  }catch(err){
+    alert(`This recovery point could not be restored safely:\n\n${formatResourcePackageError(err)}`);
+    return;
+  }
+  data = restoredData;
   localStorage.removeItem(DELETION_REVIEW_STORAGE_KEY);
   clearUndoSnapshot();
   sanitizePrintSelection();
   persist();
   closeDeletionReview();
-  showToast("Returned to the pre-merge state.");
+  closeReferenceModal();
+  showToast("Recovery point restored.");
   safeRender();
+}
+
+function restorePreMergeState(){
+  const latest = getPreMergeSnapshot();
+  if(latest) restoreRecoveryPoint(latest.id);
+}
+
+function showRecoveryPoints(){
+  const points = getRecoveryPoints();
+  if(!points.length){
+    showToast("There are no recovery points yet.");
+    return;
+  }
+  const modal = getReferenceModal();
+  modal.innerHTML = `
+    <div class="reference-modal-panel recovery-points-panel" role="dialog" aria-modal="true" aria-labelledby="recoveryPointsTitle">
+      <div class="reference-modal-header">
+        <div>
+          <div id="recoveryPointsTitle" class="reference-modal-title">Pre-merge recovery points</div>
+          <div class="reference-modal-subtitle">Newest first · up to ${RECOVERY_POINT_LIMIT} retained</div>
+        </div>
+        <button class="button reference-modal-close" type="button">Close</button>
+      </div>
+      <div class="reference-modal-body">
+        <p>Restoring replaces current resource data. Review the package version, source filename, and saved time before continuing.</p>
+        <div class="recovery-points-list">
+          ${points.map(point => `
+            <div class="recovery-point-entry">
+              <div>
+                <strong>Resource Package ${escapeHTML(String(point.packageVersion))}</strong>
+                <span>${escapeHTML(point.fileName)}</span>
+                <span>${escapeHTML(formatLocalDateTime(point.savedAt))}</span>
+              </div>
+              <button class="button" type="button" onclick="restoreRecoveryPoint('${escapeHTML(point.id)}')">Restore</button>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+    </div>
+  `;
+  const closeBtn = modal.querySelector(".reference-modal-close");
+  if(closeBtn) closeBtn.addEventListener("click", closeReferenceModal);
+  modal.classList.remove("hidden");
 }
 
 function saveDeletionReview(fileName, packageVersion, incomingRequests){
@@ -8145,6 +8290,373 @@ function renderAdminForGroups(container){
   refreshForGroupDetails();
 }
 
+// Source: src/js/102-office-context.js
+// ============================================================
+// OFFICE CONTEXT, SETUP, AND LOCAL PUBLICATION HISTORY
+// ============================================================
+// This module describes only the office file currently open. It deliberately
+// does not contain an office registry, and none of this state is package data.
+
+const PUBLICATION_HISTORY_SCHEMA_VERSION = 1;
+const PUBLICATION_HISTORY_LIMIT = 10;
+let officeSetupDirectoryHandle = null;
+
+function getPublicationHistoryStorageKey(storageId = STORAGE_KEY_PREFIX){
+  return `${normalizeStorageId(storageId)}PublicationHistory`;
+}
+
+function normalizePublicationHistoryEntry(entry){
+  if(!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
+  const savedAt = Date.parse(String(entry.savedAt || "")) ? String(entry.savedAt) : "";
+  const fileName = String(entry.fileName || "").trim();
+  if(!savedAt || !fileName) return null;
+  const id = String(entry.id || `publication:${savedAt}:${fileName}`).trim();
+  const replacedAt = Date.parse(String(entry.replacedAt || "")) ? String(entry.replacedAt) : "";
+  return {
+    id,
+    savedAt,
+    replacedAt,
+    packageVersion:normalizePackageVersionValue(entry.packageVersion),
+    fileName,
+    resourceCount:Number.isFinite(Number(entry.resourceCount)) ? Number(entry.resourceCount) : 0,
+    resourcesAdded:Number.isFinite(Number(entry.resourcesAdded)) ? Number(entry.resourcesAdded) : 0,
+    resourcesUpdated:Number.isFinite(Number(entry.resourcesUpdated)) ? Number(entry.resourcesUpdated) : 0,
+    approvedDeletions:Number.isFinite(Number(entry.approvedDeletions)) ? Number(entry.approvedDeletions) : 0,
+    sharePointFolder:String(entry.sharePointFolder || "").trim(),
+    sharePointLibraryUrl:String(entry.sharePointLibraryUrl || "").trim()
+  };
+}
+
+const PublicationHistoryStore = Object.freeze({
+  load(storageId = STORAGE_KEY_PREFIX){
+    try{
+      const parsed = JSON.parse(localStorage.getItem(getPublicationHistoryStorageKey(storageId)) || "null");
+      const entries = Array.isArray(parsed)
+        ? parsed
+        : (parsed && Array.isArray(parsed.entries) ? parsed.entries : []);
+      return entries
+        .map(normalizePublicationHistoryEntry)
+        .filter(Boolean)
+        .sort((a, b) => String(b.savedAt).localeCompare(String(a.savedAt)))
+        .slice(0, PUBLICATION_HISTORY_LIMIT);
+    }catch(_err){
+      return [];
+    }
+  },
+
+  save(entries, storageId = STORAGE_KEY_PREFIX){
+    const normalized = (Array.isArray(entries) ? entries : [])
+      .map(normalizePublicationHistoryEntry)
+      .filter(Boolean)
+      .sort((a, b) => String(b.savedAt).localeCompare(String(a.savedAt)))
+      .slice(0, PUBLICATION_HISTORY_LIMIT);
+    localStorage.setItem(getPublicationHistoryStorageKey(storageId), JSON.stringify({
+      schemaVersion:PUBLICATION_HISTORY_SCHEMA_VERSION,
+      entries:normalized
+    }));
+    return normalized;
+  },
+
+  recordSaved(summary, storageId = STORAGE_KEY_PREFIX){
+    const savedAt = Date.parse(String(summary && summary.savedAt || ""))
+      ? String(summary.savedAt)
+      : nowISO();
+    const entry = normalizePublicationHistoryEntry({
+      ...summary,
+      id:String(summary && summary.id || `publication:${savedAt}:${Math.random().toString(16).slice(2, 10)}`),
+      savedAt,
+      replacedAt:""
+    });
+    if(!entry) throw new Error("The local publication record is incomplete.");
+    const entries = this.load(storageId).filter(item => item.id !== entry.id);
+    this.save([entry, ...entries], storageId);
+    return entry;
+  },
+
+  confirmReplaced(publicationId, confirmedAt = nowISO(), storageId = STORAGE_KEY_PREFIX){
+    const id = String(publicationId || "");
+    let confirmed = null;
+    const entries = this.load(storageId).map(entry => {
+      if(entry.id !== id) return entry;
+      confirmed = normalizePublicationHistoryEntry({ ...entry, replacedAt:confirmedAt });
+      return confirmed;
+    });
+    if(!confirmed) return null;
+    this.save(entries, storageId);
+    return confirmed;
+  }
+});
+
+function evaluateOfficeSetupStatus(context){
+  const storageId = String(context && context.storageId || "").trim();
+  const tsoName = String(context && context.tsoName || "").trim();
+  const expectedPackageFileName = String(context && context.expectedPackageFileName || "").trim();
+  const target = context && context.target;
+  const directoryHandle = context && context.directoryHandle;
+  const directoryPermission = String(context && context.directoryPermission || "denied");
+  const issues = [];
+  if(!storageId || normalizeStorageId(storageId) === "new"){
+    issues.push("Open an office-specific HTML file with a configured storage ID.");
+  }
+  if(!tsoName) issues.push("Enter the TSO name.");
+  if(!expectedPackageFileName) issues.push("The expected resource-package filename could not be determined.");
+  if(!target) issues.push("Save a valid SharePoint resource-package URL.");
+  if(!directoryHandle) issues.push("Choose the folder where Edge saves the SharePoint package.");
+  else if(directoryPermission !== "granted") issues.push("Authorize read and write access to the download folder.");
+  return {
+    complete:issues.length === 0,
+    issues,
+    storageId,
+    tsoName,
+    expectedPackageFileName,
+    target:target || null,
+    directoryHandle:directoryHandle || null,
+    directoryName:String(directoryHandle && directoryHandle.name || ""),
+    directoryPermission
+  };
+}
+
+async function getOfficeSetupStatus(options = {}){
+  const storageId = getConfiguredStorageId();
+  const tsoName = getTsoName();
+  const expectedPackageFileName = getExpectedSharePointPackageFileName();
+  const target = getSharePointPublishingTarget();
+  const directoryHandle = options.directoryHandle !== undefined
+    ? options.directoryHandle
+    : await loadPublishingDirectoryHandle();
+  let directoryPermission = await queryPublishingDirectoryPermission(directoryHandle);
+  if(options.requestPermission && directoryHandle && directoryPermission !== "granted"
+    && typeof directoryHandle.requestPermission === "function"){
+    try{
+      directoryPermission = await directoryHandle.requestPermission({ mode:"readwrite" });
+    }catch(_err){
+      directoryPermission = "denied";
+    }
+  }
+  return evaluateOfficeSetupStatus({
+    storageId,
+    tsoName,
+    expectedPackageFileName,
+    target,
+    directoryHandle,
+    directoryPermission
+  });
+}
+
+const OfficeContext = Object.freeze({
+  get storageId(){ return getConfiguredStorageId(); },
+  get tsoName(){ return getTsoName(); },
+  get expectedPackageFileName(){ return getExpectedSharePointPackageFileName(); },
+  get sharePointTarget(){ return getSharePointPublishingTarget(); },
+  inspect:getOfficeSetupStatus,
+  get publicationHistory(){ return PublicationHistoryStore.load(); }
+});
+
+function formatLocalDateTime(value){
+  const date = new Date(String(value || ""));
+  return Number.isFinite(date.getTime()) ? date.toLocaleString() : "Unknown time";
+}
+
+function officePublicationHistoryHTML(entries = PublicationHistoryStore.load()){
+  const history = Array.isArray(entries) ? entries : [];
+  if(!history.length){
+    return `<p class="admin-setup-note">No packages have been saved through guided publishing on this computer.</p>`;
+  }
+  return `
+    <div class="office-publication-history">
+      ${history.slice(0, 5).map(entry => `
+        <div class="office-publication-entry">
+          <strong>Resource Package ${escapeHTML(String(entry.packageVersion))}</strong>
+          <span>${escapeHTML(entry.fileName)} · saved ${escapeHTML(formatLocalDateTime(entry.savedAt))}</span>
+          <span>${entry.replacedAt
+            ? `Replacement recorded ${escapeHTML(formatLocalDateTime(entry.replacedAt))}`
+            : "SharePoint replacement not yet recorded"}</span>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderOfficeSetupStatus(status, message = ""){
+  const statusBox = document.getElementById("officeSetupStatus");
+  const folderStatus = document.getElementById("officeSetupFolderStatus");
+  if(folderStatus){
+    const folderName = status && status.directoryName ? `<strong>${escapeHTML(status.directoryName)}</strong>: ` : "";
+    const permissionText = !status || !status.directoryHandle
+      ? "No folder selected"
+      : (status.directoryPermission === "granted" ? "Authorized" : "Authorization required");
+    folderStatus.innerHTML = `${folderName}${escapeHTML(permissionText)}`;
+  }
+  if(!statusBox) return;
+  if(!status){
+    statusBox.className = "office-setup-status";
+    statusBox.innerHTML = "Checking configuration…";
+    return;
+  }
+  statusBox.className = `office-setup-status ${status.complete ? "complete" : "incomplete"}`;
+  statusBox.innerHTML = `
+    <strong>${status.complete ? "Setup complete" : "Setup incomplete"}</strong>
+    ${message ? `<p>${escapeHTML(message)}</p>` : ""}
+    ${status.issues.length ? `<ul>${status.issues.map(issue => `<li>${escapeHTML(issue)}</li>`).join("")}</ul>` : ""}
+  `;
+}
+
+async function refreshOfficeSetupStatus(options = {}){
+  renderOfficeSetupStatus(null);
+  try{
+    const status = await getOfficeSetupStatus({
+      directoryHandle:officeSetupDirectoryHandle === null ? undefined : officeSetupDirectoryHandle,
+      requestPermission:!!options.requestPermission
+    });
+    officeSetupDirectoryHandle = status.directoryHandle;
+    renderOfficeSetupStatus(status, options.message || "");
+    return status;
+  }catch(err){
+    renderOfficeSetupStatus(evaluateOfficeSetupStatus({
+      storageId:getConfiguredStorageId(),
+      tsoName:getTsoName(),
+      expectedPackageFileName:getExpectedSharePointPackageFileName(),
+      target:getSharePointPublishingTarget(),
+      directoryHandle:null,
+      directoryPermission:"denied"
+    }), `Configuration could not be checked: ${err && err.message ? err.message : err}`);
+    return null;
+  }
+}
+
+function updateOfficeSetupExpectedFilename(){
+  const nameInput = document.getElementById("adminSetupTsoName");
+  const output = document.getElementById("officeSetupExpectedPackage");
+  if(!output) return;
+  const candidateName = String(nameInput && nameInput.value || "").trim();
+  const stem = slugifyFileStem(candidateName || getSharePointPublishingOfficeName(), "tso");
+  output.textContent = `${stem}-resource-package.zip`;
+}
+
+async function saveOfficeSetupFromModal(options = {}){
+  const nameInput = document.getElementById("adminSetupTsoName");
+  const urlInput = document.getElementById("officeSetupSharePointUrl");
+  const nextName = String(nameInput && nameInput.value || "").trim();
+  const destinationInput = String(urlInput && urlInput.value || "").trim();
+  if(nextName){
+    localStorage.setItem(TSO_NAME_STORAGE_KEY, nextName);
+    if(isNewTemplateFile()) markRenamedAdminTrainingPending(nextName);
+  }else{
+    localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+    if(isNewTemplateFile()) localStorage.removeItem(NEW_ADMIN_TRAINING_PENDING_KEY);
+  }
+  refreshAppTitle();
+  updateOfficeSetupExpectedFilename();
+
+  try{
+    if(destinationInput){
+      const target = parseSharePointPublishingUrl(
+        destinationInput,
+        getExpectedSharePointPackageFileName(),
+        getSharePointPublishingOfficeName()
+      );
+      saveSharePointPublishingTarget({ ...target, configuredAt:nowISO() });
+    }else{
+      localStorage.removeItem(getSharePointPublishingTargetStorageKey());
+    }
+  }catch(err){
+    renderOfficeSetupStatus(evaluateOfficeSetupStatus({
+      storageId:getConfiguredStorageId(),
+      tsoName:getTsoName(),
+      expectedPackageFileName:getExpectedSharePointPackageFileName(),
+      target:null,
+      directoryHandle:officeSetupDirectoryHandle,
+      directoryPermission:await queryPublishingDirectoryPermission(officeSetupDirectoryHandle)
+    }), err && err.message ? err.message : String(err));
+    return false;
+  }
+
+  safeRender();
+  const status = await refreshOfficeSetupStatus({
+    requestPermission:!!options.requestPermission,
+    message:options.testConfiguration ? "Configuration test completed." : "Office setup saved locally."
+  });
+  if(!options.silent) showToast(options.testConfiguration ? "Configuration tested." : "Office setup saved.");
+  return !!status;
+}
+
+async function chooseOfficeSetupDirectory(){
+  if(typeof window.showDirectoryPicker !== "function"){
+    renderOfficeSetupStatus(await getOfficeSetupStatus(), "This browser cannot authorize a download folder. Use current Microsoft Edge.");
+    return;
+  }
+  try{
+    const handle = await window.showDirectoryPicker({
+      id:"tso-sharepoint-publishing",
+      startIn:"downloads",
+      mode:"readwrite"
+    });
+    officeSetupDirectoryHandle = handle;
+    await rememberPublishingDirectoryHandle(handle);
+    await refreshOfficeSetupStatus({ requestPermission:true, message:"Download folder selected." });
+  }catch(err){
+    if(err && err.name === "AbortError") return;
+    renderOfficeSetupStatus(await getOfficeSetupStatus(), `The download folder could not be opened: ${err && err.message ? err.message : err}`);
+  }
+}
+
+function showOfficeSetup(){
+  const modal = getReferenceModal();
+  const target = OfficeContext.sharePointTarget;
+  const storageId = OfficeContext.storageId;
+  officeSetupDirectoryHandle = null;
+  modal.innerHTML = `
+    <div class="reference-modal-panel office-setup-panel" role="dialog" aria-modal="true" aria-labelledby="adminSetupTitle">
+      <div class="reference-modal-header">
+        <div>
+          <div id="adminSetupTitle" class="reference-modal-title">Admin Office Setup</div>
+          <div class="reference-modal-subtitle">Configuration for this HTML file on this computer</div>
+        </div>
+        <button class="button reference-modal-close" type="button">Close</button>
+      </div>
+      <div class="reference-modal-body admin-setup-panel">
+        <div id="officeSetupStatus" class="office-setup-status">Checking configuration…</div>
+        <label for="adminSetupTsoName">TSO name
+          <input id="adminSetupTsoName" type="text" value="${escapeHTML(getTsoName())}" placeholder="Example: Provo">
+        </label>
+        <dl class="sharepoint-publish-destination office-setup-details">
+          <div><dt>Storage ID</dt><dd><code>${escapeHTML(storageId || "Not configured")}</code></dd></div>
+          <div><dt>Expected resource-package filename</dt><dd><code id="officeSetupExpectedPackage">${escapeHTML(OfficeContext.expectedPackageFileName)}</code></dd></div>
+        </dl>
+        <label for="officeSetupSharePointUrl">SharePoint package URL
+          <textarea id="officeSetupSharePointUrl" class="sharepoint-publish-url" spellcheck="false" placeholder="https://${SHAREPOINT_PUBLISHING_ALLOWED_HOST}/sites/WSR_TSO/…">${escapeHTML(target && target.packageViewUrl || getStoredSharePointPublishingUrl())}</textarea>
+        </label>
+        <div class="office-setup-folder-row">
+          <div><strong>Download-folder authorization</strong><div id="officeSetupFolderStatus">Checking…</div></div>
+          <button class="button" type="button" id="officeSetupChooseFolder">Choose folder</button>
+        </div>
+        <p class="admin-setup-note">This setup belongs only to the office file currently open. It is stored on this computer and is never included in a resource package.</p>
+        <div class="admin-setup-actions">
+          <button class="button primary" type="button" id="officeSetupSave">Save Office Setup</button>
+          <button class="button" type="button" id="officeSetupTest">Test Configuration</button>
+        </div>
+        <section class="office-publication-history-section">
+          <h3>Publishing history on this computer</h3>
+          <p class="admin-setup-note">“Replaced” means an administrator recorded the manual action. TSO Resources cannot independently verify a SharePoint upload.</p>
+          ${officePublicationHistoryHTML(OfficeContext.publicationHistory)}
+        </section>
+      </div>
+    </div>
+  `;
+  const closeBtn = modal.querySelector(".reference-modal-close");
+  const nameInput = document.getElementById("adminSetupTsoName");
+  const saveBtn = document.getElementById("officeSetupSave");
+  const testBtn = document.getElementById("officeSetupTest");
+  const folderBtn = document.getElementById("officeSetupChooseFolder");
+  if(closeBtn) closeBtn.addEventListener("click", closeReferenceModal);
+  if(nameInput) nameInput.addEventListener("input", updateOfficeSetupExpectedFilename);
+  if(saveBtn) saveBtn.addEventListener("click", () => saveOfficeSetupFromModal());
+  if(testBtn) testBtn.addEventListener("click", () => saveOfficeSetupFromModal({ testConfiguration:true, requestPermission:true }));
+  if(folderBtn) folderBtn.addEventListener("click", chooseOfficeSetupDirectory);
+  modal.classList.remove("hidden");
+  refreshOfficeSetupStatus();
+}
+
 // Source: src/js/105-sharepoint-publishing.js
 // ============================================================
 // GUIDED SHAREPOINT PUBLISHING
@@ -8165,6 +8677,15 @@ let sharePointPublishRun = null;
 
 function getSharePointPublishingTargetStorageKey(storageId = STORAGE_KEY_PREFIX){
   return `${normalizeStorageId(storageId)}SharePointPublishingTarget`;
+}
+
+function getStoredSharePointPublishingUrl(storageId = STORAGE_KEY_PREFIX){
+  try{
+    const stored = JSON.parse(localStorage.getItem(getSharePointPublishingTargetStorageKey(storageId)) || "null");
+    return stored && typeof stored === "object" ? String(stored.packageViewUrl || "") : "";
+  }catch(_err){
+    return "";
+  }
 }
 
 function getSharePointPublishingOfficeName(storageId = STORAGE_KEY_PREFIX){
@@ -8494,6 +9015,41 @@ async function pollForSharePointPackageDownload(){
   run.pollTimer = setTimeout(pollForSharePointPackageDownload, SHAREPOINT_PUBLISHING_POLL_MS);
 }
 
+function summarizePreparedPublication(preparedData, canonicalData){
+  const preparedResources = Array.isArray(preparedData && preparedData.resources) ? preparedData.resources : [];
+  const canonicalResources = new Map(
+    (Array.isArray(canonicalData && canonicalData.resources) ? canonicalData.resources : [])
+      .map(resource => [String(resource && resource.id || ""), resource])
+      .filter(([id]) => id)
+  );
+  const canonicallyDeletedResourceIds = new Set(
+    mergeDeletionRecords([], canonicalData && canonicalData.deletions, "deletedAt")
+      .filter(record => record.kind === "resource")
+      .map(record => record.targetId)
+  );
+  let resourcesAdded = 0;
+  let resourcesUpdated = 0;
+  preparedResources.forEach(resource => {
+    const id = String(resource && resource.id || "");
+    if(!id || canonicallyDeletedResourceIds.has(id)) return;
+    const canonical = canonicalResources.get(id);
+    if(!canonical){
+      resourcesAdded += 1;
+      return;
+    }
+    const choice = chooseMergeObject(resource, canonical);
+    if(choice.item === resource && objectsDiffer(resource, canonical)) resourcesUpdated += 1;
+  });
+
+  const canonicalDeletionKeys = new Set(
+    mergeDeletionRecords([], canonicalData && canonicalData.deletions, "deletedAt")
+      .map(record => record.key)
+  );
+  const approvedDeletions = mergeDeletionRecords([], preparedData && preparedData.deletions, "deletedAt")
+    .filter(record => !canonicalDeletionKeys.has(record.key)).length;
+  return { resourcesAdded, resourcesUpdated, approvedDeletions };
+}
+
 async function mergeAndSaveSharePointPackage(downloaded){
   const run = sharePointPublishRun;
   if(!run || !downloaded || !downloaded.file) return;
@@ -8506,7 +9062,7 @@ async function mergeAndSaveSharePointPackage(downloaded){
 
   try{
     const warnings = [];
-    const merged = await mergeImportPackage({
+    const mergeResult = await mergeImportPackage({
       target: {
         files:[downloaded.file],
         value:"",
@@ -8514,12 +9070,11 @@ async function mergeAndSaveSharePointPackage(downloaded){
       }
     }, {
       preservePreparedChanges:true,
-      skipPreMergeSnapshot:true,
       skipDeletionReview:true,
       silent:true,
       onWarnings:blocks => warnings.push(...blocks)
     });
-    if(!merged) throw new Error("The downloaded resource package could not be merged.");
+    if(!mergeResult) throw new Error("The downloaded resource package could not be merged.");
 
     const outputHandle = run.directoryHandle && typeof run.directoryHandle.getFileHandle === "function"
       ? await run.directoryHandle.getFileHandle(run.target.packageFileName, { create:true })
@@ -8537,6 +9092,24 @@ async function mergeAndSaveSharePointPackage(downloaded){
     const saved = await saveCurrentResourcePackage(saveTarget, { showSuccessToast:false });
     if(!saved) throw new Error("Publishing was canceled before the merged package was saved.");
 
+    const savedAt = nowISO();
+    const publishedChanges = summarizePreparedPublication(preparedDataSnapshot, mergeResult.importedData);
+    let publicationRecord = null;
+    try{
+      publicationRecord = PublicationHistoryStore.recordSaved({
+        savedAt,
+        packageVersion:saved.packageVersion,
+        fileName:run.target.packageFileName,
+        resourceCount:saved.resourceCount,
+        ...publishedChanges,
+        sharePointFolder:String(run.target.parentPath || ""),
+        sharePointLibraryUrl:String(run.target.libraryUrl || "")
+      });
+    }catch(err){
+      warnings.push(
+        `The package was saved, but its local publishing-history entry could not be recorded: ${err && err.message ? err.message : err}`
+      );
+    }
     if(outputHandle) lastOpenedResourcePackageHandle = outputHandle;
     setSharePointPublishingState("complete", {
       outputFileName:run.target.packageFileName,
@@ -8545,6 +9118,11 @@ async function mergeAndSaveSharePointPackage(downloaded){
         : "your browser's Downloads folder",
       packageVersion:saved.packageVersion,
       resourceCount:saved.resourceCount,
+      savedAt,
+      resourcesAdded:publishedChanges.resourcesAdded,
+      resourcesUpdated:publishedChanges.resourcesUpdated,
+      approvedDeletions:publishedChanges.approvedDeletions,
+      publicationId:publicationRecord && publicationRecord.id || "",
       warnings
     });
   }catch(err){
@@ -8598,12 +9176,24 @@ async function checkAgainForSharePointDownload(){
 
 function confirmSharePointPackageUploaded(){
   if(!sharePointPublishRun) return;
-  localStorage.removeItem(PRE_MERGE_STORAGE_KEY);
+  const confirmedAt = nowISO();
+  let historyRecorded = false;
+  if(sharePointPublishRun.publicationId){
+    try{
+      historyRecorded = !!PublicationHistoryStore.confirmReplaced(
+        sharePointPublishRun.publicationId,
+        confirmedAt
+      );
+    }catch(_err){}
+  }
   const undo = getUndoSnapshot();
   if(undo && /^approved deletion/i.test(String(undo.message || ""))){
     clearUndoSnapshot();
   }
-  setSharePointPublishingState("uploaded");
+  setSharePointPublishingState("uploaded", {
+    replacementRecordedAt:confirmedAt,
+    historyRecorded
+  });
   safeRenderAdmin();
 }
 
@@ -8672,7 +9262,7 @@ function cancelSharePointPublishingDestinationChange(){
 
 function restartSharePointPublishing(){
   clearSharePointPublishingTimer();
-  const target = getSharePointPublishingTarget();
+  const target = OfficeContext.sharePointTarget;
   if(!isSharePointPublishingAvailable()){
     sharePointPublishRun = null;
     return;
@@ -8834,19 +9424,31 @@ function sharePointPublishingBodyHTML(run){
     const outputLocation = escapeHTML(run.outputLocation || run.directoryName || "publishing folder");
     return `
       <div class="sharepoint-publish-status sharepoint-publish-success" role="status">Merge complete</div>
-      <p><strong>${escapeHTML(run.outputFileName || target.packageFileName)}</strong> was saved in <strong>${outputLocation}</strong> as Resource Package ${escapeHTML(String(run.packageVersion))}.</p>
+      <dl class="sharepoint-publish-destination publication-summary">
+        <div><dt>Saved package</dt><dd>Resource Package ${escapeHTML(String(run.packageVersion))}</dd></div>
+        <div><dt>Filename</dt><dd><code>${escapeHTML(run.outputFileName || target.packageFileName)}</code></dd></div>
+        <div><dt>Save time</dt><dd>${escapeHTML(formatLocalDateTime(run.savedAt))}</dd></div>
+        <div><dt>Saved in</dt><dd>${outputLocation}</dd></div>
+        <div><dt>Resources added</dt><dd>${escapeHTML(String(run.resourcesAdded || 0))}</dd></div>
+        <div><dt>Resources updated</dt><dd>${escapeHTML(String(run.resourcesUpdated || 0))}</dd></div>
+        <div><dt>Approved deletions</dt><dd>${escapeHTML(String(run.approvedDeletions || 0))}</dd></div>
+        <div><dt>SharePoint destination</dt><dd><code>${escapeHTML(target.parentPath || target.libraryUrl || "Configured office folder")}</code></dd></div>
+      </dl>
       ${warningHTML}
       <p>Upload that file to the <strong>${escapeHTML(officeName)} TSO</strong> SharePoint folder and choose <strong>Replace</strong> when SharePoint asks.</p>
       <a class="button primary" href="${escapeHTML(target.libraryUrl)}" target="_blank" rel="noopener">Upload to SharePoint</a>
-      <button class="button" type="button" onclick="confirmSharePointPackageUploaded()">I replaced the SharePoint file</button>
+      <button class="button" type="button" onclick="confirmSharePointPackageUploaded()">I replaced the package</button>
+      <p class="sharepoint-publish-note">TSO Resources cannot independently verify the SharePoint upload. This button records the administrator's confirmation locally.</p>
     `;
   }
   if(run.state === "uploaded"){
     return `
-      <div class="sharepoint-publish-status sharepoint-publish-success" role="status">Resource package uploaded</div>
-      <p>The administrator confirmed that SharePoint replaced <strong>${escapeHTML(target.packageFileName)}</strong> for <strong>${escapeHTML(officeName)} TSO</strong>.</p>
+      <div class="sharepoint-publish-status sharepoint-publish-success" role="status">SharePoint replacement recorded</div>
+      <p>The administrator recorded replacing <strong>${escapeHTML(target.packageFileName)}</strong> for <strong>${escapeHTML(officeName)} TSO</strong> at ${escapeHTML(formatLocalDateTime(run.replacementRecordedAt))}.</p>
+      <p class="sharepoint-publish-note">This is a local administrative record. TSO Resources cannot independently verify that SharePoint completed the upload.</p>
+      ${run.historyRecorded ? "" : `<p class="sharepoint-publish-warning">The confirmation could not be attached to local publishing history.</p>`}
       <button class="button" type="button" onclick="restartSharePointPublishing()">Publish again</button>
-      <button class="button" type="button" onclick="beginChangeSharePointPublishingDestination()">Change SharePoint destination</button>
+      <button class="button" type="button" onclick="showAdminSetup()">Office Setup and history</button>
     `;
   }
   return `

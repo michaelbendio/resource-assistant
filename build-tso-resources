@@ -28,6 +28,7 @@ APP_JS_SOURCES = [
     "src/js/90-persistence-and-packages.js",
     "src/js/95-deletion-workflow.js",
     "src/js/100-admin-editors.js",
+    "src/js/102-office-context.js",
     "src/js/105-sharepoint-publishing.js",
     "src/js/110-shortcuts.js",
     "src/js/120-startup.js",

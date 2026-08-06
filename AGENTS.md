@@ -109,3 +109,11 @@ Add compatibility behavior to a focused schema migration in
 normalization or make behavior depend on call order. Each new or changed
 migration requires a fixture in `tests/fixtures/package-fixtures.js` and browser
 regression coverage for safe-field preservation and failure behavior.
+
+## Office-local administrative state
+
+Office setup, download-folder handles, publishing history, and recovery points
+belong only to the office HTML file currently open on that computer. Keep this
+state in office-scoped browser storage; never export it in resource packages and
+never introduce a central office registry. Preserve compatibility with existing
+SharePoint destination keys and legacy single pre-merge snapshots.

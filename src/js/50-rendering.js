@@ -260,10 +260,6 @@ function getCategoryTipId(){
   return "user";
 }
 
-function shouldShowChangeTsoNameButton(isTemplateFile = isNewTemplateFile()){
-  return !!isTemplateFile;
-}
-
 function printAdminHelp(){
   const modal = document.getElementById("referenceModal");
   if(!modal || modal.classList.contains("hidden")) return;
@@ -337,57 +333,7 @@ if(topbar){
 }
 
 function showAdminSetup(){
-  const modal = getReferenceModal();
-  modal.innerHTML = `
-    <div class="reference-modal-panel" role="dialog" aria-modal="true" aria-labelledby="adminSetupTitle">
-      <div class="reference-modal-header">
-        <div id="adminSetupTitle" class="reference-modal-title">Admin Setup</div>
-        <button class="button reference-modal-close" type="button">Close</button>
-      </div>
-      <div class="reference-modal-body admin-setup-panel">
-        <label for="adminSetupTsoName">What is the name of your TSO?
-          <input id="adminSetupTsoName" type="text" value="${escapeHTML(getTsoName())}" placeholder="Example: Provo">
-        </label>
-        <p class="admin-setup-note">This name appears in the blue title bar. You can change it and save again until it looks right.</p>
-        <div class="admin-setup-actions">
-          <button class="button primary" type="button" id="adminSetupSaveName">Save TSO Name</button>
-        </div>
-        <p class="admin-setup-note">After the blue bar looks right, click Close.</p>
-      </div>
-    </div>
-  `;
-
-  const closeBtn = modal.querySelector(".reference-modal-close");
-  const nameInput = document.getElementById("adminSetupTsoName");
-  const saveBtn = document.getElementById("adminSetupSaveName");
-
-  function saveName(){
-    const nextName = String(nameInput ? nameInput.value : "").trim();
-    if(nextName){
-      localStorage.setItem(TSO_NAME_STORAGE_KEY, nextName);
-      if(isNewTemplateFile()) markRenamedAdminTrainingPending(nextName);
-    }else{
-      localStorage.removeItem(TSO_NAME_STORAGE_KEY);
-      if(isNewTemplateFile()) localStorage.removeItem(NEW_ADMIN_TRAINING_PENDING_KEY);
-    }
-    refreshAppTitle();
-    safeRender();
-    showToast("TSO name saved.");
-  }
-
-  if(closeBtn) closeBtn.addEventListener("click", () => {
-    closeReferenceModal();
-  });
-  if(saveBtn) saveBtn.addEventListener("click", saveName);
-  if(nameInput){
-    nameInput.addEventListener("keydown", event => {
-      if(event.key !== "Enter") return;
-      event.preventDefault();
-      saveName();
-    });
-  }
-  modal.classList.remove("hidden");
-  if(nameInput) nameInput.focus();
+  showOfficeSetup();
 }
 
 function showUserHelp(){
@@ -593,14 +539,21 @@ function showAdminHelp(options = {}){
         </details>
 
         <details>
+          <summary>Office Setup</summary>
+          <div class="admin-help-section-body">
+            <p><strong>Office Setup</strong> gathers the TSO name, this file's storage ID, expected package filename, SharePoint package URL, and download-folder authorization in one place.</p>
+            <p>Use <strong>Test Configuration</strong> until the panel says <strong>Setup complete</strong>. The settings and publishing history belong only to this office file on this computer and are never exported in a resource package.</p>
+          </div>
+        </details>
+
+        <details>
           <summary>Publish to SharePoint</summary>
           <div class="admin-help-section-body">
             <p>Every office-specific file shows <strong>Publish to SharePoint</strong> immediately to the left of <strong>Admin Help</strong>.</p>
-            <p>On each computer's first use, select or open this office's resource-package ZIP in SharePoint, copy its complete address-bar URL, and paste it into the publishing panel. Confirm the office, package, and SharePoint folder shown by TSO Resources.</p>
-            <p>Next, choose the folder where Edge saves downloads and grant read and write access. This SharePoint destination and folder authorization are stored only for this office on this computer; they are never included in a resource package.</p>
-            <p>Open the current SharePoint package from the publishing panel and click SharePoint's Download arrow. TSO Resources detects the completed download, shows <strong>Merging</strong>, merges the canonical package with the prepared local data, reapplies approved deletions, and saves the configured package filename. When <strong>Merge complete</strong> appears, click <strong>Upload to SharePoint</strong>, upload that file, and choose <strong>Replace</strong>.</p>
-            <p>If Edge saves the download somewhere unexpected, use <strong>Select downloaded package</strong>. The final SharePoint replacement remains manual so SharePoint permissions authorize it.</p>
-            <p>Use <strong>Change SharePoint destination</strong> only if this office's package moves to a different SharePoint folder.</p>
+            <p>Complete <strong>Office Setup</strong> first. Then open the current SharePoint package from the publishing panel and click SharePoint's Download arrow. TSO Resources detects the completed download, shows <strong>Merging</strong>, merges the canonical package with the prepared local data, reapplies approved deletions, and saves the configured package filename.</p>
+            <p>After <strong>Merge complete</strong>, review the saved package version, filename, save time, resource changes, approved deletions, and SharePoint destination. Click <strong>Upload to SharePoint</strong>, upload the file, and choose <strong>Replace</strong>.</p>
+            <p>After SharePoint finishes, click <strong>I replaced the package</strong>. This records the administrator's confirmation in local publishing history; TSO Resources cannot independently verify the upload.</p>
+            <p>If Edge saves the download somewhere unexpected, use <strong>Select downloaded package</strong>. Change the destination or folder in <strong>Office Setup</strong> if the office workflow moves.</p>
           </div>
         </details>
 
@@ -609,7 +562,8 @@ function showAdminHelp(options = {}){
           <div class="admin-help-section-body">
             <p>Delete actions tag resources, categories, Types, and For groups for deletion without removing them. Tagged items remain active and are labeled <strong>tagged for deletion</strong>.</p>
             <p>After an admin merges a package containing deletion tags, the review opens immediately. It shows affected resources and can print a working list. The admin chooses which deletions to approve and can continue editing the merged data.</p>
-            <p><strong>Return to before merge</strong> restores the one snapshot saved immediately before the latest merge. It also discards edits made after that merge.</p>
+            <p><strong>Recovery points</strong> retains the five newest pre-merge snapshots, including guided SharePoint merges. Each is labeled with save time, package version, and source filename.</p>
+            <p>Select <strong>Restore</strong> only after checking the label. Restoring discards current edits made after that point but retains the recovery history.</p>
           </div>
         </details>
 

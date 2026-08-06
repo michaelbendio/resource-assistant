@@ -93,7 +93,7 @@ Open the local `.html` file directly in a browser. The file starts with the stan
 
 1. Press `Ctrl+Alt+A` to show the `Admin` button in the blue bar.
 2. Click `Admin`.
-3. If this is a fresh template file, click `Change TSO Name`, enter the local TSO name, and save it.
+3. Click `Office Setup`. Enter the local TSO name and review the storage ID, expected resource-package filename, SharePoint package URL, and download-folder authorization.
 4. Click `Help` in Admin mode for the admin reference and printable first-time admin training guide.
 
 Before editing live resources, load the latest resource package:
@@ -104,8 +104,10 @@ Before editing live resources, load the latest resource package:
 4. If the package contains items tagged for deletion, review their effects immediately. Print the proposed-deletions list if you want a paper worksheet, approve the deletions you want applied, and leave the others unchecked to keep them.
 5. Wait for the merge to finish before making edits.
 
-The app keeps one pre-merge restore point. In Admin, use `Return to before merge`
-to discard the merge and every edit made after it.
+The app keeps the five newest pre-merge recovery points, labeled with their time,
+package version, and source filename. In Admin, use `Recovery points` to select a
+snapshot. Restoring discards the merge and every edit made after that snapshot,
+but it does not erase the other recovery points.
 
 After a batch of edits, share the updated resources:
 
@@ -113,14 +115,16 @@ After a batch of edits, share the updated resources:
 2. Resource missionaries click `Save Resource Package`, save the exported ZIP, and send it to the office admin.
 3. The office admin merges submitted packages and reviews tagged deletions.
 4. In the office-specific HTML file, the admin clicks `Publish to SharePoint`, downloads the current canonical package when prompted, and waits for `Merge complete`.
-5. The admin clicks `Upload to SharePoint`, uploads the saved canonical package, and chooses `Replace`.
+5. The admin reviews the publication summary, clicks `Upload to SharePoint`, uploads the saved canonical package, and chooses `Replace`.
+6. The admin clicks `I replaced the package` to record the manual action locally. The app cannot independently verify the SharePoint upload.
 
-On first use on each computer, guided publishing asks the admin to paste the
-address-bar URL for that office's SharePoint resource-package ZIP. The app validates
-the WSR_TSO location, expected office package filename, and containing folder before
-saving the destination in office-scoped browser storage. The destination is never
-included in exported packages. The admin then authorizes the folder where Edge saves
-downloads. TSO Resources watches that folder for the completed canonical package,
+On first use on each computer, `Office Setup` gathers the TSO name, storage ID,
+expected package filename, SharePoint package URL, and download-folder authorization.
+`Test Configuration` reports whether setup is complete. The app validates the WSR_TSO
+location, expected office package filename, and containing folder before saving the
+destination in office-scoped browser storage. This configuration and local publishing
+history are never included in exported packages. TSO Resources watches the authorized
+folder for the completed canonical package,
 merges it with the prepared local data, reapplies approved deletion tombstones, and
 saves the combined package automatically. SharePoint upload and replacement remain
 manual and are authorized by the signed-in user's SharePoint permissions.

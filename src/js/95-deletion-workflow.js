@@ -80,42 +80,179 @@ function getDeletionKindLabel(kind){
   return ({ resource:"Resource", category:"Category", type:"Type", forGroup:"For group" })[kind] || "Item";
 }
 
+const RECOVERY_POINT_SCHEMA_VERSION = 2;
+const RECOVERY_POINT_LIMIT = 5;
+
+function normalizeRecoveryPoint(point){
+  if(!point || typeof point !== "object" || Array.isArray(point)) return null;
+  if(!point.dataSnapshot || typeof point.dataSnapshot !== "object" || Array.isArray(point.dataSnapshot)) return null;
+  const savedAt = Date.parse(String(point.savedAt || "")) ? String(point.savedAt) : nowISO();
+  const fileName = String(point.fileName || "resource package").trim() || "resource package";
+  return {
+    id:String(point.id || stablePDFIdFromPath(`${savedAt}:${fileName}`, "recovery")),
+    dataSnapshot:cloneDataObject(point.dataSnapshot),
+    fileName,
+    savedAt,
+    packageVersion:normalizePackageVersionValue(
+      point.packageVersion != null ? point.packageVersion : point.dataSnapshot.packageVersion
+    )
+  };
+}
+
+const AdminRecoveryStore = Object.freeze({
+  load(){
+    try{
+      const parsed = JSON.parse(localStorage.getItem(PRE_MERGE_STORAGE_KEY) || "null");
+      const points = parsed && Array.isArray(parsed.recoveryPoints)
+        ? parsed.recoveryPoints
+        : (parsed && parsed.dataSnapshot ? [parsed] : []);
+      return points
+        .map(normalizeRecoveryPoint)
+        .filter(Boolean)
+        .sort((a, b) => String(b.savedAt).localeCompare(String(a.savedAt)))
+        .slice(0, RECOVERY_POINT_LIMIT);
+    }catch(_err){
+      return [];
+    }
+  },
+
+  save(points){
+    const normalized = (Array.isArray(points) ? points : [])
+      .map(normalizeRecoveryPoint)
+      .filter(Boolean)
+      .sort((a, b) => String(b.savedAt).localeCompare(String(a.savedAt)))
+      .slice(0, RECOVERY_POINT_LIMIT);
+    let candidates = normalized.slice();
+    let lastError = null;
+    while(candidates.length){
+      try{
+        localStorage.setItem(PRE_MERGE_STORAGE_KEY, JSON.stringify({
+          schemaVersion:RECOVERY_POINT_SCHEMA_VERSION,
+          recoveryPoints:candidates
+        }));
+        return candidates;
+      }catch(err){
+        lastError = err;
+        if(candidates.length <= 3) break;
+        candidates = candidates.slice(0, -1);
+      }
+    }
+    if(!normalized.length){
+      localStorage.removeItem(PRE_MERGE_STORAGE_KEY);
+      return [];
+    }
+    throw lastError || new Error("Recovery points could not be saved.");
+  },
+
+  add(fileName, snapshot = data){
+    const savedAt = nowISO();
+    const point = normalizeRecoveryPoint({
+      id:`recovery:${savedAt}:${Math.random().toString(16).slice(2, 10)}`,
+      dataSnapshot:snapshot,
+      fileName,
+      savedAt,
+      packageVersion:snapshot && snapshot.packageVersion
+    });
+    const existing = this.load().filter(item => item.id !== point.id);
+    return this.save([point, ...existing])[0];
+  },
+
+  find(recoveryId){
+    const id = String(recoveryId || "");
+    return this.load().find(point => point.id === id) || null;
+  }
+});
+
 function savePreMergeSnapshot(fileName){
   try{
-    localStorage.setItem(PRE_MERGE_STORAGE_KEY, JSON.stringify({
-      dataSnapshot:cloneDataObject(data),
-      fileName:String(fileName || "resource package"),
-      savedAt:nowISO()
-    }));
+    AdminRecoveryStore.add(String(fileName || "resource package"));
     return true;
   }catch(_err){
-    alert("The merge cannot begin because the pre-merge restore point could not be saved. Free browser storage and try again.");
+    alert("The merge cannot begin because at least three recovery points could not be retained. Free browser storage and try again.");
     return false;
   }
 }
 
-function getPreMergeSnapshot(){
-  try{
-    const parsed = JSON.parse(localStorage.getItem(PRE_MERGE_STORAGE_KEY) || "null");
-    return parsed && parsed.dataSnapshot && typeof parsed.dataSnapshot === "object" ? parsed : null;
-  }catch(_err){
-    return null;
-  }
+function getRecoveryPoints(){
+  return AdminRecoveryStore.load();
 }
 
-function restorePreMergeState(){
-  const snapshot = getPreMergeSnapshot();
+function getPreMergeSnapshot(){
+  return getRecoveryPoints()[0] || null;
+}
+
+function recoveryPointLabel(point){
+  return `${formatLocalDateTime(point && point.savedAt)} · Resource Package ${String(point && point.packageVersion)} · ${String(point && point.fileName || "resource package")}`;
+}
+
+function restoreRecoveryPoint(recoveryId){
+  const snapshot = AdminRecoveryStore.find(recoveryId);
   if(!snapshot) return;
-  if(!confirm(`Return to the state before merging ${snapshot.fileName}?\n\nEdits made after that merge will also be discarded.`)) return;
-  data = normalizePackageData(cloneDataObject(snapshot.dataSnapshot));
-  localStorage.removeItem(PRE_MERGE_STORAGE_KEY);
+  if(!confirm(
+    `Restore this recovery point?\n\n${recoveryPointLabel(snapshot)}\n\n` +
+    "Current edits made after this point will be discarded. The recovery history itself will be retained."
+  )) return;
+  let restoredData;
+  try{
+    restoredData = processResourcePackageData(cloneDataObject(snapshot.dataSnapshot), {
+      sourceName:`Recovery point for ${snapshot.fileName}`
+    }).data;
+  }catch(err){
+    alert(`This recovery point could not be restored safely:\n\n${formatResourcePackageError(err)}`);
+    return;
+  }
+  data = restoredData;
   localStorage.removeItem(DELETION_REVIEW_STORAGE_KEY);
   clearUndoSnapshot();
   sanitizePrintSelection();
   persist();
   closeDeletionReview();
-  showToast("Returned to the pre-merge state.");
+  closeReferenceModal();
+  showToast("Recovery point restored.");
   safeRender();
+}
+
+function restorePreMergeState(){
+  const latest = getPreMergeSnapshot();
+  if(latest) restoreRecoveryPoint(latest.id);
+}
+
+function showRecoveryPoints(){
+  const points = getRecoveryPoints();
+  if(!points.length){
+    showToast("There are no recovery points yet.");
+    return;
+  }
+  const modal = getReferenceModal();
+  modal.innerHTML = `
+    <div class="reference-modal-panel recovery-points-panel" role="dialog" aria-modal="true" aria-labelledby="recoveryPointsTitle">
+      <div class="reference-modal-header">
+        <div>
+          <div id="recoveryPointsTitle" class="reference-modal-title">Pre-merge recovery points</div>
+          <div class="reference-modal-subtitle">Newest first · up to ${RECOVERY_POINT_LIMIT} retained</div>
+        </div>
+        <button class="button reference-modal-close" type="button">Close</button>
+      </div>
+      <div class="reference-modal-body">
+        <p>Restoring replaces current resource data. Review the package version, source filename, and saved time before continuing.</p>
+        <div class="recovery-points-list">
+          ${points.map(point => `
+            <div class="recovery-point-entry">
+              <div>
+                <strong>Resource Package ${escapeHTML(String(point.packageVersion))}</strong>
+                <span>${escapeHTML(point.fileName)}</span>
+                <span>${escapeHTML(formatLocalDateTime(point.savedAt))}</span>
+              </div>
+              <button class="button" type="button" onclick="restoreRecoveryPoint('${escapeHTML(point.id)}')">Restore</button>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+    </div>
+  `;
+  const closeBtn = modal.querySelector(".reference-modal-close");
+  if(closeBtn) closeBtn.addEventListener("click", closeReferenceModal);
+  modal.classList.remove("hidden");
 }
 
 function saveDeletionReview(fileName, packageVersion, incomingRequests){
