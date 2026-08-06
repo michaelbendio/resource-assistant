@@ -27,7 +27,11 @@ APP_JS_SOURCES = [
     "src/js/80-admin-shell.js",
     "src/js/90-persistence-and-packages.js",
     "src/js/95-deletion-workflow.js",
-    "src/js/100-admin-editors.js",
+    "src/js/100a-admin-search-and-references.js",
+    "src/js/100b-admin-editor-core.js",
+    "src/js/100c-admin-category-editor.js",
+    "src/js/100d-admin-resource-editor.js",
+    "src/js/100e-admin-for-groups-editor.js",
     "src/js/102-office-context.js",
     "src/js/105-sharepoint-publishing.js",
     "src/js/110-shortcuts.js",
@@ -90,7 +94,17 @@ def load_release() -> dict[str, object]:
 
 
 def latest_app_changes(release: dict[str, object]) -> list[dict[str, str]]:
-    return list(release.get("appChanges", []))[:5]
+    selected_versions: set[str] = set()
+    changes: list[dict[str, str]] = []
+    for change in release.get("appChanges", []):
+        version = change["version"]
+        if version not in selected_versions:
+            if len(selected_versions) >= 5:
+                continue
+            selected_versions.add(version)
+        if version in selected_versions:
+            changes.append(change)
+    return changes
 
 
 def build_app_release_data() -> str:

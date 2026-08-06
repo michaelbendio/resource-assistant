@@ -96,10 +96,24 @@ def load_release(path: Path = RELEASE_JSON) -> dict[str, object]:
     }
 
 
+def latest_app_changes(release: dict[str, object]) -> list[dict[str, str]]:
+    selected_versions: set[str] = set()
+    changes: list[dict[str, str]] = []
+    for change in release["appChanges"]:
+        version = change["version"]
+        if version not in selected_versions:
+            if len(selected_versions) >= 5:
+                continue
+            selected_versions.add(version)
+        if version in selected_versions:
+            changes.append(change)
+    return changes
+
+
 def expected_release_payload(release: dict[str, object]) -> dict[str, object]:
     return {
         "version": release["version"],
-        "changes": list(release["appChanges"])[:5],
+        "changes": latest_app_changes(release),
     }
 
 

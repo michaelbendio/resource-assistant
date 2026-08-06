@@ -149,6 +149,19 @@ body {
   background:var(--surface-color);
   box-shadow:0 1px 2px rgba(23,33,43,.05);
 }
+.app-change-groups { margin-top:8px; }
+.app-change-group {
+  display:grid;
+  grid-template-columns:minmax(5.25rem,max-content) minmax(0,1fr);
+  gap:12px;
+  padding:8px 0;
+  border-top:1px solid #e2e2e2;
+}
+.app-change-group:first-child { border-top:0; padding-top:0; }
+.app-change-version { font-weight:700; }
+.app-change-rows { margin:0; padding-left:20px; }
+.app-change-rows li + li { margin-top:5px; }
+.app-change-date { white-space:nowrap; }
 .category-card-interactive {
   position:relative;
   min-height:58px;
@@ -1019,12 +1032,17 @@ textarea.information-editor { min-height:320px; resize:vertical; }
     {
       "date": "2026-08-06",
       "version": "2.2.14",
-      "message": "Show package creation dates and make Resource Information URLs clickable"
+      "message": "Split admin editors and group app changes"
     },
     {
       "date": "2026-08-06",
       "version": "2.2.14",
-      "message": "Add office setup, publication summaries, history, and five recovery points"
+      "message": "Preserve package dates and link resource URLs"
+    },
+    {
+      "date": "2026-08-06",
+      "version": "2.2.14",
+      "message": "Add office setup, publishing history, and recovery"
     },
     {
       "date": "2026-08-06",
@@ -1040,6 +1058,21 @@ textarea.information-editor { min-height:320px; resize:vertical; }
       "date": "2026-08-05",
       "version": "2.2.11",
       "message": "Protect newer edits when tagging or undoing deletions"
+    },
+    {
+      "date": "2026-08-04",
+      "version": "2.2.10",
+      "message": "Preserve legacy For groups during package merges"
+    },
+    {
+      "date": "2026-08-04",
+      "version": "2.2.10",
+      "message": "Configure SharePoint publishing per office"
+    },
+    {
+      "date": "2026-08-04",
+      "version": "2.2.10",
+      "message": "Add guided SharePoint publishing"
     }
   ]
 }
@@ -1085,7 +1118,10 @@ EVENT HANDLERS
 ADMIN MODE
 PERSISTENCE AND RESOURCE PACKAGES
 SEARCH AND REFERENCE LOOKUPS
-ADMIN EDITORS
+ADMIN EDITOR COORDINATION
+CATEGORY EDITOR
+RESOURCE EDITOR
+FOR-GROUP EDITOR
 GUIDED SHAREPOINT PUBLISHING
 APPLICATION SHORTCUTS
 
@@ -4096,6 +4132,41 @@ function renderCategoryView(){
   renderCategoryResources(filtered, activeFilters);
 }
 
+function groupAppChangesByVersion(changes){
+  const groups = [];
+  const groupsByVersion = new Map();
+  (Array.isArray(changes) ? changes : []).forEach(change => {
+    const version = String(change && change.version || "").trim();
+    if(!version) return;
+    let group = groupsByVersion.get(version);
+    if(!group){
+      group = { version, changes:[] };
+      groupsByVersion.set(version, group);
+      groups.push(group);
+    }
+    group.changes.push(change);
+  });
+  return groups;
+}
+
+function formatAppChangeDate(value){
+  const dateParts = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return dateParts
+    ? `${Number(dateParts[2])}/${Number(dateParts[3])}/${dateParts[1].slice(-2)}`
+    : String(value || "");
+}
+
+function appChangeGroupsHTML(changes){
+  return groupAppChangesByVersion(changes).map(group => `
+    <div class="app-change-group">
+      <div class="app-change-version" aria-label="Version ${escapeHTML(group.version)}">${escapeHTML(group.version)}</div>
+      <ul class="app-change-rows">
+        ${group.changes.map(change => `<li><span class="app-change-date">${escapeHTML(formatAppChangeDate(change.date))}</span> — ${escapeHTML(change.message)}</li>`).join("")}
+      </ul>
+    </div>
+  `).join("");
+}
+
 function renderUpdateInfo(packageInfo, packageChanges){
   const resourcePackageVersion = normalizePackageVersionValue(data && data.packageVersion);
   const sourcePackageVersion = packageInfo
@@ -4110,15 +4181,9 @@ function renderUpdateInfo(packageInfo, packageChanges){
       ? `${packageCreatedContent}<div>Updates loaded from Resource Package ${escapeHTML(String(sourcePackageVersion))}:</div><ul>${packageChanges.map(change => `<li>${escapeHTML(change)}</li>`).join("")}</ul>`
       : `${packageCreatedContent}<div>No resource package updates were loaded from Resource Package ${escapeHTML(String(sourcePackageVersion))}.</div>`
     : `<div>No resource package updates loaded.</div>`;
-  const appChangeItems = APP_CHANGE_LOG.slice(0, 5).map(change => {
-    const dateParts = String(change.date || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    const displayDate = dateParts
-      ? `${Number(dateParts[2])}/${Number(dateParts[3])}/${dateParts[1].slice(-2)}`
-      : String(change.date || "");
-    return `<li>${escapeHTML(displayDate)} ${escapeHTML(change.version)} — ${escapeHTML(change.message)}</li>`;
-  }).join("");
+  const appChangeGroups = appChangeGroupsHTML(APP_CHANGE_LOG);
   appView.innerHTML += `<div class="category-card"><div>App version: ${escapeHTML(data.appVersion || APP_VERSION)}</div></div>`;
-  appView.innerHTML += `<div class="category-card"><strong>App Changes</strong>${appChangeItems ? `<ul>${appChangeItems}</ul>` : `<div>No app changes available.</div>`}</div>`;
+  appView.innerHTML += `<div class="category-card"><strong>App Changes</strong>${appChangeGroups ? `<div class="app-change-groups">${appChangeGroups}</div>` : `<div>No app changes available.</div>`}</div>`;
   appView.innerHTML += `<div class="category-card"><strong>Latest Resource Package ${escapeHTML(String(resourcePackageVersion))}:</strong>${packageUpdateContent}</div>`;
 }
 
@@ -6076,7 +6141,7 @@ function printProposedDeletions(){
   });
 }
 
-// Source: src/js/100-admin-editors.js
+// Source: src/js/100a-admin-search-and-references.js
 /* =========================
    Admin UI
 ========================= */
@@ -6554,6 +6619,13 @@ function handleAdminListReferenceInspection(event, resource){
   showReferenceModal(resourceName, findReferencingLists(resource));
   return true;
 }
+
+// Source: src/js/100b-admin-editor-core.js
+/* =========================
+   Admin editor coordination
+========================= */
+// Shared drafts, validation, action bars, and commit coordination used by the
+// focused category, resource, and For-group editor modules.
 
 function switchAdminTab(nextTab){
   if(adminTab === nextTab) return;
@@ -7073,6 +7145,7 @@ function commitPendingEditsIfChanged(){
   return true;
 }
 
+// Source: src/js/100c-admin-category-editor.js
 /* ---------- Admin: Categories ---------- */
 // Category admin owns category labels, category filters, deletion, and the
 // helper list of resources assigned to the selected category.
@@ -7479,6 +7552,7 @@ function renderCategoryFilterRows(filters){
   normalizeCategoryFilters(filters).forEach(filter => addCategoryFilterRow(filter));
 }
 
+// Source: src/js/100d-admin-resource-editor.js
 /* ---------- Admin: Resources ---------- */
 // Resource admin owns the large resource editor. It normalizes For groups, categories,
 // verification dates, and structured information text before saving.
@@ -8158,6 +8232,7 @@ function editResource(idx){
   focusAndSelectResourceName();
 }
 
+// Source: src/js/100e-admin-for-groups-editor.js
 /* ---------- Admin: For ---------- */
 // The For editor owns the governed cross-category people-served list. Resources
 // reference these values through resource.forGroups.

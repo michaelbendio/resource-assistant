@@ -43,6 +43,23 @@ class AppChangeLogTests(unittest.TestCase):
             "message": "Preserve latest resource package updates",
         }])
 
+    def test_keeps_every_row_for_the_latest_five_distinct_versions(self) -> None:
+        app_changes = [
+            {"date": "2026-08-06", "version": "2.2.14", "message": "Third 2.2.14 change"},
+            {"date": "2026-08-06", "version": "2.2.14", "message": "Second 2.2.14 change"},
+            {"date": "2026-08-06", "version": "2.2.13", "message": "2.2.13 change"},
+            {"date": "2026-08-06", "version": "2.2.12", "message": "2.2.12 change"},
+            {"date": "2026-08-05", "version": "2.2.11", "message": "2.2.11 change"},
+            {"date": "2026-08-04", "version": "2.2.10", "message": "First 2.2.10 change"},
+            {"date": "2026-08-04", "version": "2.2.10", "message": "Second 2.2.10 change"},
+            {"date": "2026-07-31", "version": "2.2.9", "message": "Excluded sixth version"},
+        ]
+
+        self.assertEqual(
+            latest_app_changes({"appChanges": app_changes}),
+            app_changes[:7],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

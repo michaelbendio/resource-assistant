@@ -390,21 +390,31 @@ async function runSelfTests(){
         if(!appChangesHeading){
           throw new Error("app change log heading was missing");
         }
-        const appChangesList = appChangesHeading.parentElement.querySelector("ul");
-        const appChangeItems = appChangesList ? Array.from(appChangesList.querySelectorAll("li")) : [];
-        if(!appChangesList || appChangeItems.length !== Math.min(APP_CHANGE_LOG.length, 5)){
-          throw new Error("app change log was not rendered as a five-item bulleted list");
+        const expectedAppChangeGroups = groupAppChangesByVersion(APP_CHANGE_LOG);
+        const renderedAppChangeGroups = Array.from(appChangesHeading.parentElement.querySelectorAll(".app-change-group"));
+        if(renderedAppChangeGroups.length !== expectedAppChangeGroups.length){
+          throw new Error("app changes were not grouped by distinct version");
         }
-        if(APP_CHANGE_LOG.length){
-          const latestAppChange = APP_CHANGE_LOG[0];
-          const dateParts = String(latestAppChange.date || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
-          const displayDate = dateParts
-            ? `${Number(dateParts[2])}/${Number(dateParts[3])}/${dateParts[1].slice(-2)}`
-            : String(latestAppChange.date || "");
-          const expectedText = `${displayDate} ${latestAppChange.version} — ${latestAppChange.message}`;
-          if(appChangeItems[0].textContent.trim() !== expectedText){
-            throw new Error("latest app change did not use the required date, version, and message format");
+        renderedAppChangeGroups.forEach((element, index) => {
+          const expectedGroup = expectedAppChangeGroups[index];
+          const versionHeading = element.querySelector(".app-change-version");
+          const rows = Array.from(element.querySelectorAll(".app-change-rows li"));
+          if(!versionHeading || versionHeading.textContent.trim() !== expectedGroup.version){
+            throw new Error("app change version heading was missing or repeated incorrectly");
           }
+          if(rows.length !== expectedGroup.changes.length){
+            throw new Error(`app change rows were lost for version ${expectedGroup.version}`);
+          }
+          expectedGroup.changes.forEach((change, rowIndex) => {
+            const expectedText = `${formatAppChangeDate(change.date)} — ${change.message}`;
+            if(rows[rowIndex].textContent.trim() !== expectedText){
+              throw new Error(`app change row was formatted incorrectly for version ${expectedGroup.version}`);
+            }
+          });
+        });
+        const version210Group = expectedAppChangeGroups.find(group => group.version === "2.2.10");
+        if(!version210Group || version210Group.changes.length !== 3){
+          throw new Error("the three 2.2.10 changes were not retained under one version heading");
         }
         if(/Resource data last modified:/.test(appView.textContent || "")){
           throw new Error("local merge time should not be presented as the package update date");

@@ -95,6 +95,23 @@ class VerifyTsoReleaseTests(unittest.TestCase):
             path.write_text(sample_html(release), encoding="utf-8")
             verify_tso_release.verify_new_html(path, release)
 
+    def test_expected_payload_keeps_rows_for_latest_five_versions(self) -> None:
+        release = sample_release()
+        release["appChanges"] = [
+            {"date": "2026-08-06", "version": "2.3.4", "message": "Second current change"},
+            {"date": "2026-08-06", "version": "2.3.4", "message": "First current change"},
+            {"date": "2026-08-05", "version": "2.3.3", "message": "Version 2.3.3"},
+            {"date": "2026-08-04", "version": "2.3.2", "message": "Version 2.3.2"},
+            {"date": "2026-08-03", "version": "2.3.1", "message": "Version 2.3.1"},
+            {"date": "2026-08-02", "version": "2.3.0", "message": "Version 2.3.0"},
+            {"date": "2026-08-01", "version": "2.2.9", "message": "Excluded sixth version"},
+        ]
+
+        self.assertEqual(
+            verify_tso_release.expected_release_payload(release)["changes"],
+            release["appChanges"][:6],
+        )
+
     def test_verify_new_html_rejects_stale_change_log(self) -> None:
         release = sample_release()
         stale_release = sample_release()

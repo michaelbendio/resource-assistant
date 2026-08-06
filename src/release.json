@@ -1,17 +1,22 @@
 {
   "version": "2.2.14",
   "date": "2026-08-06",
-  "message": "Preserve package dates and link resource URLs",
+  "message": "Split admin editors and group app changes",
   "appChanges": [
     {
       "date": "2026-08-06",
       "version": "2.2.14",
-      "message": "Show package creation dates and make Resource Information URLs clickable"
+      "message": "Split admin editors and group app changes"
     },
     {
       "date": "2026-08-06",
       "version": "2.2.14",
-      "message": "Add office setup, publication summaries, history, and five recovery points"
+      "message": "Preserve package dates and link resource URLs"
+    },
+    {
+      "date": "2026-08-06",
+      "version": "2.2.14",
+      "message": "Add office setup, publishing history, and recovery"
     },
     {
       "date": "2026-08-06",

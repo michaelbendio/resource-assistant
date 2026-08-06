@@ -402,6 +402,41 @@ function renderCategoryView(){
   renderCategoryResources(filtered, activeFilters);
 }
 
+function groupAppChangesByVersion(changes){
+  const groups = [];
+  const groupsByVersion = new Map();
+  (Array.isArray(changes) ? changes : []).forEach(change => {
+    const version = String(change && change.version || "").trim();
+    if(!version) return;
+    let group = groupsByVersion.get(version);
+    if(!group){
+      group = { version, changes:[] };
+      groupsByVersion.set(version, group);
+      groups.push(group);
+    }
+    group.changes.push(change);
+  });
+  return groups;
+}
+
+function formatAppChangeDate(value){
+  const dateParts = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return dateParts
+    ? `${Number(dateParts[2])}/${Number(dateParts[3])}/${dateParts[1].slice(-2)}`
+    : String(value || "");
+}
+
+function appChangeGroupsHTML(changes){
+  return groupAppChangesByVersion(changes).map(group => `
+    <div class="app-change-group">
+      <div class="app-change-version" aria-label="Version ${escapeHTML(group.version)}">${escapeHTML(group.version)}</div>
+      <ul class="app-change-rows">
+        ${group.changes.map(change => `<li><span class="app-change-date">${escapeHTML(formatAppChangeDate(change.date))}</span> — ${escapeHTML(change.message)}</li>`).join("")}
+      </ul>
+    </div>
+  `).join("");
+}
+
 function renderUpdateInfo(packageInfo, packageChanges){
   const resourcePackageVersion = normalizePackageVersionValue(data && data.packageVersion);
   const sourcePackageVersion = packageInfo
@@ -416,15 +451,9 @@ function renderUpdateInfo(packageInfo, packageChanges){
       ? `${packageCreatedContent}<div>Updates loaded from Resource Package ${escapeHTML(String(sourcePackageVersion))}:</div><ul>${packageChanges.map(change => `<li>${escapeHTML(change)}</li>`).join("")}</ul>`
       : `${packageCreatedContent}<div>No resource package updates were loaded from Resource Package ${escapeHTML(String(sourcePackageVersion))}.</div>`
     : `<div>No resource package updates loaded.</div>`;
-  const appChangeItems = APP_CHANGE_LOG.slice(0, 5).map(change => {
-    const dateParts = String(change.date || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    const displayDate = dateParts
-      ? `${Number(dateParts[2])}/${Number(dateParts[3])}/${dateParts[1].slice(-2)}`
-      : String(change.date || "");
-    return `<li>${escapeHTML(displayDate)} ${escapeHTML(change.version)} — ${escapeHTML(change.message)}</li>`;
-  }).join("");
+  const appChangeGroups = appChangeGroupsHTML(APP_CHANGE_LOG);
   appView.innerHTML += `<div class="category-card"><div>App version: ${escapeHTML(data.appVersion || APP_VERSION)}</div></div>`;
-  appView.innerHTML += `<div class="category-card"><strong>App Changes</strong>${appChangeItems ? `<ul>${appChangeItems}</ul>` : `<div>No app changes available.</div>`}</div>`;
+  appView.innerHTML += `<div class="category-card"><strong>App Changes</strong>${appChangeGroups ? `<div class="app-change-groups">${appChangeGroups}</div>` : `<div>No app changes available.</div>`}</div>`;
   appView.innerHTML += `<div class="category-card"><strong>Latest Resource Package ${escapeHTML(String(resourcePackageVersion))}:</strong>${packageUpdateContent}</div>`;
 }
 

@@ -12,6 +12,24 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 class BuildTests(unittest.TestCase):
+    def test_admin_editor_sources_are_split_and_built_in_order(self) -> None:
+        source_paths = [
+            "src/js/100a-admin-search-and-references.js",
+            "src/js/100b-admin-editor-core.js",
+            "src/js/100c-admin-category-editor.js",
+            "src/js/100d-admin-resource-editor.js",
+            "src/js/100e-admin-for-groups-editor.js",
+        ]
+        self.assertFalse((ROOT / "src/js/100-admin-editors.js").exists())
+        for source_path in source_paths:
+            self.assertTrue((ROOT / source_path).is_file(), source_path)
+
+        production = (ROOT / "new.html").read_text(encoding="utf-8")
+        source_markers = [f"// Source: {source_path}" for source_path in source_paths]
+        marker_positions = [production.find(marker) for marker in source_markers]
+        self.assertTrue(all(position >= 0 for position in marker_positions))
+        self.assertEqual(marker_positions, sorted(marker_positions))
+
     def test_generated_outputs_are_current(self) -> None:
         subprocess.run(
             [sys.executable, "build-tso-resources", "--check"],
