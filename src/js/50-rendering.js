@@ -43,9 +43,14 @@ function flashAdminButton(){
 }
 
 const tabPrintSelection = document.getElementById("tabPrintSelection");
+const tabFavorites = document.getElementById("tabFavorites");
 const helpButton = document.getElementById("helpButton");
 const tabSearch = document.getElementById("tabSearch");
 tabCategories.onclick = ()=>{ setView("categories"); };
+if(tabFavorites){
+  tabFavorites.appendChild(createInterfaceIcon("star-outline"));
+  tabFavorites.onclick = ()=>{ setView("favorites"); };
+}
 if(tabPrintSelection) tabPrintSelection.onclick = ()=>{ startPrintSelectionPreview(); };
 if(helpButton) helpButton.onclick = ()=>{ showUserHelp(); };
 tabAdmin.onclick = ()=>{ setView("admin"); };
@@ -222,8 +227,53 @@ function refreshAppTitle(){
 
 refreshAppTitle();
 
+function createInterfaceIcon(name){
+  const namespace = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(namespace, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("focusable", "false");
+  svg.classList.add("interface-icon");
+  svg.dataset.icon = name;
+
+  if(name === "printer"){
+    svg.innerHTML = `
+      <path d="M7 8V3.75h10V8"></path>
+      <path d="M7 17H5.5A2.5 2.5 0 0 1 3 14.5v-4A2.5 2.5 0 0 1 5.5 8h13a2.5 2.5 0 0 1 2.5 2.5v4a2.5 2.5 0 0 1-2.5 2.5H17"></path>
+      <path d="M7 14h10v6.25H7z"></path>
+      <circle cx="17.5" cy="11.25" r=".75"></circle>
+    `;
+    return svg;
+  }
+
+  const star = document.createElementNS(namespace, "path");
+  star.setAttribute("d", "M12 2.75l2.83 5.73 6.32.92-4.58 4.46 1.08 6.3L12 17.18l-5.65 2.98 1.08-6.3L2.85 9.4l6.32-.92L12 2.75z");
+  if(name === "star-filled") star.classList.add("interface-icon-filled");
+  svg.appendChild(star);
+  return svg;
+}
+
 function createTip(tipId){
-  return createRedTip(TIP_TEXT[tipId], tipId);
+  const tip = createRedTip(TIP_TEXT[tipId], tipId);
+  if(!tip || tipId !== "user") return tip;
+
+  const text = tip.querySelector(".red-tip-text");
+  if(!text) return tip;
+  text.textContent = "";
+  text.append("Click a category to see its resources and click a resource for details. Click ");
+  const printer = createInterfaceIcon("printer");
+  printer.classList.add("tip-inline-icon", "tip-printer-icon");
+  text.appendChild(printer);
+  text.append(" to select it for printing. Click ");
+  const outlineStar = createInterfaceIcon("star-outline");
+  outlineStar.classList.add("tip-inline-icon");
+  text.appendChild(outlineStar);
+  text.append(" to add it to Favorites; click ");
+  const filledStar = createInterfaceIcon("star-filled");
+  filledStar.classList.add("tip-inline-icon", "tip-favorite-icon");
+  text.appendChild(filledStar);
+  text.append(" to remove it.");
+  return tip;
 }
 
 function createRedTip(tipText, tipId){
@@ -356,11 +406,13 @@ function showUserHelp(){
         <p>Search checks resource names, descriptions, categories, <strong>Types</strong>, <strong>For</strong> groups, phone numbers, addresses, websites, hours, PDF names, and resource information. It also searches the automatically generated <strong>Lists</strong> category.</p>
         <p>Enter words in any order; the words can appear in different parts of a resource. Each resource appears once in the results.</p>
         <p>Select a result to see the full resource. Matching words in the displayed details are highlighted. Use a <strong>View in…</strong> button to open and expand the resource on one of its category pages.</p>
+        <h3>Favorites</h3>
+        <p>Click the outline star next to a resource to add it to <strong>Favorites</strong>. A filled star means the resource is a favorite. Click the filled star to remove it. Click the outline star beside <strong>Categories</strong> to view favorite resources.</p>
         <h3>Selecting Resources for Printing</h3>
-        <p>Click ⬜ or 🖨️ next to a resource to change whether it is selected for printing.</p>
+        <p>Click the gray printer button next to a resource to select it for printing. A highlighted printer means the resource is selected.</p>
         <h3>Print Preview and Printing</h3>
         <p>Click 🖨️ in the top bar to open <strong>Print Preview</strong>.</p>
-        <p>In Print Preview, click 🖨️ to disable printing for a resource.</p>
+        <p>In Print Preview, click a highlighted printer to remove that resource from the printed handout.</p>
         <p>Review the selected resources and print the handout.</p>
         <p>To save the handout as a PDF, choose <strong>Print</strong>, select <strong>Print to PDF</strong> as the printer, then click <strong>Print</strong> and choose where to save the file.</p>
         <h3>Application Information</h3>
@@ -628,7 +680,59 @@ function getCategoryUpdateMap(){
 // reference checks. Keep resource-card behavior here so all surfaces agree on
 // print toggles, details expansion, and information formatting.
 
-function buildResourceCard(res,{expanded=false,showDescription=false,showPrintToggle=true}={}){
+function updateFavoriteToggleButton(button, resource){
+  if(!button) return;
+  const selected = isFavoriteResource(resource.id);
+  button.setAttribute("aria-pressed", selected ? "true" : "false");
+  button.setAttribute("aria-label", selected
+    ? `Remove ${resource.name || "this resource"} from favorites`
+    : `Add ${resource.name || "this resource"} to favorites`);
+  button.title = selected ? "Remove from favorites" : "Add to favorites";
+  button.replaceChildren(createInterfaceIcon(selected ? "star-filled" : "star-outline"));
+}
+
+function createFavoriteToggleButton(resource){
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "resource-icon-button favorite-toggle";
+  updateFavoriteToggleButton(button, resource);
+  button.onclick = event => {
+    event.stopPropagation();
+    toggleFavoriteResource(resource.id, { rerender:false });
+    updateFavoriteToggleButton(button, resource);
+    if(view === "favorites") safeRender();
+  };
+  return button;
+}
+
+function createPrintSelectionToggleButton(resource){
+  const selected = isSelectedForPrinting(resource.id);
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "resource-icon-button print-selection-toggle";
+  button.setAttribute("aria-pressed", selected ? "true" : "false");
+  button.setAttribute("aria-label", selected
+    ? `Remove ${resource.name || "this resource"} from print selection`
+    : `Select ${resource.name || "this resource"} for printing`);
+  button.title = selected ? "Remove from print selection" : "Select for printing";
+  button.appendChild(createInterfaceIcon("printer"));
+  button.onclick = event => {
+    event.stopPropagation();
+    togglePrintSelection(resource.id);
+  };
+  return button;
+}
+
+function createResourceActionButtons(resource, { showFavoriteToggle = true, showPrintToggle = true } = {}){
+  const controls = document.createElement("div");
+  controls.className = "resource-action-buttons";
+  controls.setAttribute("aria-label", `Actions for ${resource.name || "resource"}`);
+  if(showFavoriteToggle) controls.appendChild(createFavoriteToggleButton(resource));
+  if(showPrintToggle) controls.appendChild(createPrintSelectionToggleButton(resource));
+  return controls;
+}
+
+function buildResourceCard(res,{expanded=false,showDescription=false,showPrintToggle=true,showFavoriteToggle=true}={}){
   // Shared DOM builder used by category view, print-selection view, and print previews.
   normalizeResourceInformation(res);
   normalizeResourcePDFs(res);
@@ -639,14 +743,8 @@ function buildResourceCard(res,{expanded=false,showDescription=false,showPrintTo
     handleAdminListReferenceInspection(event, res);
   }, true);
 
-  if(showPrintToggle){
-    const toggle=document.createElement("button");
-    toggle.type = "button";
-    toggle.className="print-selection-toggle";
-    toggle.setAttribute("aria-label", isSelectedForPrinting(res.id) ? "Disable printing for this resource" : "Enable printing for this resource");
-    toggle.textContent=getPrintSelectionIcon(res.id);
-    toggle.onclick=e=>{e.stopPropagation(); togglePrintSelection(res.id);};
-    card.appendChild(toggle);
+  if(showFavoriteToggle || showPrintToggle){
+    card.appendChild(createResourceActionButtons(res, { showFavoriteToggle, showPrintToggle }));
   }
 
   const main=document.createElement("div");
@@ -873,6 +971,14 @@ function renderSearchResultsView(){
   results.items.forEach(item => {
     const row = document.createElement("li");
     row.className = "search-result-item";
+
+    const resource = (Array.isArray(data.resources) ? data.resources : [])
+      .find(candidate => String(candidate && candidate.id || "") === String(item.resourceId || ""));
+    if(resource){
+      const actions = createResourceActionButtons(resource);
+      actions.classList.add("search-result-actions");
+      row.appendChild(actions);
+    }
 
     const btn = document.createElement("button");
     btn.type = "button";

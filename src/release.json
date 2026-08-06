@@ -1,8 +1,13 @@
 {
-  "version": "2.2.14",
+  "version": "2.3.0",
   "date": "2026-08-06",
-  "message": "Hide blank list resources",
+  "message": "Add persistent resource favorites",
   "appChanges": [
+    {
+      "date": "2026-08-06",
+      "version": "2.3.0",
+      "message": "Add persistent resource favorites"
+    },
     {
       "date": "2026-08-06",
       "version": "2.2.14",

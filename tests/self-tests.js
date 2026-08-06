@@ -110,8 +110,14 @@ async function runSelfTests(){
           if(getStorageKeyPrefix("backup-copy.html") !== "boiseNorth") throw new Error("configured storage id should normalize like filenames");
         }
         if(DATA_STORAGE_KEY !== `${STORAGE_KEY_PREFIX}Data`) throw new Error("data storage key should use current storage prefix");
+        if(FAVORITE_RESOURCE_IDS_STORAGE_KEY !== `${STORAGE_KEY_PREFIX}FavoriteResourceIdsV1`){
+          throw new Error("favorites storage key should use the current office prefix");
+        }
         if(STARTUP_STATE_STORAGE_KEYS.includes(TSO_NAME_STORAGE_KEY)){
           throw new Error("startup reset should not clear the scoped TSO name");
+        }
+        if(STARTUP_STATE_STORAGE_KEYS.includes(FAVORITE_RESOURCE_IDS_STORAGE_KEY)){
+          throw new Error("startup reset should preserve persistent favorites");
         }
       }finally{
         if(meta) meta.setAttribute("content", previousContent || "");
@@ -412,9 +418,13 @@ async function runSelfTests(){
             }
           });
         });
-        const version210Group = expectedAppChangeGroups.find(group => group.version === "2.2.10");
-        if(!version210Group || version210Group.changes.length !== 3){
-          throw new Error("the three 2.2.10 changes were not retained under one version heading");
+        const groupedFixture = groupAppChangesByVersion([
+          { version:"fixture-a", message:"First" },
+          { version:"fixture-a", message:"Second" },
+          { version:"fixture-b", message:"Third" }
+        ]);
+        if(groupedFixture.length !== 2 || groupedFixture[0].changes.length !== 2){
+          throw new Error("multiple changes for one version were not retained under one heading");
         }
         if(/Resource data last modified:/.test(appView.textContent || "")){
           throw new Error("local merge time should not be presented as the package update date");
@@ -2217,6 +2227,26 @@ async function runSelfTests(){
   });
 
   tests.push({
+    name: "USER TIP EXPLAINS FAVORITES AND ICON PRINTING",
+    fn: () => {
+      const wasDismissed = dismissedTipIds.has("user");
+      try{
+        dismissedTipIds.delete("user");
+        const tip = createTip("user");
+        if(!tip) throw new Error("user tip was not created");
+        if((tip.textContent || "").includes("⬜")) throw new Error("user tip still shows the old print checkbox");
+        if(!(tip.textContent || "").includes("Favorites")) throw new Error("user tip does not explain Favorites");
+        if(!tip.querySelector('[data-icon="printer"]')) throw new Error("user tip does not show the printer icon");
+        if(!tip.querySelector('[data-icon="star-outline"]')) throw new Error("user tip does not show the outline star");
+        if(!tip.querySelector('[data-icon="star-filled"]')) throw new Error("user tip does not show the filled star");
+      }finally{
+        if(wasDismissed) dismissedTipIds.add("user");
+        else dismissedTipIds.delete("user");
+      }
+    }
+  });
+
+  tests.push({
     name: "USER HELP BUTTON HAS NO OUTLINE BORDER",
     fn: () => {
       const help = document.getElementById("helpButton");
@@ -2581,7 +2611,7 @@ async function runSelfTests(){
         render();
         const emptyBanner = appView.querySelector(".category-print-banner");
         if(!emptyBanner) throw new Error("category print instruction banner was not rendered");
-        if(emptyBanner.textContent !== "Click ⬜ next to a resource to select it for printing."){
+        if(emptyBanner.textContent !== "Click the gray printer button next to a resource to select it for printing."){
           throw new Error(`unexpected empty banner '${emptyBanner.textContent}'`);
         }
 
@@ -2599,6 +2629,200 @@ async function runSelfTests(){
         printSelection = previousPrintSelection;
         selectedCategoryFilters = previousSelectedCategoryFilters;
         updatePrintSelectionIndicator();
+      }
+    }
+  });
+
+  tests.push({
+    name: "FAVORITES ARE PERSISTENT AND INDEPENDENT FROM PRINTING",
+    fn: () => {
+      const previousData = data;
+      const previousFavorites = favoriteResourceIds.slice();
+      const previousPrintSelection = printSelection.slice();
+      const previousStoredFavorites = localStorage.getItem(FAVORITE_RESOURCE_IDS_STORAGE_KEY);
+      try{
+        data = {
+          categories:[],
+          resources:[
+            { id:"favorite-one", name:"Favorite One", categories:[], informationText:"" },
+            { id:"favorite-two", name:"Favorite Two", categories:[], informationText:"" }
+          ],
+          changes:[]
+        };
+        favoriteResourceIds = [];
+        printSelection = [];
+        saveFavoriteResourceIds();
+
+        toggleFavoriteResource("favorite-one", { rerender:false });
+        if(!isFavoriteResource("favorite-one")) throw new Error("resource was not favorited");
+        if(printSelection.length) throw new Error("favoriting a resource changed the print selection");
+        if(JSON.stringify(loadFavoriteResourceIds()) !== JSON.stringify(["favorite-one"])){
+          throw new Error("favorite resource id was not persisted");
+        }
+
+        togglePrintSelection("favorite-one", { rerender:false });
+        if(!isFavoriteResource("favorite-one")) throw new Error("printing selection changed favorite state");
+
+        data.resources = [data.resources[1]];
+        sanitizeFavoriteResourceIds();
+        if(favoriteResourceIds.length) throw new Error("missing resource id was not removed from Favorites");
+
+        const packageData = buildResourcePackageData(data);
+        if("favoriteResourceIds" in packageData || "favorites" in packageData){
+          throw new Error("personal Favorites leaked into a resource package");
+        }
+      }finally{
+        data = previousData;
+        favoriteResourceIds = previousFavorites;
+        printSelection = previousPrintSelection;
+        if(previousStoredFavorites === null) localStorage.removeItem(FAVORITE_RESOURCE_IDS_STORAGE_KEY);
+        else localStorage.setItem(FAVORITE_RESOURCE_IDS_STORAGE_KEY, previousStoredFavorites);
+        updatePrintSelectionIndicator();
+      }
+    }
+  });
+
+  tests.push({
+    name: "FAVORITES VIEW USES RESOURCE ICON BUTTONS",
+    fn: () => {
+      const previousData = data;
+      const previousView = view;
+      const previousFavorites = favoriteResourceIds.slice();
+      const previousPrintSelection = printSelection.slice();
+      const previousStoredFavorites = localStorage.getItem(FAVORITE_RESOURCE_IDS_STORAGE_KEY);
+      try{
+        data = {
+          categories:[],
+          resources:[
+            { id:"favorite-alpha", name:"Alpha Favorite", categories:[], informationText:"" },
+            { id:"favorite-beta", name:"Beta Favorite", categories:[], informationText:"" }
+          ],
+          changes:[]
+        };
+        favoriteResourceIds = ["favorite-beta"];
+        printSelection = [];
+        saveFavoriteResourceIds();
+        view = "favorites";
+        render();
+
+        const cards = Array.from(appView.querySelectorAll(".resource-card[data-resource-id]"));
+        if(cards.length !== 1 || cards[0].dataset.resourceId !== "favorite-beta"){
+          throw new Error("Favorites view did not show only favorited resources");
+        }
+        const star = cards[0].querySelector(".favorite-toggle");
+        const printer = cards[0].querySelector(".print-selection-toggle");
+        if(!star || star.getAttribute("aria-pressed") !== "true") throw new Error("favorite resource did not show a filled star button");
+        if(!printer || printer.getAttribute("aria-pressed") !== "false") throw new Error("favorite resource did not show an inactive printer button");
+        if(star.tagName !== "BUTTON" || printer.tagName !== "BUTTON") throw new Error("resource icons should use whole clickable buttons");
+        if(getComputedStyle(printer).color !== "rgb(137, 148, 158)"){
+          throw new Error(`inactive printer should be gray, got ${getComputedStyle(printer).color}`);
+        }
+        if(!star.querySelector('[data-icon="star-filled"]')) throw new Error("favorite button did not render the filled star icon");
+        if(!printer.querySelector('[data-icon="printer"]')) throw new Error("print button did not render the printer icon");
+        if(!tabFavorites.querySelector('[data-icon="star-outline"]')) throw new Error("Favorites navigation icon should remain an outline");
+        if(tabCategories.nextElementSibling !== tabFavorites) throw new Error("Favorites button should be immediately right of Categories");
+        if((tabFavorites.textContent || "").trim()) throw new Error("Favorites navigation should not show a badge or count");
+
+        printer.click();
+        const selectedPrinter = appView.querySelector(".resource-card[data-resource-id] .print-selection-toggle");
+        if(!selectedPrinter || selectedPrinter.getAttribute("aria-pressed") !== "true"){
+          throw new Error("printer button did not mark the favorite resource for printing");
+        }
+        const selectedStar = appView.querySelector(".resource-card[data-resource-id] .favorite-toggle");
+        selectedStar.click();
+        if(appView.querySelector(".resource-card[data-resource-id]")) throw new Error("removed favorite remained in Favorites view");
+        if(!printSelection.includes("favorite-beta")) throw new Error("removing a Favorite changed its print selection");
+        if(!appView.querySelector(".favorites-empty") || !/No favorite resources/.test(appView.textContent || "")){
+          throw new Error("empty Favorites message was not rendered");
+        }
+      }finally{
+        data = previousData;
+        view = previousView;
+        favoriteResourceIds = previousFavorites;
+        printSelection = previousPrintSelection;
+        if(previousStoredFavorites === null) localStorage.removeItem(FAVORITE_RESOURCE_IDS_STORAGE_KEY);
+        else localStorage.setItem(FAVORITE_RESOURCE_IDS_STORAGE_KEY, previousStoredFavorites);
+        updatePrintSelectionIndicator();
+      }
+    }
+  });
+
+  tests.push({
+    name: "FAVORITES SURVIVE MERGED DATA AND PRUNE REMOVED RESOURCES",
+    fn: () => {
+      const previousData = data;
+      const previousView = view;
+      const previousFavorites = favoriteResourceIds.slice();
+      const previousPrintSelection = printSelection.slice();
+      const previousStoredData = localStorage.getItem(DATA_STORAGE_KEY);
+      const previousStoredFavorites = localStorage.getItem(FAVORITE_RESOURCE_IDS_STORAGE_KEY);
+      try{
+        data = {
+          categories:[],
+          resources:[
+            { id:"merge-favorite-keep", name:"Keep Favorite", categories:[], informationText:"" },
+            { id:"merge-favorite-remove", name:"Remove Favorite", categories:[], informationText:"" }
+          ],
+          changes:[]
+        };
+        favoriteResourceIds = ["merge-favorite-keep", "merge-favorite-remove"];
+        printSelection = [];
+        saveFavoriteResourceIds();
+        view = "categories";
+
+        applyMergedData({
+          categories:[],
+          resources:[
+            { id:"merge-favorite-keep", name:"Updated Favorite", categories:[], informationText:"" }
+          ],
+          changes:[]
+        });
+
+        if(JSON.stringify(favoriteResourceIds) !== JSON.stringify(["merge-favorite-keep"])){
+          throw new Error(`unexpected Favorites after merge ${JSON.stringify(favoriteResourceIds)}`);
+        }
+        if(!isFavoriteResource("merge-favorite-keep")) throw new Error("surviving resource lost its Favorite after merge");
+        if(isFavoriteResource("merge-favorite-remove")) throw new Error("removed resource remained in Favorites after merge");
+      }finally{
+        data = previousData;
+        view = previousView;
+        favoriteResourceIds = previousFavorites;
+        printSelection = previousPrintSelection;
+        if(previousStoredData === null) localStorage.removeItem(DATA_STORAGE_KEY);
+        else localStorage.setItem(DATA_STORAGE_KEY, previousStoredData);
+        if(previousStoredFavorites === null) localStorage.removeItem(FAVORITE_RESOURCE_IDS_STORAGE_KEY);
+        else localStorage.setItem(FAVORITE_RESOURCE_IDS_STORAGE_KEY, previousStoredFavorites);
+        updatePrintSelectionIndicator();
+      }
+    }
+  });
+
+  tests.push({
+    name: "SEARCH RESULTS SHOW FAVORITE AND PRINT BUTTONS",
+    fn: () => {
+      const previousData = data;
+      const previousView = view;
+      const previousSearchResults = searchResults;
+      try{
+        data = {
+          categories:[],
+          resources:[{ id:"search-actions", name:"Search Actions", categories:[], informationText:"" }],
+          changes:[]
+        };
+        searchResults = {
+          query:"actions",
+          items:[{ resourceId:"search-actions", resourceName:"Search Actions", sectionLabel:"", snippet:"", categories:[] }]
+        };
+        view = "search-results";
+        render();
+        const row = appView.querySelector(".search-result-item");
+        if(!row || !row.querySelector(".favorite-toggle") || !row.querySelector(".print-selection-toggle")){
+          throw new Error("search result did not include both resource actions");
+        }
+      }finally{
+        data = previousData;
+        view = previousView;
+        searchResults = previousSearchResults;
       }
     }
   });
@@ -3455,7 +3679,7 @@ async function runSelfTests(){
         }
         const instruction = printContent.querySelector(".print-empty-instruction");
         if(!instruction) throw new Error("empty print instruction was not rendered");
-        if(instruction.textContent !== "Click ⬜ next to a resource to include it in the printed handout."){
+        if(instruction.textContent !== "Click the gray printer button next to a resource to include it in the printed handout."){
           throw new Error(`unexpected empty print instruction '${instruction.textContent}'`);
         }
         if(getComputedStyle(instruction).color !== "rgb(170, 0, 0)"){

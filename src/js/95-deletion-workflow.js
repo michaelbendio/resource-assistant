@@ -204,6 +204,7 @@ function restoreRecoveryPoint(recoveryId){
   data = restoredData;
   localStorage.removeItem(DELETION_REVIEW_STORAGE_KEY);
   clearUndoSnapshot();
+  sanitizeFavoriteResourceIds();
   sanitizePrintSelection();
   persist();
   closeDeletionReview();
@@ -383,6 +384,7 @@ function approveSelectedDeletions(){
   });
   applyDeletionTombstones(data, tombstones);
   normalizeDeletionWorkflowData(data);
+  sanitizeFavoriteResourceIds();
   sanitizePrintSelection();
   persist();
   closeDeletionReview();

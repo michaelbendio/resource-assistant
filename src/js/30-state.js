@@ -49,7 +49,8 @@ const STORAGE_KEY_PREFIX = getStorageKeyPrefix();
 const DATA_STORAGE_KEY = getStorageKey("Data");
 const UPDATE_SEEN_STORAGE_KEY = getStorageKey("RecentUpdatesSeen");
 const PRINT_SELECTION_STORAGE_KEY = getStorageKey("PrintSelection");
-const LEGACY_FAVORITES_STORAGE_KEY = getStorageKey("Favorites");
+const FAVORITE_RESOURCE_IDS_STORAGE_KEY = getStorageKey("FavoriteResourceIdsV1");
+const LEGACY_PRINT_SELECTION_STORAGE_KEY = getStorageKey("Favorites");
 const TSO_NAME_STORAGE_KEY = getStorageKey("TsoName");
 const UNDO_STORAGE_KEY = getStorageKey("Undo");
 const PRE_MERGE_STORAGE_KEY = getStorageKey("PreMerge");
@@ -59,7 +60,7 @@ const NEW_ADMIN_TRAINING_PENDING_KEY = "tsoResourcesNewAdminTrainingPending";
 const STARTUP_STATE_STORAGE_KEYS = [
   UPDATE_SEEN_STORAGE_KEY,
   PRINT_SELECTION_STORAGE_KEY,
-  LEGACY_FAVORITES_STORAGE_KEY,
+  LEGACY_PRINT_SELECTION_STORAGE_KEY,
   UNDO_STORAGE_KEY,
   DELETION_REVIEW_STORAGE_KEY
 ];
@@ -84,13 +85,14 @@ function clearTemporaryLocalState(){
   sessionStorage.clear();
 }
 
-function clearCurrentLocalState(){
+function clearCurrentLocalState({ clearFavorites = false } = {}){
   clearTemporaryLocalState();
   localStorage.removeItem(DATA_STORAGE_KEY);
   localStorage.removeItem(TSO_NAME_STORAGE_KEY);
   localStorage.removeItem(PRE_MERGE_STORAGE_KEY);
   localStorage.removeItem(DISMISSED_TIPS_STORAGE_KEY);
   localStorage.removeItem(NEW_ADMIN_TRAINING_PENDING_KEY);
+  if(clearFavorites) localStorage.removeItem(FAVORITE_RESOURCE_IDS_STORAGE_KEY);
 }
 
 function deleteCurrentAssetStorage(){
@@ -128,7 +130,7 @@ function freshStartFromSeed(){
   if(selected === "3"){
     const confirmed = confirm("Delete saved local resources/categories and local PDF storage for this file?");
     if(!confirmed) return;
-    clearCurrentLocalState();
+    clearCurrentLocalState({ clearFavorites:true });
     deleteCurrentAssetStorage().then(() => location.reload());
     return;
   }
@@ -138,7 +140,7 @@ function freshStartFromSeed(){
 // Main persisted app data snapshot (categories/resources + metadata).
 let data = JSON.parse(localStorage.getItem(DATA_STORAGE_KEY) || "null");
 const TIP_TEXT = {
-  user: "Click on a category to see its resources. Click a resource to see details. Click ⬜ to include it in the printed handout.",
+  user: "Click a category to see its resources and click a resource for details. Use the printer button to select it for printing. Use the star to add it to or remove it from Favorites.",
   newAdminWelcome: "Welcome to you, new admin. Press Ctrl+Alt+A to enter admin mode",
   newAdminMode: "Click \"Office Setup\" to name this TSO Resources. Then close this tab or window and rename new.html to the changed name, keeping the .html extension. Open it and enter admin mode again."
 };
@@ -155,6 +157,8 @@ if(!localStorage.getItem(DATA_STORAGE_KEY) || appliedCategoryPreset){
   localStorage.setItem(DATA_STORAGE_KEY, JSON.stringify(data));
 }
 
+let favoriteResourceIds = loadFavoriteResourceIds();
+sanitizeFavoriteResourceIds();
 let printSelection = loadPrintSelection();
 sanitizePrintSelection();
 if(DEBUG) assertInvariants("startup");

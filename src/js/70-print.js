@@ -1,14 +1,72 @@
+/* ---------- Favorites ---------- */
+// Favorites are personal browser state. They are scoped by the office storage
+// prefix and the signed-in Windows/Edge user, and never enter resource packages.
+
+function normalizeStoredResourceIds(value){
+  const seen = new Set();
+  return (Array.isArray(value) ? value : [])
+    .map(id => String(id || "").trim())
+    .filter(id => {
+      if(!id || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+}
+
+function loadFavoriteResourceIds(){
+  try{
+    return normalizeStoredResourceIds(JSON.parse(localStorage.getItem(FAVORITE_RESOURCE_IDS_STORAGE_KEY) || "[]"));
+  }catch(_err){
+    return [];
+  }
+}
+
+function saveFavoriteResourceIds(){
+  localStorage.setItem(FAVORITE_RESOURCE_IDS_STORAGE_KEY, JSON.stringify(favoriteResourceIds));
+}
+
+function sanitizeFavoriteResourceIds(){
+  const resourceIds = new Set((data.resources || []).map(resource => String(resource && resource.id || "")));
+  const filtered = normalizeStoredResourceIds(favoriteResourceIds)
+    .filter(id => resourceIds.has(id));
+  if(JSON.stringify(filtered) !== JSON.stringify(favoriteResourceIds)){
+    favoriteResourceIds = filtered;
+    saveFavoriteResourceIds();
+  }
+}
+
+function isFavoriteResource(id){
+  return favoriteResourceIds.includes(String(id || ""));
+}
+
+function getFavoriteResources(){
+  const selectedIds = new Set(favoriteResourceIds);
+  return (Array.isArray(data.resources) ? data.resources : [])
+    .filter(resource => selectedIds.has(String(resource && resource.id || "")));
+}
+
+function toggleFavoriteResource(id, { rerender = true } = {}){
+  const cleanId = String(id || "");
+  if(!cleanId) return;
+  if(!data.resources.some(resource => String(resource && resource.id || "") === cleanId)) return;
+  const selectedIds = new Set(favoriteResourceIds);
+  selectedIds.has(cleanId) ? selectedIds.delete(cleanId) : selectedIds.add(cleanId);
+  favoriteResourceIds = Array.from(selectedIds);
+  saveFavoriteResourceIds();
+  if(rerender) safeRender();
+}
+
 /* ---------- Print Selection ---------- */
-// Print selection replaced the older Favorites concept. The legacy key is still
-// read once so existing browsers keep their selected resources after upgrading.
+// Read the transitional storage key once so earlier builds keep their selected
+// resources after upgrading.
 
 function loadPrintSelection(){
   let raw = localStorage.getItem(PRINT_SELECTION_STORAGE_KEY);
   if(raw === null){
-    raw = localStorage.getItem(LEGACY_FAVORITES_STORAGE_KEY);
+    raw = localStorage.getItem(LEGACY_PRINT_SELECTION_STORAGE_KEY);
     if(raw !== null){
       localStorage.setItem(PRINT_SELECTION_STORAGE_KEY, raw);
-      localStorage.removeItem(LEGACY_FAVORITES_STORAGE_KEY);
+      localStorage.removeItem(LEGACY_PRINT_SELECTION_STORAGE_KEY);
     }
   }
   let parsed = [];
@@ -22,7 +80,7 @@ function loadPrintSelection(){
 
 function savePrintSelection(){
   localStorage.setItem(PRINT_SELECTION_STORAGE_KEY, JSON.stringify(printSelection));
-  localStorage.removeItem(LEGACY_FAVORITES_STORAGE_KEY);
+  localStorage.removeItem(LEGACY_PRINT_SELECTION_STORAGE_KEY);
 }
 
 function sanitizePrintSelection(){
@@ -38,10 +96,6 @@ function isSelectedForPrinting(id){
   return printSelection.includes(String(id || ""));
 }
 
-function getPrintSelectionIcon(id){
-  return isSelectedForPrinting(id) ? "🖨️" : "⬜";
-}
-
 function getPrintSelectionResources(){
   const selectedIds = new Set(printSelection.map(id => String(id || "")));
   return data.resources.filter(resource => selectedIds.has(String(resource.id || "")));
@@ -55,7 +109,7 @@ function getCategoryPrintInstructionText(){
   const count = printSelection.length;
   return count
     ? `Click 🖨️ (${count}) in the top bar to review and print selected resources.`
-    : "Click ⬜ next to a resource to select it for printing.";
+    : "Click the gray printer button next to a resource to select it for printing.";
 }
 
 function togglePrintSelection(id, { rerender = true } = {}){
@@ -180,7 +234,7 @@ const PrintWorkflow = {
     flyer.className = "print-list-flyer" + (shouldPageBreak ? " print-list-flyer-page-break" : "");
     flyer.classList.toggle("print-disabled", !isSelectedForPrinting(resource.id));
 
-    let html = `<button type="button" class="print-selection-toggle" style="position:static; margin-right:8px;">${getPrintSelectionIcon(resource.id)}</button><h2 style="display:inline;">${escapeHTML(resource.name || "")}</h2>`;
+    let html = `<div class="print-list-heading"><span class="print-list-actions-placeholder"></span><h2>${escapeHTML(resource.name || "")}</h2></div>`;
     if(resource.phone) html += `<div class="print-list-field"><strong>Phone:</strong> ${escapeHTML(resource.phone)}</div>`;
     if(resource.address) html += `<div class="print-list-field"><strong>Address:</strong> ${escapeHTML(resource.address)}</div>`;
     if(resource.website) html += `<div class="print-list-field"><strong>Website:</strong> ${escapeHTML(resource.website)}</div>`;
@@ -188,6 +242,10 @@ const PrintWorkflow = {
       html += `<div class="print-list-field"><strong>Information:</strong><div class="information-rendered resource-info-rendered">${renderInformationHTML(resource.informationText)}</div></div>`;
     }
     flyer.innerHTML = html;
+    const placeholder = flyer.querySelector(".print-list-actions-placeholder");
+    const actions = createResourceActionButtons(resource);
+    actions.classList.add("print-list-actions");
+    if(placeholder) placeholder.replaceWith(actions);
     const toggle = flyer.querySelector(".print-selection-toggle");
     if(toggle){
       toggle.onclick = e => {
@@ -223,7 +281,7 @@ const PrintWorkflow = {
     this.queue = this.buildQueue();
     if(!this.queue.length){
       this.openPreviewContent(container => {
-        container.innerHTML = "<p>No resources are selected for printing.</p><p class=\"print-empty-instruction\">Click ⬜ next to a resource to include it in the printed handout.</p>";
+        container.innerHTML = "<p>No resources are selected for printing.</p><p class=\"print-empty-instruction\">Click the gray printer button next to a resource to include it in the printed handout.</p>";
       });
       return;
     }

@@ -54,6 +54,7 @@ function undoLastDeletion(){
   }
   data = normalizePackageData(snapshot.dataSnapshot);
   clearUndoSnapshot();
+  sanitizeFavoriteResourceIds();
   sanitizePrintSelection();
   persist();
   safeRender();
@@ -66,6 +67,7 @@ function undoLastDeletion(){
 // again because it can be opened from several flows.
 function prepareRenderShell(){
   updatePrintSelectionIndicator();
+  if(tabFavorites) tabFavorites.setAttribute("aria-current", view === "favorites" ? "page" : "false");
   tabAdmin.style.display = isAdminVisible ? "" : "none";
   syncSearchPanel();
   appView.classList.toggle("hidden", view==="admin");
@@ -257,15 +259,18 @@ function getCurrentCategoryForRender(){
     : data.categories.find(c => c.id === currentCategory);
 }
 
-function renderCategoryTitle(){
-  const cat = getCurrentCategoryForRender();
-  if(!cat) return;
+function renderPublicResourceTitle(label){
   const title = document.createElement("div");
-  title.textContent = cat.label;
+  title.textContent = label;
   title.style.fontWeight = "bold";
   title.style.fontSize = "1.2em";
   title.style.marginBottom = "6px";
   appView.appendChild(title);
+}
+
+function renderCategoryTitle(){
+  const cat = getCurrentCategoryForRender();
+  if(cat) renderPublicResourceTitle(cat.label);
 }
 
 function getActiveCategoryFilters(categoryFilterOptions){
@@ -402,6 +407,21 @@ function renderCategoryView(){
   renderCategoryResources(filtered, activeFilters);
 }
 
+function renderFavoritesView(){
+  renderCategoryBackButton();
+  renderPublicResourceTitle("Favorites");
+  renderCategoryPrintInstruction();
+  const resources = getFavoriteResources().slice().sort(compareResourcesByName);
+  if(!resources.length){
+    const empty = document.createElement("p");
+    empty.className = "favorites-empty";
+    empty.textContent = "No favorite resources.";
+    appView.appendChild(empty);
+    return;
+  }
+  resources.forEach(renderCategoryResourceCard);
+}
+
 function groupAppChangesByVersion(changes){
   const groups = [];
   const groupsByVersion = new Map();
@@ -536,6 +556,10 @@ function render(){
 
   if(view==="category"){
     renderCategoryView();
+  }
+
+  if(view==="favorites"){
+    renderFavoritesView();
   }
 
   if(view==="search-results"){

@@ -730,6 +730,8 @@ function applyMergedData(mergedData){
   data = processResourcePackageData(mergedData, {
     sourceName:"Merged resource package"
   }).data;
+  sanitizeFavoriteResourceIds();
+  sanitizePrintSelection();
   persist();
   safeRender();
 }

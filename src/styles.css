@@ -36,8 +36,14 @@ body {
   font-weight:600;
 }
 
-.topbar .categories-button {
+.topbar .public-navigation {
   justify-self:center;
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+
+.topbar .categories-button {
   padding:6px 12px;
   border:1px solid white;
   border-radius:4px;
@@ -51,6 +57,26 @@ body {
 .topbar .categories-button:hover {
   background:#f0f5fa;
 }
+
+.topbar .favorites-button {
+  width:40px;
+  height:40px;
+  display:grid;
+  place-items:center;
+  padding:0;
+  border:1px solid transparent;
+  border-radius:50%;
+  background:transparent;
+  color:white;
+  cursor:pointer;
+}
+
+.topbar .favorites-button:hover { background:rgba(255,255,255,.14); }
+.topbar .favorites-button:focus-visible {
+  outline:3px solid rgba(255,255,255,.55);
+  outline-offset:1px;
+}
+.topbar .favorites-button .interface-icon { width:26px; height:26px; }
 
 .topbar .tabs {
   display:flex;
@@ -92,7 +118,7 @@ body {
 .search-panel input { flex:1; min-width:220px; max-width:520px; box-sizing:border-box; }
 .search-results-title { font-weight:bold; margin:0 0 12px; }
 .search-result-list { list-style:none; margin:0; padding:0; display:grid; gap:12px; }
-.search-result-item { margin:0; padding:14px 16px; border:1px solid #d5dbe3; border-radius:8px; background:#fff; }
+.search-result-item { position:relative; margin:0; padding:14px 104px 14px 16px; border:1px solid #d5dbe3; border-radius:8px; background:#fff; }
 .search-result-button {
   border:0;
   padding:0;
@@ -220,8 +246,53 @@ body {
   outline-offset:1px;
 }
 .resource-expand-toggle[aria-expanded="true"] { transform:rotate(180deg); }
-.print-selection-toggle { position:absolute; left:8px; top:8px; cursor:pointer; font-size:18px; border:0; background:transparent; padding:0; line-height:1; }
-.resource-main { margin-left:24px; }
+.interface-icon {
+  width:22px;
+  height:22px;
+  display:block;
+  overflow:visible;
+}
+.interface-icon path {
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.75;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.interface-icon path.interface-icon-filled { fill:currentColor; }
+.interface-icon circle { fill:currentColor; stroke:none; }
+.resource-action-buttons {
+  position:absolute;
+  left:8px;
+  top:8px;
+  display:flex;
+  align-items:center;
+  gap:3px;
+  z-index:1;
+}
+.resource-icon-button {
+  width:34px;
+  height:34px;
+  display:grid;
+  place-items:center;
+  padding:0;
+  border:0;
+  border-radius:50%;
+  background:transparent;
+  cursor:pointer;
+  transition:background-color .15s ease, color .15s ease;
+}
+.resource-icon-button:hover { background:#eef3f7; }
+.resource-icon-button:focus-visible {
+  outline:3px solid rgba(47,111,171,.35);
+  outline-offset:1px;
+}
+.favorite-toggle { color:#667684; }
+.favorite-toggle[aria-pressed="true"] { color:#b36b00; }
+.print-selection-toggle { color:#89949e; }
+.print-selection-toggle[aria-pressed="true"] { color:#0b5d96; background:#e8f3fb; }
+.resource-main { margin-left:78px; }
+.search-result-actions { left:auto; right:10px; top:10px; }
 .resource-details.collapsed { display:none; }
 .resource-info-separator { border:0; border-top:1px solid #ccc; margin:10px 0; }
 .pdf-attachments-list { margin:6px 0 8px; display:grid; gap:6px; }
@@ -263,6 +334,10 @@ textarea {
   opacity:1;
 }
 .red-tip { position:relative; margin:0 0 12px; padding:10px 44px 10px 12px; border:2px solid #aa0000; border-radius:6px; background:#fff5f5; color:#aa0000; font-size:11px; font-weight:bold; }
+.red-tip-text { display:inline; }
+.tip-inline-icon { width:17px; height:17px; display:inline-block; vertical-align:-3px; margin:0 2px; }
+.tip-printer-icon { color:#78848e; }
+.tip-favorite-icon { color:#b36b00; }
 .red-tip.new-admin-tip { font-size:20px; line-height:1.35; }
 .red-tip-dismiss {
   position:absolute;
@@ -319,6 +394,9 @@ textarea.information-editor { min-height:320px; resize:vertical; }
   background:#fff;
 }
 .print-list-flyer h2 { margin:0 0 12px; }
+.print-list-heading { display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+.print-list-heading h2 { margin:0; }
+.print-list-actions { position:static; flex:0 0 auto; }
 .print-list-field { margin:0 0 10px; }
 .print-resource-separator { border:0; border-top:1px solid #aaa; margin:14px 0; }
 .admin-panel { display:flex; gap:20px; }
