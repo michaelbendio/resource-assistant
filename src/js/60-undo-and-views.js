@@ -407,10 +407,14 @@ function renderUpdateInfo(packageInfo, packageChanges){
   const sourcePackageVersion = packageInfo
     ? normalizePackageVersionValue(packageInfo.sourcePackageVersion)
     : "Unknown";
+  const sourcePackageCreatedAt = packageInfo && packageInfo.sourcePackageCreatedAt;
+  const packageCreatedContent = packageInfo
+    ? `<div>Resource package created: ${escapeHTML(formatDateOnly(sourcePackageCreatedAt))}</div>`
+    : "";
   const packageUpdateContent = packageInfo
     ? packageChanges.length
-      ? `<div>Updates loaded from Resource Package ${escapeHTML(String(sourcePackageVersion))}:</div><ul>${packageChanges.map(change => `<li>${escapeHTML(change)}</li>`).join("")}</ul>`
-      : `<div>No resource package updates were loaded from Resource Package ${escapeHTML(String(sourcePackageVersion))}.</div>`
+      ? `${packageCreatedContent}<div>Updates loaded from Resource Package ${escapeHTML(String(sourcePackageVersion))}:</div><ul>${packageChanges.map(change => `<li>${escapeHTML(change)}</li>`).join("")}</ul>`
+      : `${packageCreatedContent}<div>No resource package updates were loaded from Resource Package ${escapeHTML(String(sourcePackageVersion))}.</div>`
     : `<div>No resource package updates loaded.</div>`;
   const appChangeItems = APP_CHANGE_LOG.slice(0, 5).map(change => {
     const dateParts = String(change.date || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -419,7 +423,7 @@ function renderUpdateInfo(packageInfo, packageChanges){
       : String(change.date || "");
     return `<li>${escapeHTML(displayDate)} ${escapeHTML(change.version)} — ${escapeHTML(change.message)}</li>`;
   }).join("");
-  appView.innerHTML += `<div class="category-card"><div>App version: ${escapeHTML(data.appVersion || APP_VERSION)}</div><div>Resource data last modified: ${escapeHTML(formatDateOnly(data.lastModified))}</div></div>`;
+  appView.innerHTML += `<div class="category-card"><div>App version: ${escapeHTML(data.appVersion || APP_VERSION)}</div></div>`;
   appView.innerHTML += `<div class="category-card"><strong>App Changes</strong>${appChangeItems ? `<ul>${appChangeItems}</ul>` : `<div>No app changes available.</div>`}</div>`;
   appView.innerHTML += `<div class="category-card"><strong>Latest Resource Package ${escapeHTML(String(resourcePackageVersion))}:</strong>${packageUpdateContent}</div>`;
 }

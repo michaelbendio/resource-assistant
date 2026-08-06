@@ -1019,6 +1019,11 @@ textarea.information-editor { min-height:320px; resize:vertical; }
     {
       "date": "2026-08-06",
       "version": "2.2.14",
+      "message": "Show package creation dates and make Resource Information URLs clickable"
+    },
+    {
+      "date": "2026-08-06",
+      "version": "2.2.14",
       "message": "Add office setup, publication summaries, history, and five recovery points"
     },
     {
@@ -1035,11 +1040,6 @@ textarea.information-editor { min-height:320px; resize:vertical; }
       "date": "2026-08-05",
       "version": "2.2.11",
       "message": "Protect newer edits when tagging or undoing deletions"
-    },
-    {
-      "date": "2026-08-04",
-      "version": "2.2.10",
-      "message": "Preserve legacy For groups during package merges"
     }
   ]
 }
@@ -1602,6 +1602,31 @@ function applyInformationMarkup(escapedText){
     .replace(/__([^_\n]+?)__/g, "<u>$1</u>");
 }
 
+function linkifyInformationURLs(html){
+  const urlPattern = /(?:https?:\/\/|www\.)[A-Za-z0-9\-._~:/?#[\]@!$&()*+,;=%]+/gi;
+  return String(html || "")
+    .split(/(<[^>]+>)/g)
+    .map(segment => {
+      if(segment.startsWith("<")) return segment;
+      return segment.replace(urlPattern, match => {
+        let url = match;
+        let trailing = "";
+        while(url && /[.,;:!?)}\]]$/.test(url)){
+          trailing = url.slice(-1) + trailing;
+          url = url.slice(0, -1);
+        }
+        if(!url) return match;
+        const href = /^www\./i.test(url) ? `https://${url}` : url;
+        return `<a href="${href}" target="_blank" rel="noopener noreferrer">${url}</a>${trailing}`;
+      });
+    })
+    .join("");
+}
+
+function renderInformationInlineHTML(text){
+  return linkifyInformationURLs(applyInformationMarkup(escapeHTML(text)));
+}
+
 function renderInformationMarkupHTML(text){
   const normalized = String(text || "").replace(/\r\n?/g, "\n");
   const lines = normalized.split("\n");
@@ -1626,7 +1651,7 @@ function renderInformationMarkupHTML(text){
     }
 
     if(bulletMatch){
-      const bulletText = applyInformationMarkup(escapeHTML(bulletMatch[1]));
+      const bulletText = renderInformationInlineHTML(bulletMatch[1]);
       listItems.push(`<li>${bulletText}</li>`);
       return;
     }
@@ -1636,7 +1661,7 @@ function renderInformationMarkupHTML(text){
       out.push('<div class="information-line information-blank">&nbsp;</div>');
       return;
     }
-    out.push(`<div class="information-line">${applyInformationMarkup(escapeHTML(line))}</div>`);
+    out.push(`<div class="information-line">${renderInformationInlineHTML(line)}</div>`);
   });
 
   flushList();
@@ -2038,6 +2063,10 @@ function collectUnsafePackageShapeErrors(packageData){
   }else if(!isMigratableTaxonomyValue(packageData.forGroups)){
     errors.push("'forGroups' contains a value that is not a label.");
   }
+  if(packageData.packageCreatedAt != null
+    && !Number.isFinite(Date.parse(String(packageData.packageCreatedAt)))){
+    errors.push("'packageCreatedAt' must be a valid date when present.");
+  }
 
   (Array.isArray(packageData.categories) ? packageData.categories : []).forEach((category, index) => {
     if(!category || typeof category !== "object" || Array.isArray(category)){
@@ -2159,6 +2188,9 @@ function collectUnsafePackageShapeErrors(packageData){
 
 function normalizeResourcePackageData(packageData){
   packageData.resourcePackageSchemaVersion = RESOURCE_PACKAGE_SCHEMA_VERSION;
+  if(packageData.packageCreatedAt != null){
+    packageData.packageCreatedAt = new Date(packageData.packageCreatedAt).toISOString();
+  }
   normalizeDataInformationShape(packageData);
   normalizeDataPDFShape(packageData);
   normalizeDeletionWorkflowData(packageData);
@@ -4069,10 +4101,14 @@ function renderUpdateInfo(packageInfo, packageChanges){
   const sourcePackageVersion = packageInfo
     ? normalizePackageVersionValue(packageInfo.sourcePackageVersion)
     : "Unknown";
+  const sourcePackageCreatedAt = packageInfo && packageInfo.sourcePackageCreatedAt;
+  const packageCreatedContent = packageInfo
+    ? `<div>Resource package created: ${escapeHTML(formatDateOnly(sourcePackageCreatedAt))}</div>`
+    : "";
   const packageUpdateContent = packageInfo
     ? packageChanges.length
-      ? `<div>Updates loaded from Resource Package ${escapeHTML(String(sourcePackageVersion))}:</div><ul>${packageChanges.map(change => `<li>${escapeHTML(change)}</li>`).join("")}</ul>`
-      : `<div>No resource package updates were loaded from Resource Package ${escapeHTML(String(sourcePackageVersion))}.</div>`
+      ? `${packageCreatedContent}<div>Updates loaded from Resource Package ${escapeHTML(String(sourcePackageVersion))}:</div><ul>${packageChanges.map(change => `<li>${escapeHTML(change)}</li>`).join("")}</ul>`
+      : `${packageCreatedContent}<div>No resource package updates were loaded from Resource Package ${escapeHTML(String(sourcePackageVersion))}.</div>`
     : `<div>No resource package updates loaded.</div>`;
   const appChangeItems = APP_CHANGE_LOG.slice(0, 5).map(change => {
     const dateParts = String(change.date || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -4081,7 +4117,7 @@ function renderUpdateInfo(packageInfo, packageChanges){
       : String(change.date || "");
     return `<li>${escapeHTML(displayDate)} ${escapeHTML(change.version)} — ${escapeHTML(change.message)}</li>`;
   }).join("");
-  appView.innerHTML += `<div class="category-card"><div>App version: ${escapeHTML(data.appVersion || APP_VERSION)}</div><div>Resource data last modified: ${escapeHTML(formatDateOnly(data.lastModified))}</div></div>`;
+  appView.innerHTML += `<div class="category-card"><div>App version: ${escapeHTML(data.appVersion || APP_VERSION)}</div></div>`;
   appView.innerHTML += `<div class="category-card"><strong>App Changes</strong>${appChangeItems ? `<ul>${appChangeItems}</ul>` : `<div>No app changes available.</div>`}</div>`;
   appView.innerHTML += `<div class="category-card"><strong>Latest Resource Package ${escapeHTML(String(resourcePackageVersion))}:</strong>${packageUpdateContent}</div>`;
 }
@@ -4810,6 +4846,19 @@ function getLatestPackageVersionValue(...values){
   return numericVersions.length ? Math.max(...numericVersions) : "Unknown";
 }
 
+function getResourcePackageCreatedAt(packageData){
+  if(!packageData || typeof packageData !== "object") return null;
+  const createdAt = String(packageData.packageCreatedAt || "").trim();
+  if(createdAt && Number.isFinite(Date.parse(createdAt))){
+    return new Date(createdAt).toISOString();
+  }
+  const legacyLastModified = String(packageData.lastModified || "").trim();
+  if(legacyLastModified && Number.isFinite(Date.parse(legacyLastModified))){
+    return new Date(legacyLastModified).toISOString();
+  }
+  return null;
+}
+
 function normalizeLastLoadedPackageInfo(packageData){
   if(!packageData || typeof packageData !== "object") return;
   const source = packageData.lastLoadedPackageInfo;
@@ -4827,6 +4876,9 @@ function normalizeLastLoadedPackageInfo(packageData){
       source.sourcePackageVersion != null ? source.sourcePackageVersion : source.packageVersion
     ),
     loadedAt: Date.parse(String(source.loadedAt || "")) ? String(source.loadedAt) : nowISO(),
+    sourcePackageCreatedAt: Date.parse(String(source.sourcePackageCreatedAt || ""))
+      ? new Date(source.sourcePackageCreatedAt).toISOString()
+      : null,
     changes
   };
 }
@@ -5181,6 +5233,7 @@ function buildResourcePackageData(sourceData){
     appVersion: APP_VERSION,
     appChanges: APP_CHANGE_LOG.map(change => ({ ...change })),
     packageVersion: source.packageVersion,
+    packageCreatedAt: nowISO(),
     lastModified: source.lastModified || nowISO(),
     categories: source.categories,
     categoryMigrations: source.categoryMigrations,
@@ -5532,6 +5585,7 @@ async function mergeImportPackage(event, options = {}){
       data.lastLoadedPackageInfo = {
         sourcePackageVersion: importedPackageVersion,
         loadedAt: nowISO(),
+        sourcePackageCreatedAt: getResourcePackageCreatedAt(imported),
         changes: persistentChangeSummaries
       };
     }else{

@@ -10,6 +10,11 @@ The same processor is used for direct package merges, guided SharePoint
 publishing, saved browser data, merge results, and package export. A compatibility
 change belongs in a schema migration rather than in a later normalization step.
 
+Current packages also record `packageCreatedAt`, an ISO timestamp written when
+the ZIP is built. The Recent Updates screen uses this value instead of the local
+merge time. Packages created before this field existed fall back to their
+package-level `lastModified` value when imported.
+
 ## Supported schemas
 
 ### Schema 1 — unversioned legacy packages

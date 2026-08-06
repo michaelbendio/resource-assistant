@@ -227,6 +227,10 @@ function collectUnsafePackageShapeErrors(packageData){
   }else if(!isMigratableTaxonomyValue(packageData.forGroups)){
     errors.push("'forGroups' contains a value that is not a label.");
   }
+  if(packageData.packageCreatedAt != null
+    && !Number.isFinite(Date.parse(String(packageData.packageCreatedAt)))){
+    errors.push("'packageCreatedAt' must be a valid date when present.");
+  }
 
   (Array.isArray(packageData.categories) ? packageData.categories : []).forEach((category, index) => {
     if(!category || typeof category !== "object" || Array.isArray(category)){
@@ -348,6 +352,9 @@ function collectUnsafePackageShapeErrors(packageData){
 
 function normalizeResourcePackageData(packageData){
   packageData.resourcePackageSchemaVersion = RESOURCE_PACKAGE_SCHEMA_VERSION;
+  if(packageData.packageCreatedAt != null){
+    packageData.packageCreatedAt = new Date(packageData.packageCreatedAt).toISOString();
+  }
   normalizeDataInformationShape(packageData);
   normalizeDataPDFShape(packageData);
   normalizeDeletionWorkflowData(packageData);

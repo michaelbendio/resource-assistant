@@ -249,6 +249,19 @@ function getLatestPackageVersionValue(...values){
   return numericVersions.length ? Math.max(...numericVersions) : "Unknown";
 }
 
+function getResourcePackageCreatedAt(packageData){
+  if(!packageData || typeof packageData !== "object") return null;
+  const createdAt = String(packageData.packageCreatedAt || "").trim();
+  if(createdAt && Number.isFinite(Date.parse(createdAt))){
+    return new Date(createdAt).toISOString();
+  }
+  const legacyLastModified = String(packageData.lastModified || "").trim();
+  if(legacyLastModified && Number.isFinite(Date.parse(legacyLastModified))){
+    return new Date(legacyLastModified).toISOString();
+  }
+  return null;
+}
+
 function normalizeLastLoadedPackageInfo(packageData){
   if(!packageData || typeof packageData !== "object") return;
   const source = packageData.lastLoadedPackageInfo;
@@ -266,6 +279,9 @@ function normalizeLastLoadedPackageInfo(packageData){
       source.sourcePackageVersion != null ? source.sourcePackageVersion : source.packageVersion
     ),
     loadedAt: Date.parse(String(source.loadedAt || "")) ? String(source.loadedAt) : nowISO(),
+    sourcePackageCreatedAt: Date.parse(String(source.sourcePackageCreatedAt || ""))
+      ? new Date(source.sourcePackageCreatedAt).toISOString()
+      : null,
     changes
   };
 }
@@ -620,6 +636,7 @@ function buildResourcePackageData(sourceData){
     appVersion: APP_VERSION,
     appChanges: APP_CHANGE_LOG.map(change => ({ ...change })),
     packageVersion: source.packageVersion,
+    packageCreatedAt: nowISO(),
     lastModified: source.lastModified || nowISO(),
     categories: source.categories,
     categoryMigrations: source.categoryMigrations,
@@ -971,6 +988,7 @@ async function mergeImportPackage(event, options = {}){
       data.lastLoadedPackageInfo = {
         sourcePackageVersion: importedPackageVersion,
         loadedAt: nowISO(),
+        sourcePackageCreatedAt: getResourcePackageCreatedAt(imported),
         changes: persistentChangeSummaries
       };
     }else{

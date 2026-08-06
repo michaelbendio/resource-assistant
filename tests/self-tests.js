@@ -203,6 +203,7 @@ async function runSelfTests(){
         lastLoadedPackageInfo: {
           packageVersion: "",
           loadedAt: "not-a-date",
+          sourcePackageCreatedAt: "2026-01-02T03:04:05-07:00",
           changes: [" Added one ", "", "Added two"]
         }
       };
@@ -211,6 +212,9 @@ async function runSelfTests(){
       if(sample.lastLoadedPackageInfo.sourcePackageVersion !== "Unknown") throw new Error("package version fallback failed");
       if(sample.lastLoadedPackageInfo.changes.length !== 2) throw new Error("package changes were not normalized");
       if(!Date.parse(sample.lastLoadedPackageInfo.loadedAt)) throw new Error("loadedAt was not normalized");
+      if(sample.lastLoadedPackageInfo.sourcePackageCreatedAt !== "2026-01-02T10:04:05.000Z"){
+        throw new Error("source package creation date was not normalized");
+      }
     }
   });
 
@@ -402,8 +406,8 @@ async function runSelfTests(){
             throw new Error("latest app change did not use the required date, version, and message format");
           }
         }
-        if(!/Resource data last modified:/.test(appView.textContent || "")){
-          throw new Error("resource data modified label was missing");
+        if(/Resource data last modified:/.test(appView.textContent || "")){
+          throw new Error("local merge time should not be presented as the package update date");
         }
         if(Array.from(appView.querySelectorAll("button")).some(button => button.textContent.trim() === "View Categories")){
           throw new Error("redundant View Categories button was rendered");
@@ -418,6 +422,7 @@ async function runSelfTests(){
         data.lastLoadedPackageInfo = {
           sourcePackageVersion: 11,
           loadedAt: nowISO(),
+          sourcePackageCreatedAt: "2026-07-30T12:00:00.000Z",
           changes: ["Career Education - Formatted the services"]
         };
         render();
@@ -426,6 +431,10 @@ async function runSelfTests(){
         }
         if(!/Updates loaded from Resource Package 11:/.test(appView.textContent || "")){
           throw new Error("latest package update source was missing");
+        }
+        const expectedPackageDate = `Resource package created: ${formatDateOnly("2026-07-30T12:00:00.000Z")}`;
+        if(!appView.textContent.includes(expectedPackageDate)){
+          throw new Error("latest package update did not show the package creation date");
         }
         if(!/Career Education - Formatted the services/.test(appView.textContent || "")){
           throw new Error("missing package change text");
@@ -2704,6 +2713,9 @@ async function runSelfTests(){
       if(!Array.isArray(packageData.deletionRequests) || !Array.isArray(packageData.deletions)){
         throw new Error("deletion workflow arrays were not exported");
       }
+      if(!Number.isFinite(Date.parse(packageData.packageCreatedAt))){
+        throw new Error("resource package creation timestamp was not exported");
+      }
     }
   });
 
@@ -2839,6 +2851,20 @@ async function runSelfTests(){
       if(getLatestPackageVersionValue(missing.packageVersion, 12, numericString.packageVersion) !== 13){
         throw new Error("latest package version was not retained");
       }
+      const dated = processResourcePackageData({
+        resourcePackageSchemaVersion:RESOURCE_PACKAGE_SCHEMA_VERSION,
+        packageCreatedAt:"2026-07-30T05:00:00-07:00",
+        lastModified:"2026-07-29T12:00:00.000Z",
+        categories:[],
+        resources:[]
+      }).data;
+      if(dated.packageCreatedAt !== "2026-07-30T12:00:00.000Z"
+        || getResourcePackageCreatedAt(dated) !== "2026-07-30T12:00:00.000Z"){
+        throw new Error("explicit package creation date was not retained");
+      }
+      if(getResourcePackageCreatedAt({ lastModified:"2026-07-29T12:00:00.000Z" }) !== "2026-07-29T12:00:00.000Z"){
+        throw new Error("legacy package date did not fall back to lastModified");
+      }
     }
   });
 
@@ -2849,7 +2875,13 @@ async function runSelfTests(){
         [PACKAGE_MIGRATION_FIXTURES.malformedContainers, /cannot be migrated safely.*categories/is],
         [PACKAGE_MIGRATION_FIXTURES.malformedDeletion, /cannot be migrated safely.*unsupported kind/is],
         [PACKAGE_MIGRATION_FIXTURES.unsupportedSchema, /unsupported resource package schema 4/is],
-        [PACKAGE_MIGRATION_FIXTURES.invalidPackageVersion, /cannot be migrated safely.*packageVersion/is]
+        [PACKAGE_MIGRATION_FIXTURES.invalidPackageVersion, /cannot be migrated safely.*packageVersion/is],
+        [{
+          resourcePackageSchemaVersion:RESOURCE_PACKAGE_SCHEMA_VERSION,
+          packageCreatedAt:"not-a-date",
+          categories:[],
+          resources:[]
+        }, /cannot be migrated safely.*packageCreatedAt/is]
       ];
       cases.forEach(([fixture, expected]) => {
         let message = "";
@@ -4242,7 +4274,7 @@ async function runSelfTests(){
           categories:[{ id:"food", label:"Food" }],
           forGroups:[],
           resources:[
-            { id:"list", name:"Food Pantry List", categories:["food"], phone:"", website:"", hours:"", address:"123 Main", informationText:"" },
+            { id:"list", name:"Food Pantry List", categories:["food"], phone:"", website:"", hours:"", address:"123 Main", informationText:"Apply at https://example.org/pantry.\n* Updates: www.example.org/news" },
             { id:"phone", name:"Food Pantry Phone", categories:["food"], phone:"555-1212", website:"", hours:"", informationText:"" },
             { id:"site", name:"Food Pantry Site", categories:["food"], phone:"", website:"https://example.org", hours:"", informationText:"" },
             { id:"hours", name:"Food Pantry Hours", categories:["food"], phone:"", website:"", hours:"9-5", informationText:"" }
@@ -4269,6 +4301,16 @@ async function runSelfTests(){
         if(!text.includes("Food Pantry List")) throw new Error("Lists category did not show list resource");
         if(text.includes("Food Pantry Phone") || text.includes("Food Pantry Site") || text.includes("Food Pantry Hours")){
           throw new Error("Lists category included non-list resource");
+        }
+        const links = Array.from(appView.querySelectorAll(".resource-info-rendered a"));
+        if(links.length !== 2
+          || links[0].getAttribute("href") !== "https://example.org/pantry"
+          || links[0].textContent !== "https://example.org/pantry"
+          || links[1].getAttribute("href") !== "https://www.example.org/news"){
+          throw new Error("URLs in the generated Lists category were not rendered as safe links");
+        }
+        if(links.some(link => link.getAttribute("target") !== "_blank" || link.getAttribute("rel") !== "noopener noreferrer")){
+          throw new Error("Resource Information links were missing safe new-window attributes");
         }
 
         const results = buildSearchResults("lists");

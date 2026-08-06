@@ -422,6 +422,31 @@ function applyInformationMarkup(escapedText){
     .replace(/__([^_\n]+?)__/g, "<u>$1</u>");
 }
 
+function linkifyInformationURLs(html){
+  const urlPattern = /(?:https?:\/\/|www\.)[A-Za-z0-9\-._~:/?#[\]@!$&()*+,;=%]+/gi;
+  return String(html || "")
+    .split(/(<[^>]+>)/g)
+    .map(segment => {
+      if(segment.startsWith("<")) return segment;
+      return segment.replace(urlPattern, match => {
+        let url = match;
+        let trailing = "";
+        while(url && /[.,;:!?)}\]]$/.test(url)){
+          trailing = url.slice(-1) + trailing;
+          url = url.slice(0, -1);
+        }
+        if(!url) return match;
+        const href = /^www\./i.test(url) ? `https://${url}` : url;
+        return `<a href="${href}" target="_blank" rel="noopener noreferrer">${url}</a>${trailing}`;
+      });
+    })
+    .join("");
+}
+
+function renderInformationInlineHTML(text){
+  return linkifyInformationURLs(applyInformationMarkup(escapeHTML(text)));
+}
+
 function renderInformationMarkupHTML(text){
   const normalized = String(text || "").replace(/\r\n?/g, "\n");
   const lines = normalized.split("\n");
@@ -446,7 +471,7 @@ function renderInformationMarkupHTML(text){
     }
 
     if(bulletMatch){
-      const bulletText = applyInformationMarkup(escapeHTML(bulletMatch[1]));
+      const bulletText = renderInformationInlineHTML(bulletMatch[1]);
       listItems.push(`<li>${bulletText}</li>`);
       return;
     }
@@ -456,7 +481,7 @@ function renderInformationMarkupHTML(text){
       out.push('<div class="information-line information-blank">&nbsp;</div>');
       return;
     }
-    out.push(`<div class="information-line">${applyInformationMarkup(escapeHTML(line))}</div>`);
+    out.push(`<div class="information-line">${renderInformationInlineHTML(line)}</div>`);
   });
 
   flushList();

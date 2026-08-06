@@ -62,17 +62,21 @@ unavailable, stop with an error; do not substitute iCloud or another location.
 
 ## Commit and version workflow
 
-Every commit must bump the app version. Use the next patch version by default,
-unless the user provides another version. Before committing:
+Before each commit, ask the user to approve the next patch version or provide a
+different version. If the user instructs you in advance not to bump the version,
+treat that as approval to keep the current version for that commit and do not ask
+again or flag the exception. Before committing:
 
 1. Update `src/release.json` with the proposed version, current date, and exact
    planned commit subject. Preserve the existing change-log history unless the
    user selects a different visible set.
 2. Run `python3 verify-tso-release`. This rebuilds both outputs and runs all
    Python and browser tests.
-3. Ask: `Commit as version X.Y.Z? Reply y or provide a version number.`
+3. Unless the user already approved a version or instructed you not to bump it,
+   ask: `Commit as version X.Y.Z? Reply y or provide a version number.`
 
-Do not commit or push until the user replies `y` or supplies the version to use.
+Do not commit or push until the user replies `y`, supplies the version to use, or
+has already instructed you to retain the current version.
 
 ## Mandatory application release verification
 

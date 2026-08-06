@@ -1,8 +1,13 @@
 {
   "version": "2.2.14",
   "date": "2026-08-06",
-  "message": "Add office setup, publishing history, and recovery",
+  "message": "Preserve package dates and link resource URLs",
   "appChanges": [
+    {
+      "date": "2026-08-06",
+      "version": "2.2.14",
+      "message": "Show package creation dates and make Resource Information URLs clickable"
+    },
     {
       "date": "2026-08-06",
       "version": "2.2.14",
