@@ -560,27 +560,6 @@ function mergeIncomingResourcePDFs(mergedResources, incomingResources){
   });
 }
 
-function normalizePackageData(nextData){
-  if(!nextData || typeof nextData !== "object") nextData = {};
-  nextData.resourcePackageSchemaVersion = RESOURCE_PACKAGE_SCHEMA_VERSION;
-  if(!Array.isArray(nextData.categories)) nextData.categories = [];
-  if(!Array.isArray(nextData.resources)) nextData.resources = [];
-  normalizeDataInformationShape(nextData);
-  normalizeDataPDFShape(nextData);
-  normalizeLegacyPackageShape(nextData);
-  normalizeLegacyTagsShape(nextData);
-  normalizeDeletionWorkflowData(nextData);
-  normalizeDataForGroupsShape(nextData);
-  applyDeletionTombstones(nextData);
-  normalizeDataCategoryFilterShape(nextData);
-  normalizeCategoryMigrations(nextData);
-  normalizeDataVerifiedOnShape(nextData);
-  normalizeChanges(nextData);
-  nextData.packageVersion = normalizePackageVersionValue(nextData.packageVersion);
-  normalizeLastLoadedPackageInfo(nextData);
-  return nextData;
-}
-
 function removeUnusedUnnamedCategories(packageData){
   // Older app versions could persist a blank category as soon as Admin clicked
   // New. Remove only categories that have no resource/filter/migration target;
@@ -623,8 +602,9 @@ function removeUnusedUnnamedCategories(packageData){
 function buildResourcePackageData(sourceData){
   // Resource packages are intentionally smaller than local app state. Do not add
   // UI-only fields such as lastLoadedPackageInfo, undo, or selected filters here.
-  const source = normalizePackageData(cloneDataObject(sourceData || {}));
-  removeUnusedUnnamedCategories(source);
+  const source = processResourcePackageData(sourceData || {}, {
+    sourceName:"Current browser resource data"
+  }).data;
   const referencedUnnamedCategory = source.categories.find(category =>
     !String(category && category.label || "").trim()
   );
@@ -634,7 +614,8 @@ function buildResourcePackageData(sourceData){
       "Name or delete it in Admin before saving the resource package."
     );
   }
-  return {
+  const packageData = {
+    ...source,
     resourcePackageSchemaVersion: RESOURCE_PACKAGE_SCHEMA_VERSION,
     appVersion: APP_VERSION,
     appChanges: APP_CHANGE_LOG.map(change => ({ ...change })),
@@ -648,21 +629,20 @@ function buildResourcePackageData(sourceData){
     deletionRequests: source.deletionRequests,
     deletions: source.deletions
   };
-}
-
-function collectLegacyPackageFieldErrors(packageData){
-  // Legacy TSO packages are accepted and normalized during import. Keep this
-  // hook for fields that cannot be translated safely in the future.
-  const errors = [];
-  if(!packageData || typeof packageData !== "object") return errors;
-  return errors;
+  delete packageData.lastLoadedPackageInfo;
+  delete packageData.categoryPresetVersion;
+  return packageData;
 }
 
 function mergeResourcePackages(localData, incomingData){
   // Merge into cloned normalized objects so a failed import cannot partially
   // mutate the user's current data.
-  const local = normalizePackageData(cloneDataObject(localData));
-  const incoming = normalizePackageData(cloneDataObject(incomingData));
+  const local = processResourcePackageData(localData, {
+    sourceName:"Current browser resource data"
+  }).data;
+  const incoming = processResourcePackageData(incomingData, {
+    sourceName:"Incoming resource package"
+  }).data;
   const categoryMigrations = mergeCategoryMigrations(local.categoryMigrations, incoming.categoryMigrations);
   applyCategoryMigrations(local, categoryMigrations);
   applyCategoryMigrations(incoming, categoryMigrations);
@@ -687,9 +667,11 @@ function mergeResourcePackages(localData, incomingData){
     deletions,
     resourcePackageSchemaVersion: RESOURCE_PACKAGE_SCHEMA_VERSION
   };
-  normalizePackageData(mergedData);
+  const finalized = processResourcePackageData(mergedData, {
+    sourceName:"Merged resource package"
+  }).data;
   return {
-    mergedData,
+    mergedData:finalized,
     summary: {
       categoriesAdded: categoryMerge.added,
       categoriesUpdated: categoryMerge.updated,
@@ -728,8 +710,9 @@ async function mergeZipAssets(zip, mergedData){
 }
 
 function applyMergedData(mergedData){
-  normalizePackageData(mergedData);
-  data = mergedData;
+  data = processResourcePackageData(mergedData, {
+    sourceName:"Merged resource package"
+  }).data;
   persist();
   safeRender();
 }
@@ -900,115 +883,6 @@ async function beginMergeImportPackage(){
   input.click();
 }
 
-function validateImportData(imported){
-  // Validates imported resource package JSON before merging current data.
-  const errors = [];
-  const warnings = [];
-
-  if(!imported || typeof imported !== "object"){
-    return { ok:false, errors:["File is not a valid JSON object"], warnings:[] };
-  }
-
-  if(!Array.isArray(imported.categories)){
-    errors.push("Missing or invalid 'categories' array");
-  }
-
-  if(!Array.isArray(imported.resources)){
-    errors.push("Missing or invalid 'resources' array");
-  }
-
-  if(imported.categoryMigrations != null && !Array.isArray(imported.categoryMigrations)){
-    errors.push("Invalid 'categoryMigrations' array");
-  }
-
-  if(imported.appChanges != null && !Array.isArray(imported.appChanges)){
-    errors.push("Invalid 'appChanges' array");
-  }
-
-  if(imported.resourcePackageSchemaVersion != null
-    && imported.resourcePackageSchemaVersion !== LEGACY_RESOURCE_PACKAGE_SCHEMA_VERSION
-    && imported.resourcePackageSchemaVersion !== RESOURCE_PACKAGE_SCHEMA_VERSION){
-    errors.push(
-      `Unsupported resource package schema. Expected ${LEGACY_RESOURCE_PACKAGE_SCHEMA_VERSION} or ${RESOURCE_PACKAGE_SCHEMA_VERSION}.`
-    );
-  }
-
-  if(imported.deletionRequests != null && !Array.isArray(imported.deletionRequests)){
-    errors.push("Invalid 'deletionRequests' array");
-  }
-  if(imported.deletions != null && !Array.isArray(imported.deletions)){
-    errors.push("Invalid 'deletions' array");
-  }
-
-  collectLegacyPackageFieldErrors(imported).forEach(error => errors.push(error));
-
-  const categoryIds = new Set();
-  (Array.isArray(imported.categories) ? imported.categories : []).forEach((c, i) => {
-    if(!c.id) errors.push(`Category at index ${i} is missing id`);
-    if(!String(c && c.label || "").trim()) errors.push(`Category '${c && c.id || i}' is missing a label`);
-    if(c.id){
-      if(categoryIds.has(c.id)){
-        errors.push(`Duplicate category id '${c.id}'`);
-      }
-      categoryIds.add(c.id);
-    }
-  });
-
-  const migratedCategoryIds = new Set();
-  (Array.isArray(imported.categoryMigrations) ? imported.categoryMigrations : []).forEach((migration, i) => {
-    if(!migration || typeof migration !== "object"){
-      errors.push(`Category migration at index ${i} must be an object`);
-      return;
-    }
-    const fromId = String(migration.fromId || "").trim();
-    const toId = String(migration.toId || "").trim();
-    const toFilter = String(migration.toFilter || "").trim();
-    if(!fromId) errors.push(`Category migration at index ${i} is missing fromId`);
-    if(fromId && migratedCategoryIds.has(fromId)) errors.push(`Duplicate category migration from '${fromId}'`);
-    if(fromId) migratedCategoryIds.add(fromId);
-    if(toId && fromId === toId) errors.push(`Category migration '${fromId}' cannot target itself`);
-    if(toId && !categoryIds.has(toId)) errors.push(`Category migration '${fromId}' references unknown target '${toId}'`);
-    if(toFilter && !toId) errors.push(`Category migration '${fromId}' has toFilter without toId`);
-  });
-
-  const resourceIds = new Set();
-  (Array.isArray(imported.resources) ? imported.resources : []).forEach((r, i) => {
-    if(!r.id) errors.push(`Resource at index ${i} missing id`);
-    if(!r.name) warnings.push(`Resource '${r.id || i}' missing name`);
-
-    if(r.id){
-      if(resourceIds.has(r.id)){
-        errors.push(`Duplicate resource id '${r.id}'`);
-      }
-      resourceIds.add(r.id);
-    }
-
-    if(Array.isArray(r.categories)){
-      r.categories.forEach(catId => {
-        if(!categoryIds.has(catId)){
-          warnings.push(`Resource '${r.id}' references unknown category '${catId}'`);
-        }
-      });
-    }
-    if("pdfs" in r && !Array.isArray(r.pdfs)){
-      errors.push(`Resource '${r.id || i}' has invalid 'pdfs' value`);
-    }
-    (Array.isArray(r.pdfs) ? r.pdfs : []).forEach((pdf, pdfIndex) => {
-      if(!pdf || typeof pdf !== "object"){
-        errors.push(`Resource '${r.id || i}' PDF ${pdfIndex} must be an object`);
-        return;
-      }
-      if(!pdf.path) errors.push(`Resource '${r.id || i}' PDF ${pdfIndex} is missing path`);
-    });
-  });
-
-  return {
-    ok: errors.length === 0,
-    errors,
-    warnings
-  };
-}
-
 async function mergeImportPackage(event, options = {}){
   // Imports package ZIP, validates JSON, merges data, then stores referenced PDFs.
   if(!commitPendingEditsIfChanged()){
@@ -1034,18 +908,9 @@ async function mergeImportPackage(event, options = {}){
     }
 
     const jsonText = await jsonFile.async("string");
-    const imported = JSON.parse(jsonText);
-    const removedUnnamedCategoryIds = removeUnusedUnnamedCategories(imported);
-
-    const report = validateImportData(imported);
-    if(!report.ok){
-      alert(
-        "Load failed due to errors:\n\n" +
-        report.errors.join("\n")
-      );
-      return;
-    }
-    normalizePackageData(imported);
+    const processedPackage = processResourcePackageJSON(jsonText, { sourceName:file.name });
+    const imported = processedPackage.data;
+    const removedUnnamedCategoryIds = processedPackage.removedUnnamedCategoryIds;
     const incomingDeletionRequests = cloneDataObject(imported.deletionRequests || []);
     const preparedChanges = options.preservePreparedChanges
       ? cloneDataObject(Array.isArray(data && data.changes) ? data.changes : [])
@@ -1157,7 +1022,7 @@ async function mergeImportPackage(event, options = {}){
     }
     return true;
   }catch(e){
-    alert("Load failed: " + e.message);
+    alert("Load failed: " + formatResourcePackageError(e));
   }finally{
     // allow re-import of same filename
     event.target.value = "";

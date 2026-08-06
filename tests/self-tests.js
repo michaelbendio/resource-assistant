@@ -1198,7 +1198,13 @@ async function runSelfTests(){
       }
       const importValidation = validateImportData({
         categories:[{ id:"blank", label:"   " }],
-        resources:[]
+        resources:[{
+          id:"uses-blank",
+          name:"Uses Blank Category",
+          categories:["blank"],
+          categoryFilters:{ blank:[] },
+          forGroups:[]
+        }]
       });
       if(importValidation.ok || !importValidation.errors.some(error => error.includes("missing a label"))){
         throw new Error("package with blank category label was not rejected");
@@ -2570,6 +2576,172 @@ async function runSelfTests(){
       }
       if(!Array.isArray(packageData.deletionRequests) || !Array.isArray(packageData.deletions)){
         throw new Error("deletion workflow arrays were not exported");
+      }
+    }
+  });
+
+  tests.push({
+    name: "RESOURCE PACKAGE PIPELINE ORDER",
+    fn: () => {
+      const processed = processResourcePackageData(
+        PACKAGE_MIGRATION_FIXTURES.schema2ArrayForGroups,
+        { sourceName:"schema-2-fixture.zip" }
+      );
+      const expected = ["read", "migrate", "normalize", "applyTombstones", "validate"];
+      if(JSON.stringify(processed.stages) !== JSON.stringify(expected)){
+        throw new Error(`unexpected package pipeline ${JSON.stringify(processed.stages)}`);
+      }
+      if(processed.fromVersion !== 2 || JSON.stringify(processed.appliedMigrations) !== JSON.stringify(["2->3"])){
+        throw new Error("schema 2 migration was not explicit");
+      }
+    }
+  });
+
+  tests.push({
+    name: "UNVERSIONED PACKAGE MIGRATES FOR TYPES AND SAFE FIELDS",
+    fn: () => {
+      const processed = processResourcePackageData(
+        PACKAGE_MIGRATION_FIXTURES.unversionedStringForAndTypes,
+        { sourceName:"legacy-fixture.json" }
+      );
+      const migrated = processed.data;
+      if(processed.fromVersion !== 1
+        || JSON.stringify(processed.appliedMigrations) !== JSON.stringify(["1->2", "2->3"])){
+        throw new Error("unversioned package did not run both migrations");
+      }
+      if(migrated.resourcePackageSchemaVersion !== RESOURCE_PACKAGE_SCHEMA_VERSION){
+        throw new Error("legacy package did not reach the current schema");
+      }
+      if(migrated.packageVersion !== 7) throw new Error("numeric-string package version was not normalized");
+      if(JSON.stringify(migrated.forGroups) !== JSON.stringify(["Veterans", "Women"])){
+        throw new Error(`legacy governed For groups changed: ${JSON.stringify(migrated.forGroups)}`);
+      }
+      const category = migrated.categories[0];
+      const resource = migrated.resources[0];
+      if(JSON.stringify(category.filters) !== JSON.stringify(["Pantry", "Meals"])){
+        throw new Error("legacy category Types were not migrated");
+      }
+      if(JSON.stringify(resource.forGroups) !== JSON.stringify(["Veterans", "Women"])){
+        throw new Error("legacy resource For groups were not migrated");
+      }
+      if(JSON.stringify(resource.categoryFilters.food) !== JSON.stringify(["Pantry"])){
+        throw new Error("legacy resource Types were not migrated to categoryFilters");
+      }
+      if(resource.informationText !== "Legacy services" || !resource.pdfs.length){
+        throw new Error("legacy content fields were not normalized after migration");
+      }
+      if(migrated.customPackageField.officeNote !== "preserve me"
+        || category.customCategoryField !== "category extension"
+        || !resource.customResourceField.keep){
+        throw new Error("unknown safe fields were lost during migration");
+      }
+      if("version" in migrated || "Types" in category || "For" in resource || "tags" in resource){
+        throw new Error("known consumed legacy fields remained after migration");
+      }
+    }
+  });
+
+  tests.push({
+    name: "SCHEMA 2 ARRAY FOR GROUPS AND CATEGORY FILTERS MIGRATE",
+    fn: () => {
+      const migrated = processResourcePackageData(
+        PACKAGE_MIGRATION_FIXTURES.schema2ArrayForGroups,
+        { sourceName:"albuquerque-schema-2.json" }
+      ).data;
+      if(JSON.stringify(migrated.forGroups) !== JSON.stringify(["Families", "Veterans"])){
+        throw new Error("schema 2 governed For array changed");
+      }
+      if(JSON.stringify(migrated.resources[0].forGroups) !== JSON.stringify(["Veterans", "Families"])){
+        throw new Error("schema 2 resource For string was not normalized");
+      }
+      if(JSON.stringify(migrated.resources[0].categoryFilters.food) !== JSON.stringify(["Meals", "Pantry"])){
+        throw new Error("schema 2 categoryFilters string was not normalized");
+      }
+      if(JSON.stringify(migrated.categories[0].filters) !== JSON.stringify(["Pantry", "Meals"])){
+        throw new Error("resource Types were not retained on the category");
+      }
+      const exported = buildResourcePackageData(migrated);
+      if(exported.customPackageField.source !== "historical Albuquerque shape"
+        || exported.resources[0].customResourceField !== "keep"
+        || exported.resources[0].pdfs[0].checksum !== "preserve-pdf-extension"){
+        throw new Error("safe fields were lost during package re-export");
+      }
+      if("lastLoadedPackageInfo" in exported){
+        throw new Error("local-only package state was exported");
+      }
+    }
+  });
+
+  tests.push({
+    name: "PACKAGE TOMBSTONES APPLY AFTER NORMALIZATION",
+    fn: () => {
+      const migrated = processResourcePackageData(
+        PACKAGE_MIGRATION_FIXTURES.schema3DeletionWorkflow,
+        { sourceName:"deletion-fixture.zip" }
+      ).data;
+      const kept = migrated.resources.find(resource => resource.id === "keep");
+      if(!kept || migrated.resources.some(resource => resource.id === "remove")){
+        throw new Error("resource tombstone was not applied");
+      }
+      if(kept.forGroups.includes("Veterans") || migrated.forGroups.includes("Veterans")){
+        throw new Error("For-group tombstone was not applied");
+      }
+      if(kept.categoryFilters.food.includes("Pantry") || migrated.categories[0].filters.includes("Pantry")){
+        throw new Error("Type tombstone was not applied");
+      }
+      const pendingKeys = migrated.deletionRequests.map(record => record.key);
+      if(!pendingKeys.includes("resource:keep") || pendingKeys.includes("resource:remove")){
+        throw new Error("pending deletion requests were not reconciled with tombstones");
+      }
+      if(migrated.deletions.length !== 3) throw new Error("approved tombstones were not retained");
+    }
+  });
+
+  tests.push({
+    name: "PACKAGE VERSION MISSING STRING AND LATEST HANDLING",
+    fn: () => {
+      const missing = processResourcePackageData({ categories:[], resources:[] }).data;
+      const numericString = processResourcePackageData({
+        resourcePackageSchemaVersion:2,
+        packageVersion:"13",
+        categories:[],
+        resources:[]
+      }).data;
+      if(missing.packageVersion !== "Unknown") throw new Error("missing package version changed");
+      if(numericString.packageVersion !== 13) throw new Error("numeric-string package version changed");
+      if(getLatestPackageVersionValue(missing.packageVersion, 12, numericString.packageVersion) !== 13){
+        throw new Error("latest package version was not retained");
+      }
+    }
+  });
+
+  tests.push({
+    name: "MALFORMED AND UNSUPPORTED PACKAGES EXPLAIN FAILURE",
+    fn: () => {
+      const cases = [
+        [PACKAGE_MIGRATION_FIXTURES.malformedContainers, /cannot be migrated safely.*categories/is],
+        [PACKAGE_MIGRATION_FIXTURES.malformedDeletion, /cannot be migrated safely.*unsupported kind/is],
+        [PACKAGE_MIGRATION_FIXTURES.unsupportedSchema, /unsupported resource package schema 4/is],
+        [PACKAGE_MIGRATION_FIXTURES.invalidPackageVersion, /cannot be migrated safely.*packageVersion/is]
+      ];
+      cases.forEach(([fixture, expected]) => {
+        let message = "";
+        try{
+          processResourcePackageData(fixture, { sourceName:"bad-package.zip" });
+        }catch(error){
+          message = formatResourcePackageError(error);
+        }
+        if(!expected.test(message)) throw new Error(`unclear package error: ${message}`);
+      });
+
+      let jsonMessage = "";
+      try{
+        processResourcePackageJSON(MALFORMED_RESOURCE_PACKAGE_JSON, { sourceName:"broken.json" });
+      }catch(error){
+        jsonMessage = formatResourcePackageError(error);
+      }
+      if(!/broken\.json contains invalid JSON/i.test(jsonMessage)){
+        throw new Error(`malformed JSON error was unclear: ${jsonMessage}`);
       }
     }
   });

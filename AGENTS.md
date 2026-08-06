@@ -94,3 +94,18 @@ The pushed-state check requires a clean worktree, a pushed upstream commit, and
 a commit subject exactly matching `src/release.json`. Office generation and
 copying happen only when requested for that office and are not prerequisites for
 verifying the application release.
+
+## Resource package migrations
+
+Resource packages must follow the pipeline documented in
+`docs/resource-package-migrations.md`:
+
+```text
+read → migrate schema versions → normalize → apply tombstones → validate
+```
+
+Add compatibility behavior to a focused schema migration in
+`src/js/27-package-pipeline.js`; do not add legacy transformations to canonical
+normalization or make behavior depend on call order. Each new or changed
+migration requires a fixture in `tests/fixtures/package-fixtures.js` and browser
+regression coverage for safe-field preservation and failure behavior.

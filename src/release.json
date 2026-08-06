@@ -1,8 +1,13 @@
 {
-  "version": "2.2.12",
+  "version": "2.2.13",
   "date": "2026-08-06",
-  "message": "Separate release verification from office publication",
+  "message": "Formalize resource package migration pipeline",
   "appChanges": [
+    {
+      "date": "2026-08-06",
+      "version": "2.2.13",
+      "message": "Migrate legacy resource packages through explicit schema stages"
+    },
     {
       "date": "2026-08-06",
       "version": "2.2.12",

@@ -130,6 +130,12 @@ tagged item remains active until an admin merges the package and approves the
 deletion. Approved deletions are retained in future packages so that merging an
 older package does not recreate them.
 
+Resource package compatibility follows an explicit
+`read → migrate → normalize → apply tombstones → validate` pipeline. See
+[`docs/resource-package-migrations.md`](docs/resource-package-migrations.md) for
+the supported schemas, legacy-field handling, safe-field preservation, and
+failure rules.
+
 Admin edits are saved in the browser first. They are not shared with anyone else until a new resource package is exported.
 
 ## Convert a resource package between JSON and ZIP

@@ -17,6 +17,8 @@ APP_JS_SOURCES = [
     "src/js/00-index.js",
     "src/js/10-utilities.js",
     "src/js/20-normalization.js",
+    "src/js/25-deletion-core.js",
+    "src/js/27-package-pipeline.js",
     "src/js/30-state.js",
     "src/js/40-safety.js",
     "src/js/50-rendering.js",
@@ -29,6 +31,10 @@ APP_JS_SOURCES = [
     "src/js/105-sharepoint-publishing.js",
     "src/js/110-shortcuts.js",
     "src/js/120-startup.js",
+]
+TEST_JS_SOURCES = [
+    "tests/fixtures/package-fixtures.js",
+    "tests/self-tests.js",
 ]
 PLACEHOLDERS = [
     "{{APP_CSS}}",
@@ -137,11 +143,7 @@ def build_document(include_tests: bool) -> str:
         "{{APP_RELEASE_DATA}}": build_app_release_data(),
         "{{VENDOR_JS}}": read("vendor/jszip.min.js"),
         "{{APP_JS}}": join_javascript(APP_JS_SOURCES),
-        "{{TEST_JS}}": (
-            "// Source: tests/self-tests.js\n" + read("tests/self-tests.js")
-            if include_tests
-            else ""
-        ),
+        "{{TEST_JS}}": join_javascript(TEST_JS_SOURCES) if include_tests else "",
     }
     output = shell
     for placeholder, value in replacements.items():

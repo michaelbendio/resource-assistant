@@ -136,8 +136,6 @@ function freshStartFromSeed(){
 
 // Main persisted app data snapshot (categories/resources + metadata).
 let data = JSON.parse(localStorage.getItem(DATA_STORAGE_KEY) || "null");
-const LEGACY_RESOURCE_PACKAGE_SCHEMA_VERSION = 2;
-const RESOURCE_PACKAGE_SCHEMA_VERSION = 3;
 const TIP_TEXT = {
   user: "Click on a category to see its resources. Click a resource to see details. Click ⬜ to include it in the printed handout.",
   newAdminWelcome: "Welcome to you, new admin. Press Ctrl+Alt+A to enter admin mode",
@@ -149,24 +147,12 @@ const CATEGORY_REMINDER_TEXT = "Report bugs or request enhancments to Elder Bend
 if(!data){
   data = seed;
 }
+data = processResourcePackageData(data, { sourceName:"Saved browser resource data" }).data;
 const appliedCategoryPreset = applyDefaultCategoryPreset(data);
+data.appVersion = APP_VERSION;
 if(!localStorage.getItem(DATA_STORAGE_KEY) || appliedCategoryPreset){
   localStorage.setItem(DATA_STORAGE_KEY, JSON.stringify(data));
 }
-
-normalizeDataInformationShape(data);
-normalizeDataPDFShape(data);
-normalizeLegacyPackageShape(data);
-normalizeLegacyTagsShape(data);
-normalizeDataForGroupsShape(data);
-normalizeDataCategoryFilterShape(data);
-normalizeDataVerifiedOnShape(data);
-normalizeChanges(data);
-normalizeLastLoadedPackageInfo(data);
-normalizeDeletionWorkflowData(data);
-applyDeletionTombstones(data);
-data.appVersion = APP_VERSION;
-data.resourcePackageSchemaVersion = RESOURCE_PACKAGE_SCHEMA_VERSION;
 
 let printSelection = loadPrintSelection();
 sanitizePrintSelection();

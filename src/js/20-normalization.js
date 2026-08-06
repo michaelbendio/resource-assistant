@@ -75,6 +75,7 @@ function normalizeResourcePDFs(r){
       seenPaths.add(path);
       const id = String(pdf.id || "").trim() || stablePDFIdFromPath(`${path}:${index}`);
       attachments.push({
+        ...pdf,
         id,
         name: String(pdf.name || pdfNameFromPath(path)).trim() || "PDF",
         path

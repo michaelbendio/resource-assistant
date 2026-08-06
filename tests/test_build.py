@@ -29,6 +29,7 @@ class BuildTests(unittest.TestCase):
         self.assertIn('id="app-release-data"', production)
         self.assertIn('"changes": [', production)
         self.assertNotIn("function runSelfTests", production)
+        self.assertNotIn("PACKAGE_MIGRATION_FIXTURES", production)
         self.assertNotIn('id="selfTestPanel"', production)
         self.assertNotIn("isSelfTestShortcut", production)
 
@@ -37,6 +38,7 @@ class BuildTests(unittest.TestCase):
         self.assertIn("function runSelfTests", debug)
         self.assertIn('id="selfTestPanel"', debug)
         self.assertIn("isSelfTestShortcut", debug)
+        self.assertIn("PACKAGE_MIGRATION_FIXTURES", debug)
 
 
 if __name__ == "__main__":
