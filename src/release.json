@@ -1,8 +1,13 @@
 {
   "version": "2.2.14",
   "date": "2026-08-06",
-  "message": "Split admin editors and group app changes",
+  "message": "Hide blank list resources",
   "appChanges": [
+    {
+      "date": "2026-08-06",
+      "version": "2.2.14",
+      "message": "Hide blank list resources"
+    },
     {
       "date": "2026-08-06",
       "version": "2.2.14",

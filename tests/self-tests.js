@@ -2065,7 +2065,10 @@ async function runSelfTests(){
       const previousAdminResourceEditMode = adminResourceEditMode;
       const previousSelectedResourceId = selectedResourceId;
       const previousNewResourceIds = newResourceIds;
+      const previousPersist = persist;
       try{
+        let persistCalls = 0;
+        persist = () => { persistCalls += 1; };
         data = {
           categories:[],
           resources:[],
@@ -2077,6 +2080,7 @@ async function runSelfTests(){
         newResourceIds = new Set();
         renderAdmin();
         newResource();
+        if(persistCalls !== 0) throw new Error("blank new resource was persisted before validation");
         const actionBar = document.getElementById("admin_editor_actions");
         const cancelBtn = document.getElementById("res_cancel_btn");
         const doneBtn = document.getElementById("res_done_btn");
@@ -2085,6 +2089,7 @@ async function runSelfTests(){
         if(!doneBtn || !doneBtn.disabled) throw new Error("new resource Done should be disabled before valid");
         cancelBtn.click();
         if(data.resources.length !== 0) throw new Error("Cancel did not discard blank new resource");
+        if(persistCalls !== 1) throw new Error("cancelled blank resource cleanup was not persisted");
       }finally{
         data = previousData;
         adminTab = previousAdminTab;
@@ -2093,6 +2098,7 @@ async function runSelfTests(){
         adminResourceEditMode = previousAdminResourceEditMode;
         selectedResourceId = previousSelectedResourceId;
         newResourceIds = previousNewResourceIds;
+        persist = previousPersist;
         renderAdmin();
       }
     }
@@ -4285,6 +4291,8 @@ async function runSelfTests(){
           forGroups:[],
           resources:[
             { id:"list", name:"Food Pantry List", categories:["food"], phone:"", website:"", hours:"", address:"123 Main", informationText:"Apply at https://example.org/pantry.\n* Updates: www.example.org/news" },
+            { id:"blank", name:"", categories:[], phone:"", website:"", hours:"", informationText:"" },
+            { id:"unnamed-info", name:"", categories:["food"], phone:"", website:"", hours:"", informationText:"Information that needs an Admin name" },
             { id:"phone", name:"Food Pantry Phone", categories:["food"], phone:"555-1212", website:"", hours:"", informationText:"" },
             { id:"site", name:"Food Pantry Site", categories:["food"], phone:"", website:"https://example.org", hours:"", informationText:"" },
             { id:"hours", name:"Food Pantry Hours", categories:["food"], phone:"", website:"", hours:"9-5", informationText:"" }
@@ -4292,6 +4300,9 @@ async function runSelfTests(){
           changes:[]
         };
         if(!resourceMatchesListsHeuristic(data.resources[0])) throw new Error("address should not disqualify list resource");
+        if(resourceMatchesListsHeuristic(data.resources[1]) || resourceMatchesListsHeuristic(data.resources[2])){
+          throw new Error("unnamed resources should not qualify for the public Lists category");
+        }
         if(getListsResources().map(resource => resource.id).join(",") !== "list"){
           throw new Error("Lists heuristic returned wrong resources");
         }
@@ -4311,6 +4322,9 @@ async function runSelfTests(){
         if(!text.includes("Food Pantry List")) throw new Error("Lists category did not show list resource");
         if(text.includes("Food Pantry Phone") || text.includes("Food Pantry Site") || text.includes("Food Pantry Hours")){
           throw new Error("Lists category included non-list resource");
+        }
+        if(appView.querySelectorAll(".resource-card").length !== 1){
+          throw new Error("Lists category rendered an empty card for an unnamed resource");
         }
         const links = Array.from(appView.querySelectorAll(".resource-info-rendered a"));
         if(links.length !== 2

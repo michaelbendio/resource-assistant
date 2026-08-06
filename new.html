@@ -1032,6 +1032,11 @@ textarea.information-editor { min-height:320px; resize:vertical; }
     {
       "date": "2026-08-06",
       "version": "2.2.14",
+      "message": "Hide blank list resources"
+    },
+    {
+      "date": "2026-08-06",
+      "version": "2.2.14",
       "message": "Split admin editors and group app changes"
     },
     {
@@ -3582,7 +3587,8 @@ function filterResourcesBySelectedCategoryFilters(resources, categoryId, selecte
 }
 
 function resourceMatchesListsHeuristic(resource){
-  return !String(resource && resource.phone || "").trim()
+  return !!String(resource && resource.name || "").trim()
+    && !String(resource && resource.phone || "").trim()
     && !String(resource && resource.website || "").trim()
     && !String(resource && resource.hours || "").trim();
 }
@@ -7730,7 +7736,9 @@ function newResource(){
   };
   data.resources.push(resource);
 
-  persist();
+  // Keep an invalid blank draft in memory only. It becomes durable when Done
+  // validates and commits it; an interrupted editing session must not leave an
+  // empty public Lists card in browser storage.
   newResourceIds.add(resourceId);
   adminTab = "resources";
   selectedResourceId = resource.id;

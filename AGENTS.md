@@ -55,10 +55,13 @@ valid release metadata. It copies atomically and verifies byte parity. It has no
 default office, office registry, or destination.
 
 At Michael's TSO Windows workstation on Tuesdays and Thursdays, after an
-approved release has been pushed, generate `albuquerque.html` and `provo.html`
-individually and copy both to `E:\TSO` when that drive is available. Treat this
-as two explicit office publications, not a general release step. If `E:\TSO` is
-unavailable, stop with an error; do not substitute iCloud or another location.
+approved release has been pushed, use the cloned repository at
+`C:\Users\MichaelBendio\resource-assistant` to generate `albuquerque.html` and
+`provo.html` individually. This must refresh both office files in that cloned
+repository. Then copy those exact files to `E:\TSO` when that drive is
+available. Treat this as two explicit office publications, not a general
+release step. If `E:\TSO` is unavailable, stop with an error; do not substitute
+iCloud or another location.
 
 ## Commit and version workflow
 

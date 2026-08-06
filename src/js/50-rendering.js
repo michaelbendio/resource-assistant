@@ -833,7 +833,8 @@ function filterResourcesBySelectedCategoryFilters(resources, categoryId, selecte
 }
 
 function resourceMatchesListsHeuristic(resource){
-  return !String(resource && resource.phone || "").trim()
+  return !!String(resource && resource.name || "").trim()
+    && !String(resource && resource.phone || "").trim()
     && !String(resource && resource.website || "").trim()
     && !String(resource && resource.hours || "").trim();
 }

@@ -175,7 +175,9 @@ function newResource(){
   };
   data.resources.push(resource);
 
-  persist();
+  // Keep an invalid blank draft in memory only. It becomes durable when Done
+  // validates and commits it; an interrupted editing session must not leave an
+  // empty public Lists card in browser storage.
   newResourceIds.add(resourceId);
   adminTab = "resources";
   selectedResourceId = resource.id;
