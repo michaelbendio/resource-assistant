@@ -2588,7 +2588,7 @@ async function runSelfTests(){
   });
 
   tests.push({
-    name: "CATEGORY PRINT INSTRUCTION BANNER",
+    name: "CATEGORY PRINT INSTRUCTION APPEARS AFTER SELECTION",
     fn: () => {
       const previousData = data;
       const previousView = view;
@@ -2610,10 +2610,7 @@ async function runSelfTests(){
         printSelection = [];
         render();
         const emptyBanner = appView.querySelector(".category-print-banner");
-        if(!emptyBanner) throw new Error("category print instruction banner was not rendered");
-        if(emptyBanner.textContent !== "Click the gray printer button next to a resource to select it for printing."){
-          throw new Error(`unexpected empty banner '${emptyBanner.textContent}'`);
-        }
+        if(emptyBanner) throw new Error("category showed a print instruction before any resource was selected");
 
         printSelection = ["pantry"];
         render();
@@ -2709,8 +2706,8 @@ async function runSelfTests(){
         if(cards.length !== 1 || cards[0].dataset.resourceId !== "favorite-beta"){
           throw new Error("Favorites view did not show only favorited resources");
         }
-        if(!appView.querySelector(".category-print-banner")){
-          throw new Error("nonempty Favorites view did not show the print instruction");
+        if(appView.querySelector(".category-print-banner")){
+          throw new Error("Favorites view showed a print instruction before any resource was selected");
         }
         const star = cards[0].querySelector(".favorite-toggle");
         const printer = cards[0].querySelector(".print-selection-toggle");

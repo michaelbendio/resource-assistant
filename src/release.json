@@ -1,8 +1,13 @@
 {
   "version": "2.3.1",
   "date": "2026-08-10",
-  "message": "Remove publishing workflow from App Changes",
+  "message": "Hide unused printing hint",
   "appChanges": [
+    {
+      "date": "2026-08-10",
+      "version": "2.3.1",
+      "message": "Hide the printing hint until a resource is selected"
+    },
     {
       "date": "2026-08-10",
       "version": "2.3.1",

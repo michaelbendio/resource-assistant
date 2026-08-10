@@ -334,6 +334,7 @@ function renderCategoryFilterControls(categoryFilterOptions, activeFilters){
 }
 
 function renderCategoryPrintInstruction(){
+  if(!printSelection.length) return;
   const printInstruction = document.createElement("div");
   printInstruction.className = "category-print-banner";
   printInstruction.textContent = getCategoryPrintInstructionText();

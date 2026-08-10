@@ -107,9 +107,7 @@ function updatePrintSelectionIndicator(){
 
 function getCategoryPrintInstructionText(){
   const count = printSelection.length;
-  return count
-    ? `Click 🖨️ (${count}) in the top bar to review and print selected resources.`
-    : "Click the gray printer button next to a resource to select it for printing.";
+  return `Click 🖨️ (${count}) in the top bar to review and print selected resources.`;
 }
 
 function togglePrintSelection(id, { rerender = true } = {}){
