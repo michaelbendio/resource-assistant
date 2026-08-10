@@ -2699,8 +2699,16 @@ async function runSelfTests(){
         favoriteResourceIds = ["favorite-beta"];
         printSelection = [];
         saveFavoriteResourceIds();
-        view = "favorites";
+        view = "categories";
         render();
+
+        tabFavorites.click();
+        if(view !== "favorites") throw new Error("Favorites star did not show Favorites");
+        if(tabFavorites.getAttribute("aria-current") !== "page") throw new Error("Favorites star did not show its active state");
+        tabFavorites.click();
+        if(view !== "categories") throw new Error("Favorites star did not return to Categories");
+        if(tabFavorites.getAttribute("aria-current") === "page") throw new Error("Favorites star remained active after hiding Favorites");
+        tabFavorites.click();
 
         const cards = Array.from(appView.querySelectorAll(".resource-card[data-resource-id]"));
         if(cards.length !== 1 || cards[0].dataset.resourceId !== "favorite-beta"){

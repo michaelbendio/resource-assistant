@@ -49,7 +49,7 @@ const tabSearch = document.getElementById("tabSearch");
 tabCategories.onclick = ()=>{ setView("categories"); };
 if(tabFavorites){
   tabFavorites.appendChild(createInterfaceIcon("star-outline"));
-  tabFavorites.onclick = ()=>{ setView("favorites"); };
+  tabFavorites.onclick = ()=>{ setView(view === "favorites" ? "categories" : "favorites"); };
 }
 if(tabPrintSelection) tabPrintSelection.onclick = ()=>{ startPrintSelectionPreview(); };
 if(helpButton) helpButton.onclick = ()=>{ showUserHelp(); };

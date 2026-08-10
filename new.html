@@ -1113,6 +1113,11 @@ textarea.information-editor { min-height:320px; resize:vertical; }
     {
       "date": "2026-08-10",
       "version": "2.3.1",
+      "message": "Toggle the Favorites view with the navigation star"
+    },
+    {
+      "date": "2026-08-10",
+      "version": "2.3.1",
       "message": "Hide the printing hint until a resource is selected"
     },
     {
@@ -2883,7 +2888,7 @@ const tabSearch = document.getElementById("tabSearch");
 tabCategories.onclick = ()=>{ setView("categories"); };
 if(tabFavorites){
   tabFavorites.appendChild(createInterfaceIcon("star-outline"));
-  tabFavorites.onclick = ()=>{ setView("favorites"); };
+  tabFavorites.onclick = ()=>{ setView(view === "favorites" ? "categories" : "favorites"); };
 }
 if(tabPrintSelection) tabPrintSelection.onclick = ()=>{ startPrintSelectionPreview(); };
 if(helpButton) helpButton.onclick = ()=>{ showUserHelp(); };

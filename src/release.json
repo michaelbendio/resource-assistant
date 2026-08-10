@@ -1,8 +1,13 @@
 {
   "version": "2.3.1",
   "date": "2026-08-10",
-  "message": "Hide unused printing hint",
+  "message": "Toggle Favorites with the navigation star",
   "appChanges": [
+    {
+      "date": "2026-08-10",
+      "version": "2.3.1",
+      "message": "Toggle the Favorites view with the navigation star"
+    },
     {
       "date": "2026-08-10",
       "version": "2.3.1",
