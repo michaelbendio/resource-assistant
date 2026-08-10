@@ -1,17 +1,12 @@
 {
   "version": "2.3.1",
   "date": "2026-08-10",
-  "message": "Clarify empty Favorites guidance",
+  "message": "Remove publishing workflow from App Changes",
   "appChanges": [
     {
       "date": "2026-08-10",
       "version": "2.3.1",
       "message": "Clarify empty Favorites guidance"
-    },
-    {
-      "date": "2026-08-10",
-      "version": "2.3.0",
-      "message": "Publish active office files to iCloud"
     },
     {
       "date": "2026-08-06",

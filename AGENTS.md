@@ -75,12 +75,14 @@ treat that as approval to keep the current version for that commit and do not as
 again or flag the exception. Before committing:
 
 1. Update `src/release.json` with the proposed version, current date, and exact
-   planned commit subject. Add a new `appChanges` row using that same exact
-   commit subject. When the version is unchanged, give the new row the current
-   version and retain the other rows for that version. The app groups separate
-   rows beneath one version heading and includes the latest five distinct
-   versions. Preserve the existing change-log history unless the user selects a
-   different visible set.
+   planned commit subject. Add an `appChanges` row only when the commit changes
+   user-visible app functionality. Do not add rows for documentation, tests,
+   deployment or publication workflow, internal refactoring, or release-metadata
+   corrections. When a functional change keeps the current version, give the
+   new row that version and retain the other rows for it. The app groups
+   separate rows beneath one version heading and includes the latest five
+   distinct versions. Preserve the existing change-log history unless the user
+   selects a different visible set.
 2. Run `python3 verify-tso-release`. This rebuilds both outputs and runs all
    Python and browser tests.
 3. Unless the user already approved a version or instructed you not to bump it,

@@ -138,9 +138,11 @@ generated `new.html` directly.
 
 Every commit is also an app release. Before committing, update `src/release.json`
 with the proposed version, current date, and the exact commit subject, then run
-`verify-tso-release`. Preserve the existing app change-log history unless the
-user selects a different visible set. Use the next patch version by default and
-ask for approval with:
+`verify-tso-release`. Add a visible App Changes entry only for user-visible app
+functionality; omit documentation, tests, deployment/publication workflow,
+internal refactoring, and release-metadata corrections. Preserve the existing
+app change-log history unless the user selects a different visible set. Use the
+next patch version by default and ask for approval with:
 
 ```text
 Commit as version X.Y.Z? Reply y or provide a version number.
