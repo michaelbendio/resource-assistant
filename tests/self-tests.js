@@ -2488,6 +2488,12 @@ async function runSelfTests(){
         if(!document.getElementById("adminHelpPrintButton")) throw new Error("Print button missing");
         if(!document.getElementById("adminTrainingPrintButton")) throw new Error("Training print button missing");
         if(!/First-Time Admin Training/.test(modal.textContent || "")) throw new Error("training section missing");
+        const helpSectionLabels = Array.from(modal.querySelectorAll("details > summary"))
+          .map(summary => summary.textContent.trim());
+        const trainingIndex = helpSectionLabels.indexOf("First-Time Admin Training");
+        if(helpSectionLabels[trainingIndex + 1] !== "Publish to SharePoint"){
+          throw new Error("Publish to SharePoint did not immediately follow First-Time Admin Training");
+        }
         const helpText = (modal.textContent || "").replace(/\s+/g, " ");
         if(!helpText.includes("Complete this setup step only if the blue bar says <New> TSO Resources")){
           throw new Error("conditional untitled-file setup guidance missing");

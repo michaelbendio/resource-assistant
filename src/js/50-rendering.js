@@ -497,6 +497,17 @@ function showAdminHelp(options = {}){
         </details>
 
         <details>
+          <summary>Publish to SharePoint</summary>
+          <div class="admin-help-section-body">
+            <p>Every office-specific file shows <strong>Publish to SharePoint</strong> immediately to the left of <strong>Admin Help</strong>.</p>
+            <p>Complete <strong>Office Setup</strong> first. Then open the current SharePoint package from the publishing panel and click SharePoint's Download arrow. TSO Resources detects the completed download, shows <strong>Merging</strong>, merges the canonical package with the prepared local data, reapplies approved deletions, and saves the configured package filename.</p>
+            <p>After <strong>Merge complete</strong>, review the saved package version, filename, save time, resource changes, approved deletions, and SharePoint destination. Click <strong>Upload to SharePoint</strong>, upload the file, and choose <strong>Replace</strong>.</p>
+            <p>After SharePoint finishes, click <strong>I replaced the package</strong>. This records the administrator's confirmation in local publishing history; TSO Resources cannot independently verify the upload.</p>
+            <p>If Edge saves the download somewhere unexpected, use <strong>Select downloaded package</strong>. Change the destination or folder in <strong>Office Setup</strong> if the office workflow moves.</p>
+          </div>
+        </details>
+
+        <details>
           <summary>Before You Edit</summary>
           <div class="admin-help-section-body">
             <p>Before editing, make sure your resource data is current. If you have received a newer resource package, merge it before making changes.</p>
@@ -597,17 +608,6 @@ function showAdminHelp(options = {}){
           <div class="admin-help-section-body">
             <p><strong>Office Setup</strong> shows the office name, storage ID, expected package filename, and SharePoint package URL carried by this office HTML file.</p>
             <p>Each computer separately authorizes its download folder and keeps its own publishing history. Use <strong>Test Configuration</strong> until the panel says <strong>Setup complete</strong>. Office setup and publishing history are never exported in a resource package.</p>
-          </div>
-        </details>
-
-        <details>
-          <summary>Publish to SharePoint</summary>
-          <div class="admin-help-section-body">
-            <p>Every office-specific file shows <strong>Publish to SharePoint</strong> immediately to the left of <strong>Admin Help</strong>.</p>
-            <p>Complete <strong>Office Setup</strong> first. Then open the current SharePoint package from the publishing panel and click SharePoint's Download arrow. TSO Resources detects the completed download, shows <strong>Merging</strong>, merges the canonical package with the prepared local data, reapplies approved deletions, and saves the configured package filename.</p>
-            <p>After <strong>Merge complete</strong>, review the saved package version, filename, save time, resource changes, approved deletions, and SharePoint destination. Click <strong>Upload to SharePoint</strong>, upload the file, and choose <strong>Replace</strong>.</p>
-            <p>After SharePoint finishes, click <strong>I replaced the package</strong>. This records the administrator's confirmation in local publishing history; TSO Resources cannot independently verify the upload.</p>
-            <p>If Edge saves the download somewhere unexpected, use <strong>Select downloaded package</strong>. Change the destination or folder in <strong>Office Setup</strong> if the office workflow moves.</p>
           </div>
         </details>
 
