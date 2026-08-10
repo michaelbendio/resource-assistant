@@ -1,8 +1,13 @@
 {
   "version": "2.3.2",
   "date": "2026-08-10",
-  "message": "Print resource descriptions",
+  "message": "Remove the printing selection hint",
   "appChanges": [
+    {
+      "date": "2026-08-10",
+      "version": "2.3.2",
+      "message": "Remove the printing selection hint from resource views"
+    },
     {
       "date": "2026-08-10",
       "version": "2.3.2",

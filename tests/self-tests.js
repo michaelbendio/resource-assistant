@@ -2588,7 +2588,7 @@ async function runSelfTests(){
   });
 
   tests.push({
-    name: "CATEGORY PRINT INSTRUCTION APPEARS AFTER SELECTION",
+    name: "CATEGORY VIEW OMITS PRINT INSTRUCTION",
     fn: () => {
       const previousData = data;
       const previousView = view;
@@ -2615,10 +2615,7 @@ async function runSelfTests(){
         printSelection = ["pantry"];
         render();
         const selectedBanner = appView.querySelector(".category-print-banner");
-        if(!selectedBanner) throw new Error("category print instruction banner disappeared after selection");
-        if(selectedBanner.textContent !== "Click 🖨️ (1) in the top bar to review and print selected resources."){
-          throw new Error(`unexpected selected banner '${selectedBanner.textContent}'`);
-        }
+        if(selectedBanner) throw new Error("category showed a print instruction after a resource was selected");
       }finally{
         data = previousData;
         view = previousView;
@@ -2735,6 +2732,9 @@ async function runSelfTests(){
         const selectedPrinter = appView.querySelector(".resource-card[data-resource-id] .print-selection-toggle");
         if(!selectedPrinter || selectedPrinter.getAttribute("aria-pressed") !== "true"){
           throw new Error("printer button did not mark the favorite resource for printing");
+        }
+        if(appView.querySelector(".category-print-banner")){
+          throw new Error("Favorites view showed a print instruction after a resource was selected");
         }
         const selectedStar = appView.querySelector(".resource-card[data-resource-id] .favorite-toggle");
         selectedStar.click();

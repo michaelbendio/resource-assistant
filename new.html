@@ -1113,6 +1113,11 @@ textarea.information-editor { min-height:320px; resize:vertical; }
     {
       "date": "2026-08-10",
       "version": "2.3.2",
+      "message": "Remove the printing selection hint from resource views"
+    },
+    {
+      "date": "2026-08-10",
+      "version": "2.3.2",
       "message": "Print each resource's Description along with its Information"
     },
     {
@@ -4260,14 +4265,6 @@ function renderCategoryFilterControls(categoryFilterOptions, activeFilters){
   appView.appendChild(filterArea);
 }
 
-function renderCategoryPrintInstruction(){
-  if(!printSelection.length) return;
-  const printInstruction = document.createElement("div");
-  printInstruction.className = "category-print-banner";
-  printInstruction.textContent = getCategoryPrintInstructionText();
-  appView.appendChild(printInstruction);
-}
-
 function renderCategoryResourceCard(res){
   let expanded = String(res && res.id || "") === String(expandedSearchResourceId || "");
   const card = buildResourceCard(res, { expanded, showDescription:true });
@@ -4331,7 +4328,6 @@ function renderCategoryView(){
   const filtered = filterResourcesBySelectedCategoryFilters(categoryResources, currentCategory, activeFilters);
 
   renderCategoryFilterControls(categoryFilterOptions, activeFilters);
-  renderCategoryPrintInstruction();
   renderCategoryResources(filtered, activeFilters);
 }
 
@@ -4346,7 +4342,6 @@ function renderFavoritesView(){
     appView.appendChild(empty);
     return;
   }
-  renderCategoryPrintInstruction();
   resources.forEach(renderCategoryResourceCard);
 }
 
@@ -4613,11 +4608,6 @@ function getPrintSelectionResources(){
 
 function updatePrintSelectionIndicator(){
   if(tabPrintSelection) tabPrintSelection.textContent = `🖨️ (${printSelection.length})`;
-}
-
-function getCategoryPrintInstructionText(){
-  const count = printSelection.length;
-  return `Click 🖨️ (${count}) in the top bar to review and print selected resources.`;
 }
 
 function togglePrintSelection(id, { rerender = true } = {}){

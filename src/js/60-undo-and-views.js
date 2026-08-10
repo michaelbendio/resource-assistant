@@ -333,14 +333,6 @@ function renderCategoryFilterControls(categoryFilterOptions, activeFilters){
   appView.appendChild(filterArea);
 }
 
-function renderCategoryPrintInstruction(){
-  if(!printSelection.length) return;
-  const printInstruction = document.createElement("div");
-  printInstruction.className = "category-print-banner";
-  printInstruction.textContent = getCategoryPrintInstructionText();
-  appView.appendChild(printInstruction);
-}
-
 function renderCategoryResourceCard(res){
   let expanded = String(res && res.id || "") === String(expandedSearchResourceId || "");
   const card = buildResourceCard(res, { expanded, showDescription:true });
@@ -404,7 +396,6 @@ function renderCategoryView(){
   const filtered = filterResourcesBySelectedCategoryFilters(categoryResources, currentCategory, activeFilters);
 
   renderCategoryFilterControls(categoryFilterOptions, activeFilters);
-  renderCategoryPrintInstruction();
   renderCategoryResources(filtered, activeFilters);
 }
 
@@ -419,7 +410,6 @@ function renderFavoritesView(){
     appView.appendChild(empty);
     return;
   }
-  renderCategoryPrintInstruction();
   resources.forEach(renderCategoryResourceCard);
 }
 

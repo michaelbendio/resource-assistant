@@ -105,11 +105,6 @@ function updatePrintSelectionIndicator(){
   if(tabPrintSelection) tabPrintSelection.textContent = `🖨️ (${printSelection.length})`;
 }
 
-function getCategoryPrintInstructionText(){
-  const count = printSelection.length;
-  return `Click 🖨️ (${count}) in the top bar to review and print selected resources.`;
-}
-
 function togglePrintSelection(id, { rerender = true } = {}){
   const cleanId = String(id || "");
   if(!cleanId) return;
