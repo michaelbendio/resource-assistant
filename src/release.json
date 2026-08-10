@@ -1,13 +1,8 @@
 {
   "version": "2.3.2",
   "date": "2026-08-10",
-  "message": "Remove the printing selection hint",
+  "message": "Curate App Changes",
   "appChanges": [
-    {
-      "date": "2026-08-10",
-      "version": "2.3.2",
-      "message": "Remove the printing selection hint from resource views"
-    },
     {
       "date": "2026-08-10",
       "version": "2.3.2",
@@ -19,24 +14,9 @@
       "message": "Toggle the Favorites view with the navigation star"
     },
     {
-      "date": "2026-08-10",
-      "version": "2.3.1",
-      "message": "Hide the printing hint until a resource is selected"
-    },
-    {
-      "date": "2026-08-10",
-      "version": "2.3.1",
-      "message": "Clarify empty Favorites guidance"
-    },
-    {
       "date": "2026-08-06",
       "version": "2.3.0",
       "message": "Add persistent resource favorites"
-    },
-    {
-      "date": "2026-08-06",
-      "version": "2.2.14",
-      "message": "Hide blank list resources"
     },
     {
       "date": "2026-08-06",
@@ -46,17 +26,12 @@
     {
       "date": "2026-08-06",
       "version": "2.2.14",
-      "message": "Preserve package dates and link resource URLs"
-    },
-    {
-      "date": "2026-08-06",
-      "version": "2.2.14",
       "message": "Add office setup, publishing history, and recovery"
     },
     {
       "date": "2026-08-06",
       "version": "2.2.13",
-      "message": "Migrate legacy resource packages through explicit schema stages"
+      "message": "Import older resource packages while preserving their data"
     },
     {
       "date": "2026-08-06",
