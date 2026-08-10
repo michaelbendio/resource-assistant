@@ -3608,6 +3608,40 @@ async function runSelfTests(){
   });
 
   tests.push({
+    name: "PRINT OUTPUT INCLUDES DESCRIPTION AND INFORMATION",
+    fn: () => {
+      const container = document.createElement("div");
+      PrintWorkflow.renderPrintableResourceCards(container, [{
+        id:"print-fields-normal",
+        name:"Normal Print Fields",
+        description:"Normal description text",
+        categories:[],
+        informationText:"Normal information text"
+      }]);
+      if(!/Normal description text/.test(container.textContent || "")){
+        throw new Error("normal print output omitted the Description field");
+      }
+      if(!/Normal information text/.test(container.textContent || "")){
+        throw new Error("normal print output omitted the Information field");
+      }
+
+      const flyer = PrintWorkflow.buildListFlyer({
+        id:"print-fields-list",
+        name:"List Print Fields",
+        description:"List description text",
+        categories:[],
+        informationText:"List information text"
+      }, false);
+      if(!/Description:\s*List description text/.test(flyer.textContent || "")){
+        throw new Error("list print output omitted the Description field");
+      }
+      if(!/Information:\s*List information text/.test(flyer.textContent || "")){
+        throw new Error("list print output omitted the Information field");
+      }
+    }
+  });
+
+  tests.push({
     name: "PRINT PREVIEW STARTS WITH RESOURCE CONTENT",
     fn: () => {
       PrintWorkflow.openPreview([

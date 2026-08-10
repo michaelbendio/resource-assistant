@@ -208,7 +208,7 @@ const PrintWorkflow = {
         separator.classList.toggle("print-disabled", !isSelectedForPrinting(res.id));
         container.appendChild(separator);
       }
-      const card=buildResourceCard(res,{expanded:true});
+      const card=buildResourceCard(res,{expanded:true,showDescription:true});
       card.classList.toggle("print-disabled", !isSelectedForPrinting(res.id));
       const toggle = card.querySelector(".print-selection-toggle");
       if(toggle){
@@ -233,6 +233,7 @@ const PrintWorkflow = {
     flyer.classList.toggle("print-disabled", !isSelectedForPrinting(resource.id));
 
     let html = `<div class="print-list-heading"><span class="print-list-actions-placeholder"></span><h2>${escapeHTML(resource.name || "")}</h2></div>`;
+    if(resource.description) html += `<div class="print-list-field"><strong>Description:</strong> ${escapeHTML(resource.description)}</div>`;
     if(resource.phone) html += `<div class="print-list-field"><strong>Phone:</strong> ${escapeHTML(resource.phone)}</div>`;
     if(resource.address) html += `<div class="print-list-field"><strong>Address:</strong> ${escapeHTML(resource.address)}</div>`;
     if(resource.website) html += `<div class="print-list-field"><strong>Website:</strong> ${escapeHTML(resource.website)}</div>`;
