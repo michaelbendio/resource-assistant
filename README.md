@@ -72,15 +72,21 @@ local storage ID to `albuquerque`, and sets the page title to
 same command works for a future office such as `mesa`; there is no central
 office registry.
 
-Generation does not copy the office file anywhere. To copy one generated file
-to an explicitly selected sync folder or removable drive, run:
+Generation does not copy the office file anywhere. After a pushed application
+release has been verified, generate both active office files and publish them to
+`iCloud Drive/Documents/TSO`:
 
 ```sh
-python3 copy-local-tso albuquerque.html /path/to/destination
+python3 make-local-tso provo
+python3 make-local-tso albuquerque
+python3 publish-tso-offices
 ```
 
-The helper validates the office identity and release metadata, performs an
-atomic copy, and verifies byte parity.
+The publication helper validates both office identities and release versions,
+copies `provo.html` and `albuquerque.html` atomically, and verifies byte parity.
+It does not copy `new.html`, and it fails when iCloud Drive Documents is
+unavailable. For a separately requested one-off copy to another destination,
+use `copy-local-tso` with an explicit source and destination.
 
 Click the TSO Resources title in an office-specific file to see the app's Git
 selected commit dates and messages from the last 14 days alongside the latest

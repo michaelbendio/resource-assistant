@@ -1,8 +1,13 @@
 {
   "version": "2.3.0",
-  "date": "2026-08-06",
-  "message": "Add persistent resource favorites",
+  "date": "2026-08-10",
+  "message": "Publish active office files to iCloud",
   "appChanges": [
+    {
+      "date": "2026-08-10",
+      "version": "2.3.0",
+      "message": "Publish active office files to iCloud"
+    },
     {
       "date": "2026-08-06",
       "version": "2.3.0",

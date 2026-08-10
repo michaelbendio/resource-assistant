@@ -41,27 +41,31 @@ The JavaScript localStorage keys are derived at runtime from the
 `tso-storage-id` value. Do not edit individual storage keys. Do not modify
 `new.html` directly when making an office file.
 
-## Optional office copy
+## Stage 3: Publish active office files to iCloud
 
-Copying an office file is always explicit and separate from application release
-verification and office-file generation:
+After an approved release commit has been pushed and verified, generate both
+active office files:
 
 ```sh
-python3 copy-local-tso mesa.html /path/to/destination
+python3 make-local-tso provo
+python3 make-local-tso albuquerque
 ```
 
-The copy helper requires a generated office file with a nonblank storage ID and
-valid release metadata. It copies atomically and verifies byte parity. It has no
-default office, office registry, or destination.
+Then run the required Stage 3 publication:
 
-At Michael's TSO Windows workstation on Tuesdays and Thursdays, after an
-approved release has been pushed, use the cloned repository at
-`C:\Users\MichaelBendio\resource-assistant` to generate `albuquerque.html` and
-`provo.html` individually. This must refresh both office files in that cloned
-repository. Then copy those exact files to `E:\TSO` when that drive is
-available. Treat this as two explicit office publications, not a general
-release step. If `E:\TSO` is unavailable, stop with an error; do not substitute
-iCloud or another location.
+```sh
+python3 publish-tso-offices
+```
+
+The publication helper copies exactly `provo.html` and `albuquerque.html` to
+`iCloud Drive/Documents/TSO`, verifies their office storage IDs, titles, app
+versions, and copied bytes, and leaves `new.html` local. If iCloud Drive
+Documents is unavailable, stop with an error; do not substitute another
+destination. Do not report the active-office publication complete until the
+command reports `OFFICE PUBLICATION COMPLETE` and confirms two files.
+
+`copy-local-tso` remains available for an explicitly requested one-off copy to
+another destination, but it does not replace the required Stage 3 publication.
 
 ## Commit and version workflow
 
@@ -102,9 +106,10 @@ python3 verify-tso-release --require-pushed
 ```
 
 The pushed-state check requires a clean worktree, a pushed upstream commit, and
-a commit subject exactly matching `src/release.json`. Office generation and
-copying happen only when requested for that office and are not prerequisites for
-verifying the application release.
+a commit subject exactly matching `src/release.json`. Application verification
+remains office-neutral, but the complete active-office release workflow also
+requires generating Provo and Albuquerque and successfully running Stage 3 as
+described above.
 
 ## Resource package migrations
 

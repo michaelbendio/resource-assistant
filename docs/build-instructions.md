@@ -91,28 +91,21 @@ For a custom output filename:
 python3 make-local-tso albuquerque --output albq.html
 ```
 
-The generator does not copy the result. Copy one generated office file to an
-explicit destination with:
+The generator does not copy the result. The required active-office publication
+workflow generates both office files and then copies them to
+`iCloud Drive/Documents/TSO`:
 
 ```sh
-python3 copy-local-tso albuquerque.html /path/to/destination
+python3 make-local-tso provo
+python3 make-local-tso albuquerque
+python3 publish-tso-offices
 ```
 
-This validates the office file, copies it atomically, and verifies byte parity.
-It has no default destination and works with iCloud, OneDrive, removable media,
-or another explicitly selected directory.
-
-At Michael's TSO Windows workstation on Tuesdays and Thursdays, the separate
-office-publication commands after an approved release are:
-
-```powershell
-python make-local-tso albuquerque
-python make-local-tso provo
-python copy-local-tso albuquerque.html E:\TSO
-python copy-local-tso provo.html E:\TSO
-```
-
-If `E:\TSO` is unavailable, stop rather than substituting a different location.
+`publish-tso-offices` validates the Provo and Albuquerque storage IDs, titles,
+and release versions, copies both files atomically, and verifies byte parity. It
+does not copy `new.html`. If iCloud Drive Documents is unavailable, stop rather
+than substituting another destination. Use `copy-local-tso` only for a separately
+requested one-off copy.
 
 ## Windows
 
@@ -124,8 +117,10 @@ python build-tso-resources
 python build-tso-resources --with-tests
 python verify-tso-release
 python make-local-tso provo
-python copy-local-tso provo.html E:\TSO
 ```
+
+Stage 3 publication must be run on a Mac where iCloud Drive Documents is
+available.
 
 If Windows uses the Python launcher:
 
@@ -134,7 +129,6 @@ py -3 build-tso-resources
 py -3 build-tso-resources --with-tests
 py -3 verify-tso-release
 py -3 make-local-tso provo
-py -3 copy-local-tso provo.html E:\TSO
 ```
 
 ## Editing rule

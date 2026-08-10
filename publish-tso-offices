@@ -1,0 +1,117 @@
+#!/usr/bin/env python3
+"""Publish the active Provo and Albuquerque HTML files to iCloud Drive."""
+
+from __future__ import annotations
+
+import argparse
+import importlib.machinery
+import importlib.util
+import json
+import sys
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parent
+COPY_HELPER_PATH = ROOT / "copy-local-tso"
+ICLOUD_DOCUMENTS_DIR = (
+    Path.home() / "Library/Mobile Documents/com~apple~CloudDocs/Documents"
+)
+DEFAULT_ICLOUD_TSO_DIR = ICLOUD_DOCUMENTS_DIR / "TSO"
+ACTIVE_OFFICES = {
+    "provo.html": ("provo", "Provo TSO Resources"),
+    "albuquerque.html": ("albuquerque", "Albuquerque TSO Resources"),
+}
+
+
+class PublicationError(RuntimeError):
+    """Raised when the active office files cannot be safely published."""
+
+
+def load_copy_helper():
+    loader = importlib.machinery.SourceFileLoader("copy_local_tso", str(COPY_HELPER_PATH))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    if spec is None or spec.loader is None:
+        raise PublicationError(f"Could not load copy helper: {COPY_HELPER_PATH}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def release_version() -> str:
+    try:
+        release = json.loads((ROOT / "src/release.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise PublicationError(f"Could not read src/release.json: {error}") from error
+    version = str(release.get("version", "")).strip() if isinstance(release, dict) else ""
+    if not version:
+        raise PublicationError("src/release.json does not contain an app version.")
+    return version
+
+
+def publish_office_files(destination: Path) -> list[Path]:
+    copy_helper = load_copy_helper()
+    version = release_version()
+
+    if not destination.parent.is_dir():
+        raise PublicationError(
+            f"iCloud Drive Documents is unavailable: {destination.parent}"
+        )
+
+    sources: list[Path] = []
+    for filename, expected_identity in ACTIVE_OFFICES.items():
+        source = ROOT / filename
+        try:
+            storage_id, title, office_version = copy_helper.office_file_identity(source)
+        except copy_helper.CopyError as error:
+            raise PublicationError(str(error)) from error
+        if (storage_id, title) != expected_identity:
+            raise PublicationError(
+                f"{source} has identity {(storage_id, title)!r}; "
+                f"expected {expected_identity!r}."
+            )
+        if office_version != version:
+            raise PublicationError(
+                f"{source} has app version {office_version}; expected {version}."
+            )
+        sources.append(source)
+
+    destination.mkdir(exist_ok=True)
+    published: list[Path] = []
+    for source in sources:
+        try:
+            copied = copy_helper.copy_office_file(source, destination)
+        except copy_helper.CopyError as error:
+            raise PublicationError(str(error)) from error
+        print(
+            f"PUBLISHED {source.name} -> {copied} "
+            f"(sha256 {copy_helper.sha256(copied)})"
+        )
+        published.append(copied)
+    return published
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--icloud-dir",
+        type=Path,
+        default=DEFAULT_ICLOUD_TSO_DIR,
+        help=argparse.SUPPRESS,
+    )
+    args = parser.parse_args()
+
+    try:
+        published = publish_office_files(args.icloud_dir.expanduser())
+    except (OSError, PublicationError) as error:
+        print(f"OFFICE PUBLICATION FAILED: {error}", file=sys.stderr)
+        return 1
+
+    print(
+        f"OFFICE PUBLICATION COMPLETE: version {release_version()}; "
+        f"{len(published)} iCloud office files verified."
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
