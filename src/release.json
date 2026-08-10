@@ -1,8 +1,13 @@
 {
   "version": "2.3.2",
   "date": "2026-08-10",
-  "message": "Curate App Changes",
+  "message": "Clarify SharePoint publishing setup",
   "appChanges": [
+    {
+      "date": "2026-08-10",
+      "version": "2.3.2",
+      "message": "Clarified SharePoint setup for publishing resource packages."
+    },
     {
       "date": "2026-08-10",
       "version": "2.3.2",

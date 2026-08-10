@@ -22,10 +22,32 @@ function getSharePointPublishingTargetStorageKey(storageId = STORAGE_KEY_PREFIX)
 function getStoredSharePointPublishingUrl(storageId = STORAGE_KEY_PREFIX){
   try{
     const stored = JSON.parse(localStorage.getItem(getSharePointPublishingTargetStorageKey(storageId)) || "null");
-    return stored && typeof stored === "object" ? String(stored.packageViewUrl || "") : "";
+    return stored && typeof stored === "object"
+      && Number(stored.schemaVersion) === SHAREPOINT_PUBLISHING_TARGET_SCHEMA_VERSION
+      ? String(stored.packageViewUrl || "")
+      : "";
   }catch(_err){
     return "";
   }
+}
+
+function getConfiguredSharePointPublishingUrl(storageId = STORAGE_KEY_PREFIX){
+  const currentStorageId = normalizeStorageId(getConfiguredStorageId());
+  if(normalizeStorageId(storageId) === currentStorageId){
+    const embeddedUrl = getConfiguredSharePointPackageUrl();
+    if(embeddedUrl) return embeddedUrl;
+  }
+  return getStoredSharePointPublishingUrl(storageId);
+}
+
+function canChangeSharePointPublishingDestination(){
+  return !getConfiguredSharePointPackageUrl();
+}
+
+function changeSharePointPublishingDestinationButtonHTML(){
+  return canChangeSharePointPublishingDestination()
+    ? `<button class="button" type="button" onclick="beginChangeSharePointPublishingDestination()">Change SharePoint destination</button>`
+    : "";
 }
 
 function getSharePointPublishingOfficeName(storageId = STORAGE_KEY_PREFIX){
@@ -147,15 +169,15 @@ function saveSharePointPublishingTarget(target, storageId = STORAGE_KEY_PREFIX){
 
 function getSharePointPublishingTarget(storageId = STORAGE_KEY_PREFIX){
   try{
+    const configuredUrl = getConfiguredSharePointPublishingUrl(storageId);
+    if(!configuredUrl) return null;
     const stored = JSON.parse(localStorage.getItem(getSharePointPublishingTargetStorageKey(storageId)) || "null");
-    if(!stored || typeof stored !== "object") return null;
-    if(Number(stored.schemaVersion) !== SHAREPOINT_PUBLISHING_TARGET_SCHEMA_VERSION) return null;
     const parsed = parseSharePointPublishingUrl(
-      stored.packageViewUrl,
+      configuredUrl,
       getExpectedSharePointPackageFileName(storageId),
       getSharePointPublishingOfficeName(storageId)
     );
-    parsed.configuredAt = String(stored.configuredAt || "");
+    parsed.configuredAt = String(stored && stored.configuredAt || "");
     return parsed;
   }catch(_err){
     return null;
@@ -585,6 +607,7 @@ function confirmSharePointPublishingDestination(){
 
 function beginChangeSharePointPublishingDestination(){
   if(!sharePointPublishRun) return;
+  if(!canChangeSharePointPublishingDestination()) return;
   clearSharePointPublishingTimer();
   setSharePointPublishingState("destination-setup", {
     changingDestination:!!sharePointPublishRun.target,
@@ -712,7 +735,7 @@ function sharePointPublishingBodyHTML(run){
       ${sharePointPublishingTargetSummaryHTML(target)}
       <p>Choose the folder where Edge saves downloaded files. TSO Resources will watch only this folder and save the merged package there.</p>
       <button class="button primary" type="button" onclick="chooseSharePointPublishingDirectory()">Choose publishing folder</button>
-      <button class="button" type="button" onclick="beginChangeSharePointPublishingDestination()">Change SharePoint destination</button>
+      ${changeSharePointPublishingDestinationButtonHTML()}
     `;
   }
   if(run.state === "permission"){
@@ -721,7 +744,7 @@ function sharePointPublishingBodyHTML(run){
       ${run.errorMessage ? `<p class="sharepoint-publish-error">${escapeHTML(run.errorMessage)}</p>` : ""}
       <button class="button primary" type="button" onclick="allowSharePointPublishingDirectory()">Allow publishing folder</button>
       <button class="button" type="button" onclick="chooseSharePointPublishingDirectory()">Choose a different folder</button>
-      <button class="button" type="button" onclick="beginChangeSharePointPublishingDestination()">Change SharePoint destination</button>
+      ${changeSharePointPublishingDestinationButtonHTML()}
     `;
   }
   if(run.state === "ready"){
@@ -735,7 +758,7 @@ function sharePointPublishingBodyHTML(run){
       </ol>
       <a class="button primary" href="${escapeHTML(target.packageViewUrl)}" target="_blank" rel="noopener" onclick="beginSharePointPackageDownload()">Open current SharePoint package</a>
       <button class="button" type="button" onclick="chooseSharePointPublishingDirectory()">Change publishing folder</button>
-      <button class="button" type="button" onclick="beginChangeSharePointPublishingDestination()">Change SharePoint destination</button>
+      ${changeSharePointPublishingDestinationButtonHTML()}
     `;
   }
   if(run.state === "manual-ready"){
@@ -744,7 +767,7 @@ function sharePointPublishingBodyHTML(run){
       <p>Open the current SharePoint package, click its Download arrow, then return here and select the downloaded ZIP.</p>
       <a class="button primary" href="${escapeHTML(target.packageViewUrl)}" target="_blank" rel="noopener">Open current SharePoint package</a>
       <button class="button" type="button" onclick="chooseDownloadedPackageForPublishing()">Select downloaded package</button>
-      <button class="button" type="button" onclick="beginChangeSharePointPublishingDestination()">Change SharePoint destination</button>
+      ${changeSharePointPublishingDestinationButtonHTML()}
     `;
   }
   if(run.state === "waiting"){
@@ -796,7 +819,7 @@ function sharePointPublishingBodyHTML(run){
     ${run.directoryHandle ? `<button class="button primary" type="button" onclick="checkAgainForSharePointDownload()">Check publishing folder again</button>` : ""}
     <button class="button" type="button" onclick="chooseDownloadedPackageForPublishing()">Select downloaded package</button>
     <button class="button" type="button" onclick="chooseSharePointPublishingDirectory()">Change publishing folder</button>
-    <button class="button" type="button" onclick="beginChangeSharePointPublishingDestination()">Change SharePoint destination</button>
+    ${changeSharePointPublishingDestinationButtonHTML()}
   `;
 }
 

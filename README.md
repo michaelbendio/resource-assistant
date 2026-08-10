@@ -68,9 +68,10 @@ python3 make-local-tso albuquerque
 
 The helper first rebuilds `new.html`, then creates `albuquerque.html`, sets the
 local storage ID to `albuquerque`, and sets the page title to
-`Albuquerque TSO Resources`. It refuses to overwrite the master template. The
-same command works for a future office such as `mesa`; there is no central
-office registry.
+`Albuquerque TSO Resources`. It also embeds the office name and SharePoint
+resource-package URL so those settings travel with the office HTML file. It
+refuses to overwrite the master template. The same command works for a future
+office such as `mesa`; there is no central office registry.
 
 Generation does not copy the office file anywhere. After a pushed application
 release has been verified, generate both active office files and publish them to
@@ -99,7 +100,7 @@ Open the local `.html` file directly in a browser. The file starts with the stan
 
 1. Press `Ctrl+Alt+A` to show the `Admin` button in the blue bar.
 2. Click `Admin`.
-3. Click `Office Setup`. Enter the local TSO name and review the storage ID, expected resource-package filename, SharePoint package URL, and download-folder authorization.
+3. Click `Office Setup`. Review the office name, storage ID, expected resource-package filename, and SharePoint package URL carried by the HTML file, then authorize this computer's download folder.
 4. Click `Help` in Admin mode for the admin reference and printable first-time admin training guide.
 
 Before editing live resources, load the latest resource package:
@@ -124,13 +125,14 @@ After a batch of edits, share the updated resources:
 5. The admin reviews the publication summary, clicks `Upload to SharePoint`, uploads the saved canonical package, and chooses `Replace`.
 6. The admin clicks `I replaced the package` to record the manual action locally. The app cannot independently verify the SharePoint upload.
 
-On first use on each computer, `Office Setup` gathers the TSO name, storage ID,
-expected package filename, SharePoint package URL, and download-folder authorization.
-`Test Configuration` reports whether setup is complete. The app validates the WSR_TSO
-location, expected office package filename, and containing folder before saving the
-destination in office-scoped browser storage. This configuration and local publishing
-history are never included in exported packages. TSO Resources watches the authorized
-folder for the completed canonical package,
+The generated office HTML carries its office name, storage ID, expected package
+filename, and SharePoint package URL. On first use on each computer, `Office
+Setup` authorizes that computer's download folder. `Test Configuration` reports
+whether setup is complete. The app validates the WSR_TSO location, expected
+office package filename, and containing folder. Download-folder authorization
+and local publishing history remain in office-scoped browser storage and are
+never included in exported packages. TSO Resources watches the authorized folder
+for the completed canonical package,
 merges it with the prepared local data, reapplies approved deletion tombstones, and
 saves the combined package automatically. SharePoint upload and replacement remain
 manual and are authorized by the signed-in user's SharePoint permissions.

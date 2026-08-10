@@ -18,6 +18,8 @@ RELEASE_JSON = ROOT / "src" / "release.json"
 PRODUCTION_HTML = ROOT / "new.html"
 DEBUG_HTML = ROOT / "build" / "tso-resources-debug.html"
 STARTER_STORAGE_TAG = '<meta name="tso-storage-id" content="">'
+STARTER_OFFICE_NAME_TAG = '<meta name="tso-office-name" content="">'
+STARTER_SHAREPOINT_URL_TAG = '<meta name="tso-sharepoint-package-url" content="">'
 STARTER_TITLE_TAG = "<title>&lt;New&gt; TSO Resources</title>"
 
 
@@ -140,6 +142,10 @@ def verify_new_html(path: Path, release: dict[str, object]) -> None:
     html = path.read_text(encoding="utf-8")
     if STARTER_STORAGE_TAG not in html:
         raise ReleaseError(f"{path} does not have the blank starter storage ID.")
+    if STARTER_OFFICE_NAME_TAG not in html:
+        raise ReleaseError(f"{path} does not have the blank starter office name.")
+    if STARTER_SHAREPOINT_URL_TAG not in html:
+        raise ReleaseError(f"{path} does not have the blank starter SharePoint URL.")
     if STARTER_TITLE_TAG not in html:
         raise ReleaseError(f"{path} does not have the starter page title.")
 

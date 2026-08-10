@@ -77,7 +77,8 @@ python3 make-local-tso albuquerque
 ```
 
 This first rebuilds `new.html`, then creates `albuquerque.html` with the correct
-storage ID and the title `Albuquerque TSO Resources`.
+storage ID, office name, SharePoint resource-package URL, and the title
+`Albuquerque TSO Resources`.
 
 For another office:
 

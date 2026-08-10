@@ -483,6 +483,26 @@ async function runSelfTests(){
   });
 
   tests.push({
+    name: "OFFICE SETUP EXPLAINS PUBLISHING AND LOCAL STATE",
+    fn: () => {
+      showOfficeSetup();
+      const modal = getReferenceModal();
+      const text = modal.textContent || "";
+      [
+        "Download the current package from SharePoint",
+        "merge it with this computer’s updates",
+        "upload the combined package",
+        "Each computer separately authorizes its download folder",
+        "keeps its own publishing history",
+        "No guided publishing activity has been recorded on this computer."
+      ].forEach(expected => {
+        if(!text.includes(expected)) throw new Error(`Office Setup omitted '${expected}'`);
+      });
+      closeReferenceModal();
+    }
+  });
+
+  tests.push({
     name: "OFFICE SETUP STATUS IS EXPLICIT",
     fn: () => {
       const incomplete = evaluateOfficeSetupStatus({
@@ -506,6 +526,50 @@ async function runSelfTests(){
       });
       if(!complete.complete || complete.issues.length){
         throw new Error("valid office setup was not complete");
+      }
+    }
+  });
+
+  tests.push({
+    name: "OFFICE HTML PROVIDES SHARED PUBLISHING SETTINGS",
+    fn: () => {
+      const storageMeta = document.querySelector('meta[name="tso-storage-id"]');
+      const nameMeta = document.querySelector('meta[name="tso-office-name"]');
+      const urlMeta = document.querySelector('meta[name="tso-sharepoint-package-url"]');
+      const previousStorage = storageMeta && storageMeta.getAttribute("content");
+      const previousName = nameMeta && nameMeta.getAttribute("content");
+      const previousUrl = urlMeta && urlMeta.getAttribute("content");
+      const previousStoredName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
+      const targetKey = getSharePointPublishingTargetStorageKey("provo");
+      const previousStoredTarget = localStorage.getItem(targetKey);
+      const provoUrl = "https://churchofjesuschrist.sharepoint.com/sites/WSR_TSO/Provo%20TSO/Forms/AllItems.aspx?id=%2Fsites%2FWSR_TSO%2FProvo%20TSO%2Fprovo-resource-package.zip&parent=%2Fsites%2FWSR_TSO%2FProvo%20TSO";
+      try{
+        if(!storageMeta || !nameMeta || !urlMeta) throw new Error("office configuration meta tags are missing");
+        storageMeta.setAttribute("content", "provo");
+        nameMeta.setAttribute("content", "Provo");
+        urlMeta.setAttribute("content", provoUrl);
+        localStorage.setItem(TSO_NAME_STORAGE_KEY, "Wrong Local Name");
+        localStorage.setItem(targetKey, JSON.stringify({
+          schemaVersion:SHAREPOINT_PUBLISHING_TARGET_SCHEMA_VERSION,
+          packageViewUrl:"https://example.com/wrong"
+        }));
+
+        if(getTsoName() !== "Provo") throw new Error("embedded office name did not override local setup");
+        const target = getSharePointPublishingTarget("provo");
+        if(!target || target.packageFileName !== "provo-resource-package.zip"){
+          throw new Error("embedded SharePoint destination did not override local setup");
+        }
+        if(canChangeSharePointPublishingDestination()){
+          throw new Error("embedded SharePoint destination was still locally editable");
+        }
+      }finally{
+        if(storageMeta) storageMeta.setAttribute("content", previousStorage || "");
+        if(nameMeta) nameMeta.setAttribute("content", previousName || "");
+        if(urlMeta) urlMeta.setAttribute("content", previousUrl || "");
+        if(previousStoredName == null) localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+        else localStorage.setItem(TSO_NAME_STORAGE_KEY, previousStoredName);
+        if(previousStoredTarget == null) localStorage.removeItem(targetKey);
+        else localStorage.setItem(targetKey, previousStoredTarget);
       }
     }
   });
@@ -657,6 +721,9 @@ async function runSelfTests(){
       const previousProvo = localStorage.getItem(provoKey);
       const previousMesa = localStorage.getItem(mesaKey);
       try{
+        if(!officePublicationHistoryHTML([]).includes("No guided publishing activity has been recorded on this computer.")){
+          throw new Error("empty publishing history did not explain its local scope");
+        }
         localStorage.removeItem(provoKey);
         localStorage.removeItem(mesaKey);
         const record = PublicationHistoryStore.recordSaved({

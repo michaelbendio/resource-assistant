@@ -167,7 +167,7 @@ function formatLocalDateTime(value){
 function officePublicationHistoryHTML(entries = PublicationHistoryStore.load()){
   const history = Array.isArray(entries) ? entries : [];
   if(!history.length){
-    return `<p class="admin-setup-note">No packages have been saved through guided publishing on this computer.</p>`;
+    return `<p class="admin-setup-note">No guided publishing activity has been recorded on this computer.</p>`;
   }
   return `
     <div class="office-publication-history">
@@ -245,7 +245,11 @@ async function saveOfficeSetupFromModal(options = {}){
   const urlInput = document.getElementById("officeSetupSharePointUrl");
   const nextName = String(nameInput && nameInput.value || "").trim();
   const destinationInput = String(urlInput && urlInput.value || "").trim();
-  if(nextName){
+  const configuredOfficeName = getConfiguredOfficeName();
+  const configuredSharePointUrl = getConfiguredSharePointPackageUrl();
+  if(configuredOfficeName){
+    localStorage.removeItem(TSO_NAME_STORAGE_KEY);
+  }else if(nextName){
     localStorage.setItem(TSO_NAME_STORAGE_KEY, nextName);
     if(isNewTemplateFile()) markRenamedAdminTrainingPending(nextName);
   }else{
@@ -256,7 +260,9 @@ async function saveOfficeSetupFromModal(options = {}){
   updateOfficeSetupExpectedFilename();
 
   try{
-    if(destinationInput){
+    if(configuredSharePointUrl){
+      localStorage.removeItem(getSharePointPublishingTargetStorageKey());
+    }else if(destinationInput){
       const target = parseSharePointPublishingUrl(
         destinationInput,
         getExpectedSharePointPackageFileName(),
@@ -311,33 +317,35 @@ function showOfficeSetup(){
   const modal = getReferenceModal();
   const target = OfficeContext.sharePointTarget;
   const storageId = OfficeContext.storageId;
+  const configuredOfficeName = getConfiguredOfficeName();
+  const configuredSharePointUrl = getConfiguredSharePointPackageUrl();
   officeSetupDirectoryHandle = null;
   modal.innerHTML = `
     <div class="reference-modal-panel office-setup-panel" role="dialog" aria-modal="true" aria-labelledby="adminSetupTitle">
       <div class="reference-modal-header">
         <div>
           <div id="adminSetupTitle" class="reference-modal-title">Admin Office Setup</div>
-          <div class="reference-modal-subtitle">Configuration for this HTML file on this computer</div>
+          <div class="reference-modal-subtitle">Download the current package from SharePoint, merge it with this computer’s updates, then upload the combined package and replace the SharePoint copy.</div>
         </div>
         <button class="button reference-modal-close" type="button">Close</button>
       </div>
       <div class="reference-modal-body admin-setup-panel">
         <div id="officeSetupStatus" class="office-setup-status">Checking configuration…</div>
         <label for="adminSetupTsoName">TSO name
-          <input id="adminSetupTsoName" type="text" value="${escapeHTML(getTsoName())}" placeholder="Example: Provo">
+          <input id="adminSetupTsoName" type="text" value="${escapeHTML(getTsoName())}" placeholder="Example: Provo" ${configuredOfficeName ? "readonly" : ""}>
         </label>
         <dl class="sharepoint-publish-destination office-setup-details">
           <div><dt>Storage ID</dt><dd><code>${escapeHTML(storageId || "Not configured")}</code></dd></div>
           <div><dt>Expected resource-package filename</dt><dd><code id="officeSetupExpectedPackage">${escapeHTML(OfficeContext.expectedPackageFileName)}</code></dd></div>
         </dl>
         <label for="officeSetupSharePointUrl">SharePoint package URL
-          <textarea id="officeSetupSharePointUrl" class="sharepoint-publish-url" spellcheck="false" placeholder="https://${SHAREPOINT_PUBLISHING_ALLOWED_HOST}/sites/WSR_TSO/…">${escapeHTML(target && target.packageViewUrl || getStoredSharePointPublishingUrl())}</textarea>
+          <textarea id="officeSetupSharePointUrl" class="sharepoint-publish-url" spellcheck="false" placeholder="https://${SHAREPOINT_PUBLISHING_ALLOWED_HOST}/sites/WSR_TSO/…" ${configuredSharePointUrl ? "readonly" : ""}>${escapeHTML(target && target.packageViewUrl || getConfiguredSharePointPublishingUrl())}</textarea>
         </label>
         <div class="office-setup-folder-row">
           <div><strong>Download-folder authorization</strong><div id="officeSetupFolderStatus">Checking…</div></div>
           <button class="button" type="button" id="officeSetupChooseFolder">Choose folder</button>
         </div>
-        <p class="admin-setup-note">This setup belongs only to the office file currently open. It is stored on this computer and is never included in a resource package.</p>
+        <p class="admin-setup-note">The office name and SharePoint destination come from this office HTML file. Each computer separately authorizes its download folder and keeps its own publishing history. None of this is included in a resource package.</p>
         <div class="admin-setup-actions">
           <button class="button primary" type="button" id="officeSetupSave">Save Office Setup</button>
           <button class="button" type="button" id="officeSetupTest">Test Configuration</button>

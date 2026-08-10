@@ -186,6 +186,8 @@ function getTsoNameFromHtmlFileName(fileName){
 }
 
 function getTsoName(){
+  const configuredName = getConfiguredOfficeName();
+  if(configuredName) return configuredName;
   const storedName = String(localStorage.getItem(TSO_NAME_STORAGE_KEY) || "").trim();
   if(storedName) return storedName;
   if(isNewTemplateFile()) return "";
@@ -593,8 +595,8 @@ function showAdminHelp(options = {}){
         <details>
           <summary>Office Setup</summary>
           <div class="admin-help-section-body">
-            <p><strong>Office Setup</strong> gathers the TSO name, this file's storage ID, expected package filename, SharePoint package URL, and download-folder authorization in one place.</p>
-            <p>Use <strong>Test Configuration</strong> until the panel says <strong>Setup complete</strong>. The settings and publishing history belong only to this office file on this computer and are never exported in a resource package.</p>
+            <p><strong>Office Setup</strong> shows the office name, storage ID, expected package filename, and SharePoint package URL carried by this office HTML file.</p>
+            <p>Each computer separately authorizes its download folder and keeps its own publishing history. Use <strong>Test Configuration</strong> until the panel says <strong>Setup complete</strong>. Office setup and publishing history are never exported in a resource package.</p>
           </div>
         </details>
 

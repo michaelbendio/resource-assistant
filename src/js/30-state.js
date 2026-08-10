@@ -32,6 +32,16 @@ function getConfiguredStorageId(){
   return configured ? normalizeStorageId(configured) : "";
 }
 
+function getConfiguredOfficeName(){
+  const meta = document.querySelector('meta[name="tso-office-name"]');
+  return meta ? String(meta.getAttribute("content") || "").trim() : "";
+}
+
+function getConfiguredSharePointPackageUrl(){
+  const meta = document.querySelector('meta[name="tso-sharepoint-package-url"]');
+  return meta ? String(meta.getAttribute("content") || "").trim() : "";
+}
+
 function getStorageKeyPrefix(fileName = getCurrentHtmlFileName()){
   const configured = getConfiguredStorageId();
   if(configured) return configured;

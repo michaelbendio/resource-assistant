@@ -9,6 +9,7 @@ import importlib.util
 import json
 import sys
 from pathlib import Path
+from urllib.parse import quote, urlencode
 
 
 ROOT = Path(__file__).resolve().parent
@@ -21,6 +22,17 @@ ACTIVE_OFFICES = {
     "provo.html": ("provo", "Provo TSO Resources"),
     "albuquerque.html": ("albuquerque", "Albuquerque TSO Resources"),
 }
+
+
+def expected_sharepoint_url(storage_id: str, office_name: str) -> str:
+    office_folder = f"{office_name} TSO"
+    parent_path = f"/sites/WSR_TSO/{office_folder}"
+    package_path = f"{parent_path}/{storage_id}-resource-package.zip"
+    page_path = f"/sites/WSR_TSO/{quote(office_folder)}/Forms/AllItems.aspx"
+    return (
+        f"https://churchofjesuschrist.sharepoint.com{page_path}?"
+        f"{urlencode({'id': package_path, 'parent': parent_path})}"
+    )
 
 
 class PublicationError(RuntimeError):
@@ -72,6 +84,21 @@ def publish_office_files(destination: Path) -> list[Path]:
         if office_version != version:
             raise PublicationError(
                 f"{source} has app version {office_version}; expected {version}."
+            )
+        try:
+            office_name, sharepoint_url = copy_helper.office_file_configuration(source)
+        except copy_helper.CopyError as error:
+            raise PublicationError(str(error)) from error
+        expected_office_name = expected_identity[1].removesuffix(" TSO Resources")
+        if office_name != expected_office_name:
+            raise PublicationError(
+                f"{source} has embedded office name {office_name!r}; "
+                f"expected {expected_office_name!r}."
+            )
+        expected_url = expected_sharepoint_url(storage_id, expected_office_name)
+        if sharepoint_url != expected_url:
+            raise PublicationError(
+                f"{source} does not have the expected {expected_office_name} SharePoint package URL."
             )
         sources.append(source)
 

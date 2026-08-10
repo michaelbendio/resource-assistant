@@ -34,6 +34,8 @@ class MakeLocalTsoTests(unittest.TestCase):
             source = temp / "template.html"
             source.write_text(
                 '<html><head><meta name="tso-storage-id" content="">'
+                '<meta name="tso-office-name" content="">'
+                '<meta name="tso-sharepoint-package-url" content="">'
                 '<title>&lt;New&gt; TSO Resources</title></head><body></body></html>',
                 encoding="utf-8",
             )
@@ -50,6 +52,10 @@ class MakeLocalTsoTests(unittest.TestCase):
                     )
                     document = output.read_text(encoding="utf-8")
                     self.assertIn(f'<meta name="tso-storage-id" content="{office}">', document)
+                    office_name = title.removesuffix(" TSO Resources")
+                    self.assertIn(f'<meta name="tso-office-name" content="{office_name}">', document)
+                    self.assertIn(f"{office}-resource-package.zip", document)
+                    self.assertIn("churchofjesuschrist.sharepoint.com", document)
                     self.assertIn(f"<title>{title}</title>", document)
 
     def test_supports_a_custom_display_name_and_output_filename(self) -> None:
@@ -58,7 +64,10 @@ class MakeLocalTsoTests(unittest.TestCase):
             source = temp / "template.html"
             output = temp / "slc.html"
             source.write_text(
-                '<meta name="tso-storage-id" content=""><title>&lt;New&gt; TSO Resources</title>',
+                '<meta name="tso-storage-id" content="">'
+                '<meta name="tso-office-name" content="">'
+                '<meta name="tso-sharepoint-package-url" content="">'
+                '<title>&lt;New&gt; TSO Resources</title>',
                 encoding="utf-8",
             )
 
@@ -72,12 +81,19 @@ class MakeLocalTsoTests(unittest.TestCase):
 
             document = output.read_text(encoding="utf-8")
             self.assertIn('content="salt-lake"', document)
+            self.assertIn('content="Salt Lake"', document)
+            self.assertIn("salt-lake-resource-package.zip", document)
             self.assertIn("<title>Salt Lake TSO Resources</title>", document)
 
     def test_refuses_to_overwrite_the_template(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             source = Path(temp_dir) / "template.html"
-            original = '<meta name="tso-storage-id" content=""><title>Template</title>'
+            original = (
+                '<meta name="tso-storage-id" content="">'
+                '<meta name="tso-office-name" content="">'
+                '<meta name="tso-sharepoint-package-url" content="">'
+                '<title>Template</title>'
+            )
             source.write_text(original, encoding="utf-8")
 
             result = self.run_helper(

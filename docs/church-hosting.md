@@ -34,20 +34,19 @@ Each office file runs locally from its OneDrive shortcut, while SharePoint
 authentication remains in Edge. The **Publish to SharePoint** button therefore uses
 a guided local workflow instead of embedded Microsoft Graph authentication:
 
-1. On first use on each computer, the admin opens **Office Setup** and reviews the TSO name, embedded storage ID, expected package filename, SharePoint URL, and download-folder authorization.
-2. The admin selects or opens that office's canonical SharePoint ZIP, copies its complete address-bar URL, and pastes it into Office Setup.
-3. The app accepts only an HTTPS URL on `churchofjesuschrist.sharepoint.com`, under the `WSR_TSO` site, whose selected ZIP filename matches the current office.
-4. The app saves that destination and authorized folder in office-scoped browser storage. Neither configuration nor publishing history is part of a resource package.
-5. The admin runs **Test Configuration** until Office Setup reports **Setup complete**.
-6. The publishing panel opens the configured canonical SharePoint ZIP. After the admin clicks SharePoint's Download arrow, the app detects the completed ZIP.
-7. The app displays **Merging**, saves a recovery point, merges the canonical package with prepared local data, reapplies deletion tombstones, incorporates referenced PDFs, and saves the combined canonical filename.
-8. The app displays a publication summary with package version, filename, save time, resources added/updated, approved deletions, and SharePoint destination.
-9. The admin chooses **Upload to SharePoint**, uploads the saved ZIP, and chooses **Replace**.
-10. After SharePoint succeeds, the admin clicks **I replaced the package**. The app records that confirmation locally with the publishing history.
+1. On first use on each computer, the admin opens **Office Setup** and reviews the office name, embedded storage ID, expected package filename, SharePoint URL, and download-folder authorization.
+2. Each generated office HTML carries its office name and WSR_TSO SharePoint resource-package URL. The app accepts only an HTTPS URL on `churchofjesuschrist.sharepoint.com`, under the `WSR_TSO` site, whose selected ZIP filename matches the current office.
+3. The admin authorizes the download folder used on that computer. Folder authorization and publishing history remain in office-scoped browser storage; neither is part of a resource package.
+4. The admin runs **Test Configuration** until Office Setup reports **Setup complete**.
+5. The publishing panel opens the configured canonical SharePoint ZIP. After the admin clicks SharePoint's Download arrow, the app detects the completed ZIP.
+6. The app displays **Merging**, saves a recovery point, merges the canonical package with prepared local data, reapplies deletion tombstones, incorporates referenced PDFs, and saves the combined canonical filename.
+7. The app displays a publication summary with package version, filename, save time, resources added/updated, approved deletions, and SharePoint destination.
+8. The admin chooses **Upload to SharePoint**, uploads the saved ZIP, and chooses **Replace**.
+9. After SharePoint succeeds, the admin clicks **I replaced the package**. The app records that confirmation locally with the publishing history.
 
 The app never receives SharePoint credentials and cannot bypass SharePoint
 permissions. If Edge does not save into the authorized folder, the workflow falls
 back to a file picker. The browser cannot verify the final SharePoint upload, so the
 completion message records the administrator's confirmation rather than an API
-response. If an office moves its canonical package, the admin can use **Change
-SharePoint destination** and confirm a new selected-ZIP URL.
+response. If an office moves its canonical package, generate a new office HTML
+file with the updated embedded destination and distribute it to that office.

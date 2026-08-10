@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.machinery
 import importlib.util
+import html
 import json
 import tempfile
 import unittest
@@ -23,8 +24,12 @@ SPEC.loader.exec_module(publish_tso_offices)
 
 def office_html(storage_id: str, title: str, version: str = "2.3.1") -> str:
     payload = json.dumps({"version": version, "changes": []})
+    office_name = title.removesuffix(" TSO Resources")
+    sharepoint_url = publish_tso_offices.expected_sharepoint_url(storage_id, office_name)
     return (
         f'<meta name="tso-storage-id" content="{storage_id}">'
+        f'<meta name="tso-office-name" content="{office_name}">'
+        f'<meta name="tso-sharepoint-package-url" content="{html.escape(sharepoint_url, quote=True)}">'
         f"<title>{title}</title>"
         f'<script id="app-release-data" type="application/json">{payload}</script>'
     )

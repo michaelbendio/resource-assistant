@@ -66,6 +66,28 @@ def office_file_identity(path: Path) -> tuple[str, str, str]:
     return storage_id, title, version
 
 
+def office_file_configuration(path: Path) -> tuple[str, str]:
+    if not path.is_file():
+        raise CopyError(f"Office file was not found: {path}")
+    document = path.read_text(encoding="utf-8")
+
+    def meta_content(name: str) -> str:
+        match = re.search(
+            rf'<meta\s+name=["\']{re.escape(name)}["\']\s+content=["\']([^"\']*)["\']\s*>',
+            document,
+            flags=re.IGNORECASE,
+        )
+        return html_module.unescape(match.group(1).strip()) if match else ""
+
+    office_name = meta_content("tso-office-name")
+    sharepoint_url = meta_content("tso-sharepoint-package-url")
+    if not office_name:
+        raise CopyError(f"Office file is missing its embedded office name: {path}")
+    if not sharepoint_url:
+        raise CopyError(f"Office file is missing its embedded SharePoint package URL: {path}")
+    return office_name, sharepoint_url
+
+
 def copy_office_file(source: Path, destination_dir: Path) -> Path:
     if not source.is_file():
         raise CopyError(f"Office file was not found: {source}")
