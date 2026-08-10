@@ -2709,6 +2709,9 @@ async function runSelfTests(){
         if(cards.length !== 1 || cards[0].dataset.resourceId !== "favorite-beta"){
           throw new Error("Favorites view did not show only favorited resources");
         }
+        if(!appView.querySelector(".category-print-banner")){
+          throw new Error("nonempty Favorites view did not show the print instruction");
+        }
         const star = cards[0].querySelector(".favorite-toggle");
         const printer = cards[0].querySelector(".print-selection-toggle");
         if(!star || star.getAttribute("aria-pressed") !== "true") throw new Error("favorite resource did not show a filled star button");
@@ -2732,8 +2735,12 @@ async function runSelfTests(){
         selectedStar.click();
         if(appView.querySelector(".resource-card[data-resource-id]")) throw new Error("removed favorite remained in Favorites view");
         if(!printSelection.includes("favorite-beta")) throw new Error("removing a Favorite changed its print selection");
-        if(!appView.querySelector(".favorites-empty") || !/No favorite resources/.test(appView.textContent || "")){
+        const emptyFavorites = appView.querySelector(".favorites-empty");
+        if(!emptyFavorites || emptyFavorites.textContent !== "No favorite resources. Click the outline star next to a resource to add it to Favorites."){
           throw new Error("empty Favorites message was not rendered");
+        }
+        if(appView.querySelector(".category-print-banner")){
+          throw new Error("empty Favorites view showed the print instruction");
         }
       }finally{
         data = previousData;

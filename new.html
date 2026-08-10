@@ -1108,8 +1108,13 @@ textarea.information-editor { min-height:320px; resize:vertical; }
 
 <script id="app-release-data" type="application/json">
 {
-  "version": "2.3.0",
+  "version": "2.3.1",
   "changes": [
+    {
+      "date": "2026-08-10",
+      "version": "2.3.1",
+      "message": "Clarify empty Favorites guidance"
+    },
     {
       "date": "2026-08-10",
       "version": "2.3.0",
@@ -1149,11 +1154,6 @@ textarea.information-editor { min-height:320px; resize:vertical; }
       "date": "2026-08-06",
       "version": "2.2.12",
       "message": "Separate application verification from office publication"
-    },
-    {
-      "date": "2026-08-05",
-      "version": "2.2.11",
-      "message": "Protect newer edits when tagging or undoing deletions"
     }
   ]
 }
@@ -4332,15 +4332,15 @@ function renderCategoryView(){
 function renderFavoritesView(){
   renderCategoryBackButton();
   renderPublicResourceTitle("Favorites");
-  renderCategoryPrintInstruction();
   const resources = getFavoriteResources().slice().sort(compareResourcesByName);
   if(!resources.length){
     const empty = document.createElement("p");
     empty.className = "favorites-empty";
-    empty.textContent = "No favorite resources.";
+    empty.textContent = "No favorite resources. Click the outline star next to a resource to add it to Favorites.";
     appView.appendChild(empty);
     return;
   }
+  renderCategoryPrintInstruction();
   resources.forEach(renderCategoryResourceCard);
 }
 

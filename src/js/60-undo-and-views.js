@@ -410,15 +410,15 @@ function renderCategoryView(){
 function renderFavoritesView(){
   renderCategoryBackButton();
   renderPublicResourceTitle("Favorites");
-  renderCategoryPrintInstruction();
   const resources = getFavoriteResources().slice().sort(compareResourcesByName);
   if(!resources.length){
     const empty = document.createElement("p");
     empty.className = "favorites-empty";
-    empty.textContent = "No favorite resources.";
+    empty.textContent = "No favorite resources. Click the outline star next to a resource to add it to Favorites.";
     appView.appendChild(empty);
     return;
   }
+  renderCategoryPrintInstruction();
   resources.forEach(renderCategoryResourceCard);
 }
 
