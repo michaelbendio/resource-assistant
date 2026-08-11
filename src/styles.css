@@ -486,6 +486,20 @@ textarea.information-editor { min-height:320px; resize:vertical; }
   flex:0 0 auto;
 }
 .admin-mode-bar .button { flex:0 0 auto; }
+.admin-mode-bar-right {
+  margin-left:auto;
+  display:flex;
+  gap:12px;
+  align-items:center;
+  flex:0 0 auto;
+}
+.admin-mode-bar-right .admin-sticky-editor-actions { margin-left:0; }
+.admin-build-info {
+  color:#666;
+  cursor:help;
+  flex:0 0 auto;
+  font-size:12px;
+}
 .admin-sticky-bar {
   position:sticky;
   top:0;

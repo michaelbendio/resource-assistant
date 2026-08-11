@@ -21,6 +21,12 @@ function getSharePointPublishingButtonHTML(available = isSharePointPublishingAva
     : "";
 }
 
+function getAdminBuildInfoHTML(){
+  const commit = getConfiguredCommitHash();
+  const tooltip = commit ? `Commit ${commit}` : "Commit hash unavailable";
+  return `<span class="admin-build-info" title="${escapeHTML(tooltip)}">Build ${escapeHTML(String(APP_BUILD))}</span>`;
+}
+
 function renderAdmin(){
   // Admin shell plus tab routing; detailed panels render in dedicated helpers below.
   const container = document.getElementById("adminView");
@@ -69,7 +75,10 @@ function renderAdmin(){
           For
         </button>
       </div>
-      <div class="admin-sticky-editor-actions" id="admin_editor_actions" hidden></div>
+      <div class="admin-mode-bar-right">
+        <div class="admin-sticky-editor-actions" id="admin_editor_actions" hidden></div>
+        ${getAdminBuildInfoHTML()}
+      </div>
     </div>
   `;
 

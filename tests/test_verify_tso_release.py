@@ -26,6 +26,7 @@ SPEC.loader.exec_module(verify_tso_release)
 def sample_release() -> dict[str, object]:
     return {
         "version": "2.3.4",
+        "build": 212,
         "date": "2026-08-06",
         "message": "Verify one application release",
         "appChanges": [
@@ -44,6 +45,7 @@ def sample_html(release: dict[str, object]) -> str:
         '<meta name="tso-storage-id" content="">'
         '<meta name="tso-office-name" content="">'
         '<meta name="tso-sharepoint-package-url" content="">'
+        '<meta name="tso-commit" content="">'
         "<title>&lt;New&gt; TSO Resources</title>"
         f'<script id="app-release-data" type="application/json">{json.dumps(payload)}</script>'
     )
@@ -88,6 +90,15 @@ class VerifyTsoReleaseTests(unittest.TestCase):
             path = Path(temp_dir) / "release.json"
             path.write_text(json.dumps(release), encoding="utf-8")
             with self.assertRaisesRegex(verify_tso_release.ReleaseError, "YYYY-MM-DD"):
+                verify_tso_release.load_release(path)
+
+    def test_load_release_rejects_invalid_build(self) -> None:
+        release = sample_release()
+        release["build"] = 0
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "release.json"
+            path.write_text(json.dumps(release), encoding="utf-8")
+            with self.assertRaisesRegex(verify_tso_release.ReleaseError, "positive integer"):
                 verify_tso_release.load_release(path)
 
     def test_verify_new_html_accepts_exact_starter_release(self) -> None:

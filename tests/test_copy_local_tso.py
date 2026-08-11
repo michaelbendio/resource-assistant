@@ -15,9 +15,10 @@ HELPER = ROOT / "copy-local-tso"
 
 
 def office_html(storage_id: str = "mesa", title: str = "Mesa TSO Resources") -> str:
-    payload = json.dumps({"version": "2.3.4", "changes": []})
+    payload = json.dumps({"version": "2.3.4", "build": 212, "changes": []})
     return (
         f'<meta name="tso-storage-id" content="{storage_id}">'
+        f'<meta name="tso-commit" content="{"a" * 7}">'
         f"<title>{title}</title>"
         f'<script id="app-release-data" type="application/json">{payload}</script>'
     )
@@ -47,6 +48,20 @@ class CopyLocalTsoTests(unittest.TestCase):
             self.assertEqual(source.read_bytes(), destination.read_bytes())
             self.assertIn("storage id 'mesa'", result.stdout)
             self.assertIn("version 2.3.4", result.stdout)
+
+    def test_refuses_an_office_file_without_build_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            source = temp / "mesa.html"
+            source.write_text(
+                office_html().replace('"build": 212, ', ""),
+                encoding="utf-8",
+            )
+
+            result = self.run_helper(str(source), str(temp / "destination"), check=False)
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("valid app build", result.stderr)
 
     def test_replaces_an_existing_office_copy(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

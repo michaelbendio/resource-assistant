@@ -36,6 +36,7 @@ class MakeLocalTsoTests(unittest.TestCase):
                 '<html><head><meta name="tso-storage-id" content="">'
                 '<meta name="tso-office-name" content="">'
                 '<meta name="tso-sharepoint-package-url" content="">'
+                '<meta name="tso-commit" content="">'
                 '<title>&lt;New&gt; TSO Resources</title></head><body></body></html>',
                 encoding="utf-8",
             )
@@ -56,6 +57,14 @@ class MakeLocalTsoTests(unittest.TestCase):
                     self.assertIn(f'<meta name="tso-office-name" content="{office_name}">', document)
                     self.assertIn(f"{office}-resource-package.zip", document)
                     self.assertIn("churchofjesuschrist.sharepoint.com", document)
+                    commit = subprocess.run(
+                        ["git", "rev-parse", "--short=7", "HEAD"],
+                        cwd=ROOT,
+                        check=True,
+                        capture_output=True,
+                        text=True,
+                    ).stdout.strip()
+                    self.assertIn(f'<meta name="tso-commit" content="{commit}">', document)
                     self.assertIn(f"<title>{title}</title>", document)
 
     def test_supports_a_custom_display_name_and_output_filename(self) -> None:
@@ -67,6 +76,7 @@ class MakeLocalTsoTests(unittest.TestCase):
                 '<meta name="tso-storage-id" content="">'
                 '<meta name="tso-office-name" content="">'
                 '<meta name="tso-sharepoint-package-url" content="">'
+                '<meta name="tso-commit" content="">'
                 '<title>&lt;New&gt; TSO Resources</title>',
                 encoding="utf-8",
             )
@@ -92,6 +102,7 @@ class MakeLocalTsoTests(unittest.TestCase):
                 '<meta name="tso-storage-id" content="">'
                 '<meta name="tso-office-name" content="">'
                 '<meta name="tso-sharepoint-package-url" content="">'
+                '<meta name="tso-commit" content="">'
                 '<title>Template</title>'
             )
             source.write_text(original, encoding="utf-8")

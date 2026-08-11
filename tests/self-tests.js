@@ -307,6 +307,15 @@ async function runSelfTests(){
         ["Categories", "Resources", "For"].forEach(label => {
           if(!modeLabels.includes(label)) throw new Error(`${label} was not in the mode bar`);
         });
+        const buildInfo = modeBar.querySelector(".admin-build-info");
+        if(!buildInfo) throw new Error("Admin build number was missing");
+        if(buildInfo.textContent.trim() !== `Build ${APP_BUILD}`){
+          throw new Error(`Admin build number was incorrect: ${buildInfo.textContent}`);
+        }
+        if(!buildInfo.title.startsWith("Commit ")) throw new Error("Admin build tooltip was missing");
+        if(/\b[0-9a-f]{7}\b/i.test(buildInfo.textContent)){
+          throw new Error("Commit hash should not be visible in Admin mode");
+        }
       }finally{
         data = previousData;
         view = previousView;

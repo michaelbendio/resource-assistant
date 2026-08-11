@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 import unittest
@@ -44,7 +45,10 @@ class BuildTests(unittest.TestCase):
 
     def test_production_omits_self_tests(self) -> None:
         production = (ROOT / "new.html").read_text(encoding="utf-8")
+        release = json.loads((ROOT / "src/release.json").read_text(encoding="utf-8"))
         self.assertIn('id="app-release-data"', production)
+        self.assertIn(f'"build": {release["build"]}', production)
+        self.assertIn('<meta name="tso-commit" content="">', production)
         self.assertIn('"changes": [', production)
         self.assertNotIn("function runSelfTests", production)
         self.assertNotIn("PACKAGE_MIGRATION_FIXTURES", production)

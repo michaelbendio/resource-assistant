@@ -53,6 +53,23 @@ def replace_once(pattern: str, replacement: str, text: str, description: str) ->
     return updated
 
 
+def current_commit() -> str:
+    root = Path(__file__).resolve().parent
+    try:
+        commit = subprocess.run(
+            ["git", "rev-parse", "--short=7", "HEAD"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+    except subprocess.CalledProcessError as error:
+        raise SystemExit("Could not determine the Git commit for this office build.") from error
+    if not re.fullmatch(r"[0-9a-f]{7}", commit):
+        raise SystemExit("Git returned an invalid commit hash for this office build.")
+    return commit
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Create a local TSO HTML file from new.html.")
     parser.add_argument("name", help="Local TSO name, such as albuquerque or salt-lake")
@@ -94,6 +111,13 @@ def main() -> int:
         html,
         "tso-sharepoint-package-url meta tag",
     )
+    commit = current_commit()
+    html = replace_once(
+        r'<meta\s+name=["\']tso-commit["\']\s+content=["\'][^"\']*["\']\s*>',
+        f'<meta name="tso-commit" content="{commit}">',
+        html,
+        "tso-commit meta tag",
+    )
     html = replace_once(
         r"<title>.*?</title>",
         f"<title>{title_name} TSO Resources</title>",
@@ -104,7 +128,7 @@ def main() -> int:
     destination_path.write_text(html, encoding="utf-8")
     print(
         f"Wrote {destination_path} with storage id {storage_id!r}, "
-        f"title {title_name!r}, and embedded SharePoint package URL."
+        f"title {title_name!r}, build commit {commit}, and embedded SharePoint package URL."
     )
     return 0
 

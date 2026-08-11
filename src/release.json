@@ -1,7 +1,8 @@
 {
   "version": "2.3.2",
+  "build": 145,
   "date": "2026-08-10",
-  "message": "Clarify SharePoint publishing setup",
+  "message": "Show build number in Admin mode",
   "appChanges": [
     {
       "date": "2026-08-10",

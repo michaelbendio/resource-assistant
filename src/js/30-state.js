@@ -10,6 +10,9 @@
 const seed = JSON.parse(document.getElementById("seed-data").textContent);
 const APP_RELEASE = JSON.parse(document.getElementById("app-release-data").textContent);
 const APP_VERSION = String(APP_RELEASE.version || "Unknown");
+const APP_BUILD = Number.isInteger(APP_RELEASE.build) && APP_RELEASE.build > 0
+  ? APP_RELEASE.build
+  : "Unknown";
 const APP_CHANGE_LOG = Array.isArray(APP_RELEASE.changes) ? APP_RELEASE.changes : [];
 const URL_PARAMS = new URLSearchParams(location.search);
 const DEBUG = URL_PARAMS.has("debug");
@@ -40,6 +43,12 @@ function getConfiguredOfficeName(){
 function getConfiguredSharePointPackageUrl(){
   const meta = document.querySelector('meta[name="tso-sharepoint-package-url"]');
   return meta ? String(meta.getAttribute("content") || "").trim() : "";
+}
+
+function getConfiguredCommitHash(){
+  const meta = document.querySelector('meta[name="tso-commit"]');
+  const commit = meta ? String(meta.getAttribute("content") || "").trim() : "";
+  return /^[0-9a-f]{7}$/i.test(commit) ? commit.toLowerCase() : "";
 }
 
 function getStorageKeyPrefix(fileName = getCurrentHtmlFileName()){

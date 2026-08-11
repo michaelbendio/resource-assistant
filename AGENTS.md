@@ -72,14 +72,16 @@ another destination, but it does not replace the required Stage 3 publication.
 
 ## Commit and version workflow
 
-Before each commit, ask the user to approve the next patch version or provide a
-different version. If the user instructs you in advance not to bump the version,
-treat that as approval to keep the current version for that commit and do not ask
-again or flag the exception. Before committing:
+Before each commit, increment the positive integer `build` in `src/release.json`
+even when the semantic version stays the same. Ask the user to approve the next
+patch version or provide a different version. If the user instructs you in
+advance not to bump the version, treat that as approval to keep the current
+version for that commit and do not ask again or flag the exception. Before
+committing:
 
-1. Update `src/release.json` with the proposed version, current date, and exact
-   planned commit subject. Add an `appChanges` row only for meaningful
-   user-facing functionality that merits highlighting to users. Do not add rows
+1. Update `src/release.json` with the proposed version, incremented build,
+   current date, and exact planned commit subject. Add an `appChanges` row only
+   for meaningful user-facing functionality that merits highlighting to users. Do not add rows
    for minor hint or copy cleanup, documentation, tests, deployment or
    publication workflow, internal refactoring, or release-metadata corrections.
    When a qualifying functional change keeps the current version, give the new

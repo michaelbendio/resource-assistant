@@ -88,6 +88,35 @@ def office_file_configuration(path: Path) -> tuple[str, str]:
     return office_name, sharepoint_url
 
 
+def office_file_provenance(path: Path) -> tuple[int, str]:
+    if not path.is_file():
+        raise CopyError(f"Office file was not found: {path}")
+    document = path.read_text(encoding="utf-8")
+    release_match = re.search(
+        r'<script\s+id="app-release-data"\s+type="application/json">\s*(.*?)\s*</script>',
+        document,
+        flags=re.DOTALL,
+    )
+    if not release_match:
+        raise CopyError(f"Office file is missing app-release-data: {path}")
+    try:
+        release = json.loads(release_match.group(1))
+    except json.JSONDecodeError as error:
+        raise CopyError(f"Office file has invalid app-release-data: {path}") from error
+    build = release.get("build") if isinstance(release, dict) else None
+    if not isinstance(build, int) or isinstance(build, bool) or build < 1:
+        raise CopyError(f"Office file does not have a valid app build: {path}")
+    commit_match = re.search(
+        r'<meta\s+name=["\']tso-commit["\']\s+content=["\']([^"\']*)["\']\s*>',
+        document,
+        flags=re.IGNORECASE,
+    )
+    commit = commit_match.group(1).strip().lower() if commit_match else ""
+    if not re.fullmatch(r"[0-9a-f]{7}", commit):
+        raise CopyError(f"Office file does not have a valid commit hash: {path}")
+    return build, commit
+
+
 def copy_office_file(source: Path, destination_dir: Path) -> Path:
     if not source.is_file():
         raise CopyError(f"Office file was not found: {source}")
@@ -95,6 +124,7 @@ def copy_office_file(source: Path, destination_dir: Path) -> Path:
         raise CopyError(f"Office file must use the .html extension: {source}")
 
     office_file_identity(source)
+    office_file_provenance(source)
     destination_dir.mkdir(parents=True, exist_ok=True)
     destination = destination_dir / source.name
     if source.resolve() == destination.resolve():
@@ -117,6 +147,7 @@ def copy_office_file(source: Path, destination_dir: Path) -> Path:
     if source.read_bytes() != destination.read_bytes():
         raise CopyError(f"Copied office file differs from its source: {destination}")
     office_file_identity(destination)
+    office_file_provenance(destination)
     return destination
 
 

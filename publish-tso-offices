@@ -7,6 +7,8 @@ import argparse
 import importlib.machinery
 import importlib.util
 import json
+import re
+import subprocess
 import sys
 from pathlib import Path
 from urllib.parse import quote, urlencode
@@ -49,20 +51,40 @@ def load_copy_helper():
     return module
 
 
-def release_version() -> str:
+def release_identity() -> tuple[str, int]:
     try:
         release = json.loads((ROOT / "src/release.json").read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         raise PublicationError(f"Could not read src/release.json: {error}") from error
     version = str(release.get("version", "")).strip() if isinstance(release, dict) else ""
+    build = release.get("build") if isinstance(release, dict) else None
     if not version:
         raise PublicationError("src/release.json does not contain an app version.")
-    return version
+    if not isinstance(build, int) or isinstance(build, bool) or build < 1:
+        raise PublicationError("src/release.json does not contain a valid app build.")
+    return version, build
+
+
+def current_commit() -> str:
+    try:
+        commit = subprocess.run(
+            ["git", "rev-parse", "--short=7", "HEAD"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip().lower()
+    except subprocess.CalledProcessError as error:
+        raise PublicationError("Could not determine the release commit.") from error
+    if not re.fullmatch(r"[0-9a-f]{7}", commit):
+        raise PublicationError("Git returned an invalid release commit hash.")
+    return commit
 
 
 def publish_office_files(destination: Path) -> list[Path]:
     copy_helper = load_copy_helper()
-    version = release_version()
+    version, build = release_identity()
+    commit = current_commit()
 
     if not destination.parent.is_dir():
         raise PublicationError(
@@ -84,6 +106,15 @@ def publish_office_files(destination: Path) -> list[Path]:
         if office_version != version:
             raise PublicationError(
                 f"{source} has app version {office_version}; expected {version}."
+            )
+        try:
+            office_build, office_commit = copy_helper.office_file_provenance(source)
+        except copy_helper.CopyError as error:
+            raise PublicationError(str(error)) from error
+        if (office_build, office_commit) != (build, commit):
+            raise PublicationError(
+                f"{source} has build provenance {(office_build, office_commit)!r}; "
+                f"expected {(build, commit)!r}."
             )
         try:
             office_name, sharepoint_url = copy_helper.office_file_configuration(source)
@@ -134,7 +165,8 @@ def main() -> int:
         return 1
 
     print(
-        f"OFFICE PUBLICATION COMPLETE: version {release_version()}; "
+        f"OFFICE PUBLICATION COMPLETE: version {release_identity()[0]}, "
+        f"build {release_identity()[1]}, commit {current_commit()}; "
         f"{len(published)} iCloud office files verified."
     )
     return 0

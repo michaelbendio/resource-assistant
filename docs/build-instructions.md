@@ -137,8 +137,9 @@ py -3 make-local-tso provo
 Make future application changes in `src/`, `tests/`, or `vendor/`. Do not edit the
 generated `new.html` directly.
 
-Every commit is also an app release. Before committing, update `src/release.json`
-with the proposed version, current date, and the exact commit subject, then run
+Every commit is also an app release. Before committing, increment the positive
+integer `build` in `src/release.json` and update the proposed version, current
+date, and exact commit subject, then run
 `verify-tso-release`. Add a visible App Changes entry only for meaningful
 user-facing functionality that merits highlighting; omit minor hint or copy
 cleanup, documentation, tests, deployment/publication workflow, internal

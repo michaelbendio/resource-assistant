@@ -61,6 +61,7 @@ def load_release() -> dict[str, object]:
         raise SystemExit("src/release.json must contain one JSON object")
     normalized = {
         "version": str(release.get("version", "")).strip(),
+        "build": release.get("build"),
         "date": str(release.get("date", "")).strip(),
         "message": str(release.get("message", "")).strip(),
         "appChanges": [
@@ -75,6 +76,8 @@ def load_release() -> dict[str, object]:
     }
     if not re.fullmatch(r"\d+\.\d+\.\d+", normalized["version"]):
         raise SystemExit("src/release.json version must use major.minor.patch format")
+    if not isinstance(normalized["build"], int) or isinstance(normalized["build"], bool) or normalized["build"] < 1:
+        raise SystemExit("src/release.json build must be a positive integer")
     try:
         datetime.strptime(normalized["date"], "%Y-%m-%d")
     except ValueError as error:
@@ -111,6 +114,7 @@ def build_app_release_data() -> str:
     release = load_release()
     payload = {
         "version": release["version"],
+        "build": release["build"],
         "changes": latest_app_changes(release),
     }
     return json.dumps(payload, indent=2).replace("</", "<\\/")

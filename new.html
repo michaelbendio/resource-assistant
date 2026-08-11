@@ -6,6 +6,7 @@
 <meta name="tso-storage-id" content="">
 <meta name="tso-office-name" content="">
 <meta name="tso-sharepoint-package-url" content="">
+<meta name="tso-commit" content="">
 <title>&lt;New&gt; TSO Resources</title>
 
 <!-- ===== APP CSS START ===== -->
@@ -498,6 +499,20 @@ textarea.information-editor { min-height:320px; resize:vertical; }
   flex:0 0 auto;
 }
 .admin-mode-bar .button { flex:0 0 auto; }
+.admin-mode-bar-right {
+  margin-left:auto;
+  display:flex;
+  gap:12px;
+  align-items:center;
+  flex:0 0 auto;
+}
+.admin-mode-bar-right .admin-sticky-editor-actions { margin-left:0; }
+.admin-build-info {
+  color:#666;
+  cursor:help;
+  flex:0 0 auto;
+  font-size:12px;
+}
 .admin-sticky-bar {
   position:sticky;
   top:0;
@@ -1111,6 +1126,7 @@ textarea.information-editor { min-height:320px; resize:vertical; }
 <script id="app-release-data" type="application/json">
 {
   "version": "2.3.2",
+  "build": 145,
   "changes": [
     {
       "date": "2026-08-10",
@@ -2447,6 +2463,9 @@ function validateImportData(imported, options = {}){
 const seed = JSON.parse(document.getElementById("seed-data").textContent);
 const APP_RELEASE = JSON.parse(document.getElementById("app-release-data").textContent);
 const APP_VERSION = String(APP_RELEASE.version || "Unknown");
+const APP_BUILD = Number.isInteger(APP_RELEASE.build) && APP_RELEASE.build > 0
+  ? APP_RELEASE.build
+  : "Unknown";
 const APP_CHANGE_LOG = Array.isArray(APP_RELEASE.changes) ? APP_RELEASE.changes : [];
 const URL_PARAMS = new URLSearchParams(location.search);
 const DEBUG = URL_PARAMS.has("debug");
@@ -2477,6 +2496,12 @@ function getConfiguredOfficeName(){
 function getConfiguredSharePointPackageUrl(){
   const meta = document.querySelector('meta[name="tso-sharepoint-package-url"]');
   return meta ? String(meta.getAttribute("content") || "").trim() : "";
+}
+
+function getConfiguredCommitHash(){
+  const meta = document.querySelector('meta[name="tso-commit"]');
+  const commit = meta ? String(meta.getAttribute("content") || "").trim() : "";
+  return /^[0-9a-f]{7}$/i.test(commit) ? commit.toLowerCase() : "";
 }
 
 function getStorageKeyPrefix(fileName = getCurrentHtmlFileName()){
@@ -4838,6 +4863,12 @@ function getSharePointPublishingButtonHTML(available = isSharePointPublishingAva
     : "";
 }
 
+function getAdminBuildInfoHTML(){
+  const commit = getConfiguredCommitHash();
+  const tooltip = commit ? `Commit ${commit}` : "Commit hash unavailable";
+  return `<span class="admin-build-info" title="${escapeHTML(tooltip)}">Build ${escapeHTML(String(APP_BUILD))}</span>`;
+}
+
 function renderAdmin(){
   // Admin shell plus tab routing; detailed panels render in dedicated helpers below.
   const container = document.getElementById("adminView");
@@ -4886,7 +4917,10 @@ function renderAdmin(){
           For
         </button>
       </div>
-      <div class="admin-sticky-editor-actions" id="admin_editor_actions" hidden></div>
+      <div class="admin-mode-bar-right">
+        <div class="admin-sticky-editor-actions" id="admin_editor_actions" hidden></div>
+        ${getAdminBuildInfoHTML()}
+      </div>
     </div>
   `;
 
