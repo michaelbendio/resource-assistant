@@ -2506,7 +2506,17 @@ async function runSelfTests(){
         if(helpSectionLabels[trainingIndex + 2] !== "Office Setup"){
           throw new Error("Office Setup did not immediately follow Publish to SharePoint");
         }
+        if(helpSectionLabels[trainingIndex + 3] !== "Recovery Points"){
+          throw new Error("Recovery Points did not immediately follow Office Setup");
+        }
         const helpText = (modal.textContent || "").replace(/\s+/g, " ");
+        [
+          "automatic snapshots made before resource package merges",
+          "The five newest are kept on this computer",
+          "Restoring replaces current edits with the selected snapshot but keeps the recovery history"
+        ].forEach(expected => {
+          if(!helpText.includes(expected)) throw new Error(`Recovery Points omitted '${expected}'`);
+        });
         if(!helpText.includes("Complete this setup step only if the blue bar says <New> TSO Resources")){
           throw new Error("conditional untitled-file setup guidance missing");
         }

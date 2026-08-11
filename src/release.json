@@ -1,8 +1,8 @@
 {
   "version": "2.3.2",
-  "build": 145,
+  "build": 146,
   "date": "2026-08-10",
-  "message": "Show build number in Admin mode",
+  "message": "Explain recovery points in Admin Help",
   "appChanges": [
     {
       "date": "2026-08-10",

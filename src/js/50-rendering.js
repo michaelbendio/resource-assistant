@@ -516,6 +516,14 @@ function showAdminHelp(options = {}){
         </details>
 
         <details>
+          <summary>Recovery Points</summary>
+          <div class="admin-help-section-body">
+            <p><strong>Recovery points</strong> are automatic snapshots made before resource package merges, including guided SharePoint merges. The five newest are kept on this computer and labeled with the save time, package version, and source filename.</p>
+            <p>Use <strong>Restore</strong> only after checking the label. Restoring replaces current edits with the selected snapshot but keeps the recovery history.</p>
+          </div>
+        </details>
+
+        <details>
           <summary>Before You Edit</summary>
           <div class="admin-help-section-body">
             <p>Before editing, make sure your resource data is current. If you have received a newer resource package, merge it before making changes.</p>
@@ -616,8 +624,6 @@ function showAdminHelp(options = {}){
           <div class="admin-help-section-body">
             <p>Delete actions tag resources, categories, Types, and For groups for deletion without removing them. Tagged items remain active and are labeled <strong>tagged for deletion</strong>.</p>
             <p>After an admin merges a package containing deletion tags, the review opens immediately. It shows affected resources and can print a working list. The admin chooses which deletions to approve and can continue editing the merged data.</p>
-            <p><strong>Recovery points</strong> retains the five newest pre-merge snapshots, including guided SharePoint merges. Each is labeled with save time, package version, and source filename.</p>
-            <p>Select <strong>Restore</strong> only after checking the label. Restoring discards current edits made after that point but retains the recovery history.</p>
           </div>
         </details>
 
