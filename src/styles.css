@@ -896,6 +896,8 @@ textarea.information-editor { min-height:320px; resize:vertical; }
     inset: auto;
     background: transparent;
     display: block;
+    padding: 0;
+    margin: 0;
   }
 
   #printContentWrapper {
@@ -913,6 +915,10 @@ textarea.information-editor { min-height:320px; resize:vertical; }
   }
 
   #printContentWrapper button {
+    display: none !important;
+  }
+
+  #printProgress {
     display: none !important;
   }
 

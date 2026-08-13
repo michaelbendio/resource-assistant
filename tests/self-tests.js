@@ -3780,6 +3780,29 @@ async function runSelfTests(){
   });
 
   tests.push({
+    name: "PRINT PAGE STARTS WITHOUT PREVIEW SPACING",
+    fn: () => {
+      let printModalRule = null;
+      let printProgressRule = null;
+      Array.from(document.styleSheets).forEach(sheet => {
+        Array.from(sheet.cssRules || []).forEach(rule => {
+          if(rule.type !== CSSRule.MEDIA_RULE || !/\bprint\b/i.test(rule.media.mediaText)) return;
+          Array.from(rule.cssRules || []).forEach(nestedRule => {
+            if(nestedRule.selectorText === "#printModal") printModalRule = nestedRule.style;
+            if(nestedRule.selectorText === "#printProgress") printProgressRule = nestedRule.style;
+          });
+        });
+      });
+      if(!printModalRule || Number.parseFloat(printModalRule.padding) !== 0 || Number.parseFloat(printModalRule.margin) !== 0){
+        throw new Error("print modal retained screen spacing before the first resource");
+      }
+      if(!printProgressRule || printProgressRule.display !== "none" || printProgressRule.getPropertyPriority("display") !== "important"){
+        throw new Error("empty print progress row can consume the top of page one");
+      }
+    }
+  });
+
+  tests.push({
     name: "PRINT PREVIEW HAS NO PROGRESS MESSAGE",
     fn: () => {
       const previousQueue = PrintWorkflow.queue;

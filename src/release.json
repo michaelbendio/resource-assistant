@@ -1,9 +1,14 @@
 {
-  "version": "2.3.2",
-  "build": 146,
-  "date": "2026-08-10",
-  "message": "Explain recovery points in Admin Help",
+  "version": "2.3.3",
+  "build": 147,
+  "date": "2026-08-13",
+  "message": "Prevent blank first print page",
   "appChanges": [
+    {
+      "date": "2026-08-13",
+      "version": "2.3.3",
+      "message": "Prevent a blank first page when printing resource handouts."
+    },
     {
       "date": "2026-08-10",
       "version": "2.3.2",
