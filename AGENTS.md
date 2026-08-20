@@ -46,12 +46,13 @@ The JavaScript localStorage keys are derived at runtime from the
 
 ## Stage 3: Publish active office files to iCloud
 
-After an approved release commit has been pushed and verified, generate both
+After an approved release commit has been pushed and verified, generate all three
 active office files:
 
 ```sh
 python3 make-local-tso provo
 python3 make-local-tso albuquerque
+python3 make-local-tso mesa
 ```
 
 Then run the required Stage 3 publication:
@@ -60,12 +61,13 @@ Then run the required Stage 3 publication:
 python3 publish-tso-offices
 ```
 
-The publication helper copies exactly `provo.html` and `albuquerque.html` to
+The publication helper copies exactly `provo.html`, `albuquerque.html`, and
+`mesa.html` to
 `iCloud Drive/Documents/TSO`, verifies their office storage IDs, titles, app
 versions, and copied bytes, and leaves `new.html` local. If iCloud Drive
 Documents is unavailable, stop with an error; do not substitute another
 destination. Do not report the active-office publication complete until the
-command reports `OFFICE PUBLICATION COMPLETE` and confirms two files.
+command reports `OFFICE PUBLICATION COMPLETE` and confirms three files.
 
 `copy-local-tso` remains available for an explicitly requested one-off copy to
 another destination, but it does not replace the required Stage 3 publication.
@@ -116,7 +118,7 @@ python3 verify-tso-release --require-pushed
 The pushed-state check requires a clean worktree, a pushed upstream commit, and
 a commit subject exactly matching `src/release.json`. Application verification
 remains office-neutral, but the complete active-office release workflow also
-requires generating Provo and Albuquerque and successfully running Stage 3 as
+requires generating Provo, Albuquerque, and Mesa and successfully running Stage 3 as
 described above.
 
 ## Resource package migrations

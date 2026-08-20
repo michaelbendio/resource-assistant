@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Publish the active Provo and Albuquerque HTML files to iCloud Drive."""
+"""Publish the active Provo, Albuquerque, and Mesa HTML files to iCloud Drive."""
 
 from __future__ import annotations
 
@@ -23,6 +23,7 @@ DEFAULT_ICLOUD_TSO_DIR = ICLOUD_DOCUMENTS_DIR / "TSO"
 ACTIVE_OFFICES = {
     "provo.html": ("provo", "Provo TSO Resources"),
     "albuquerque.html": ("albuquerque", "Albuquerque TSO Resources"),
+    "mesa.html": ("mesa", "Mesa TSO Resources"),
 }
 
 

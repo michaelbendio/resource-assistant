@@ -40,7 +40,7 @@ def office_html(storage_id: str, title: str, version: str = "2.3.1", build: int 
 
 
 class PublishTsoOfficesTests(unittest.TestCase):
-    def test_publishes_and_verifies_both_active_office_files(self) -> None:
+    def test_publishes_and_verifies_all_active_office_files(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp = Path(temp_dir)
             root = temp / "repo"
@@ -56,6 +56,9 @@ class PublishTsoOfficesTests(unittest.TestCase):
             (root / "albuquerque.html").write_text(
                 office_html("albuquerque", "Albuquerque TSO Resources"), encoding="utf-8"
             )
+            (root / "mesa.html").write_text(
+                office_html("mesa", "Mesa TSO Resources"), encoding="utf-8"
+            )
 
             with (
                 patch.object(publish_tso_offices, "ROOT", root),
@@ -65,7 +68,7 @@ class PublishTsoOfficesTests(unittest.TestCase):
 
             self.assertEqual(
                 [path.name for path in published],
-                ["provo.html", "albuquerque.html"],
+                ["provo.html", "albuquerque.html", "mesa.html"],
             )
             for filename in publish_tso_offices.ACTIVE_OFFICES:
                 self.assertEqual(
@@ -98,6 +101,9 @@ class PublishTsoOfficesTests(unittest.TestCase):
             (root / "albuquerque.html").write_text(
                 office_html("albuquerque", "Albuquerque TSO Resources"), encoding="utf-8"
             )
+            (root / "mesa.html").write_text(
+                office_html("mesa", "Mesa TSO Resources"), encoding="utf-8"
+            )
 
             with (
                 patch.object(publish_tso_offices, "ROOT", root),
@@ -124,11 +130,40 @@ class PublishTsoOfficesTests(unittest.TestCase):
             (root / "albuquerque.html").write_text(
                 office_html("albuquerque", "Albuquerque TSO Resources"), encoding="utf-8"
             )
+            (root / "mesa.html").write_text(
+                office_html("mesa", "Mesa TSO Resources"), encoding="utf-8"
+            )
 
             with (
                 patch.object(publish_tso_offices, "ROOT", root),
                 patch.object(publish_tso_offices, "current_commit", return_value=TEST_COMMIT),
                 self.assertRaisesRegex(publish_tso_offices.PublicationError, "build provenance"),
+            ):
+                publish_tso_offices.publish_office_files(destination)
+
+            self.assertFalse(destination.exists())
+
+    def test_preflight_requires_mesa_before_copying(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            root = temp / "repo"
+            destination = temp / "iCloud Documents" / "TSO"
+            (root / "src").mkdir(parents=True)
+            destination.parent.mkdir()
+            (root / "src/release.json").write_text(
+                json.dumps({"version": "2.3.1", "build": 211}), encoding="utf-8"
+            )
+            (root / "provo.html").write_text(
+                office_html("provo", "Provo TSO Resources"), encoding="utf-8"
+            )
+            (root / "albuquerque.html").write_text(
+                office_html("albuquerque", "Albuquerque TSO Resources"), encoding="utf-8"
+            )
+
+            with (
+                patch.object(publish_tso_offices, "ROOT", root),
+                patch.object(publish_tso_offices, "current_commit", return_value=TEST_COMMIT),
+                self.assertRaisesRegex(publish_tso_offices.PublicationError, "mesa.html"),
             ):
                 publish_tso_offices.publish_office_files(destination)
 

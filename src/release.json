@@ -1,8 +1,8 @@
 {
   "version": "2.3.3",
-  "build": 148,
+  "build": 149,
   "date": "2026-08-20",
-  "message": "Preserve category Types during package merges",
+  "message": "Publish Mesa with active office files",
   "appChanges": [
     {
       "date": "2026-08-20",
