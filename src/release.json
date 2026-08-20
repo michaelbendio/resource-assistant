@@ -1,9 +1,14 @@
 {
   "version": "2.3.3",
-  "build": 147,
-  "date": "2026-08-13",
-  "message": "Prevent blank first print page",
+  "build": 148,
+  "date": "2026-08-20",
+  "message": "Preserve category Types during package merges",
   "appChanges": [
+    {
+      "date": "2026-08-20",
+      "version": "2.3.3",
+      "message": "Preserve category Types when merging resource packages"
+    },
     {
       "date": "2026-08-13",
       "version": "2.3.3",

@@ -554,6 +554,36 @@ function mergeItemsById(localItems, incomingItems, options = {}){
   return { merged, added, updated, addedIds, updatedIds, addedNames, updatedNames };
 }
 
+function mergeCategoryTypesAdditively(categoryMerge, localCategories, incomingCategories){
+  const localById = new Map((Array.isArray(localCategories) ? localCategories : [])
+    .map(category => [String(category && category.id || ""), category])
+    .filter(([id]) => id));
+  const incomingById = new Map((Array.isArray(incomingCategories) ? incomingCategories : [])
+    .map(category => [String(category && category.id || ""), category])
+    .filter(([id]) => id));
+  const updatedIds = new Set(categoryMerge.updatedIds || []);
+
+  (categoryMerge.merged || []).forEach(category => {
+    const id = String(category && category.id || "");
+    if(!id || !localById.has(id) || !incomingById.has(id)) return;
+    const localCategory = localById.get(id);
+    const incomingCategory = incomingById.get(id);
+    if(chooseMergeObject(localCategory, incomingCategory).item !== incomingCategory) return;
+    const localTypes = normalizeCategoryFilters(localCategory.filters);
+    const incomingTypes = normalizeCategoryFilters(incomingCategory.filters);
+    const mergedTypes = normalizeCategoryFilters([...localTypes, ...incomingTypes]);
+    category.filters = mergedTypes;
+
+    const localKeys = new Set(localTypes.map(deletionLabelKey));
+    const incomingAddedType = mergedTypes.some(type => !localKeys.has(deletionLabelKey(type)));
+    if(!incomingAddedType || updatedIds.has(id)) return;
+    updatedIds.add(id);
+    categoryMerge.updated += 1;
+    categoryMerge.updatedIds.push(id);
+    categoryMerge.updatedNames.push(String(category.name || category.title || category.label || id));
+  });
+}
+
 function mergeIncomingResourcePDFs(mergedResources, incomingResources){
   const incomingById = new Map((Array.isArray(incomingResources) ? incomingResources : [])
     .map(resource => [String(resource && resource.id || ""), resource])
@@ -664,6 +694,9 @@ function mergeResourcePackages(localData, incomingData){
   applyCategoryMigrations(local, categoryMigrations);
   applyCategoryMigrations(incoming, categoryMigrations);
   const categoryMerge = mergeItemsById(local.categories, incoming.categories, { kind:"categories" });
+  // Category Types are governed additions. Preserve both sides here; approved
+  // Type-deletion tombstones are applied to the finalized merged package below.
+  mergeCategoryTypesAdditively(categoryMerge, local.categories, incoming.categories);
   const resourceMerge = mergeItemsById(local.resources, incoming.resources, { kind:"resources" });
   const deletionRequests = mergeDeletionRecords(local.deletionRequests, incoming.deletionRequests, "requestedAt");
   const deletions = mergeDeletionRecords(local.deletions, incoming.deletions, "deletedAt");

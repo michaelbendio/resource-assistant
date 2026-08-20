@@ -1146,6 +1146,50 @@ async function runSelfTests(){
   });
 
   tests.push({
+    name: "CATEGORY TYPES MERGE ADDITIVELY",
+    fn: () => {
+      const local = {
+        packageVersion:20,
+        categories:[{
+          id:"housing",
+          label:"Housing",
+          filters:["Shelter", "Rapid Rehousing"],
+          lastModified:"2026-08-20T12:00:00.000Z"
+        }],
+        forGroups:["Veterans"],
+        resources:[],
+        deletionRequests:[],
+        deletions:[]
+      };
+      const incoming = {
+        packageVersion:20,
+        categories:[{
+          id:"housing",
+          label:"Housing",
+          filters:["Shelter", "Bridge housing"],
+          lastModified:"2026-08-20T13:00:00.000Z"
+        }],
+        forGroups:["Young adults"],
+        resources:[],
+        deletionRequests:[],
+        deletions:[]
+      };
+      const { mergedData, summary } = mergeResourcePackages(local, incoming);
+      const housing = mergedData.categories.find(category => category.id === "housing");
+      const types = normalizeCategoryFilters(housing && housing.filters);
+      if(JSON.stringify(types) !== JSON.stringify(["Shelter", "Rapid Rehousing", "Bridge housing"])){
+        throw new Error(`category Types were not merged additively: ${JSON.stringify(types)}`);
+      }
+      if(JSON.stringify(mergedData.forGroups) !== JSON.stringify(["Veterans", "Young adults"])){
+        throw new Error(`For groups were not merged additively: ${JSON.stringify(mergedData.forGroups)}`);
+      }
+      if(!summary.categoryIdsUpdated.includes("housing")){
+        throw new Error("additive Type merge was missing from the category update summary");
+      }
+    }
+  });
+
+  tests.push({
     name: "OLDER PACKAGE DOES NOT REPLACE LATEST PACKAGE UPDATE INFO",
     fn: () => {
       const latestInfo = {
