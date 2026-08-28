@@ -210,6 +210,12 @@ function getResourcePackageFilename(){
 }
 
 function getResourcePackageZipFilename(){
+  const autoCurator = getAutoCuratorConfig();
+  if(autoCurator){
+    const locationStem = slugifyFileStem(autoCurator.locationName, "location");
+    const categoryStem = slugifyFileStem(autoCurator.categoryLabel, "category");
+    return `${locationStem}-${categoryStem}-resource-package.zip`;
+  }
   const baseName = getTsoName() || (isNewTemplateFile() ? "tso" : getTsoNameFromHtmlFileName(getCurrentHtmlFileName()));
   const stem = slugifyFileStem(baseName, "tso");
   return `${stem}-resource-package.zip`;

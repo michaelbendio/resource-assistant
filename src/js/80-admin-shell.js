@@ -35,11 +35,15 @@ function renderAdmin(){
   const hasChangeLog = getRecentChanges().length > 0;
   const recoveryPoints = getRecoveryPoints();
   const deletionReview = getOutstandingDeletionReview();
+  const autoCurator = getAutoCuratorConfig();
+  const packageButtonLabel = autoCurator
+    ? `Save ${autoCurator.categoryLabel} Resource Package`
+    : "Save Resource Package";
 
   container.innerHTML = `
     <div class="admin-sticky-bar">
       <div class="admin-sticky-package-actions">
-        <button class="button primary" onclick="exportPackage()">Save Resource Package</button>
+        <button class="button primary" onclick="exportPackage()">${escapeHTML(packageButtonLabel)}</button>
         ${deletionReview ? `<button class="button" onclick="showDeletionReview()">Review tagged deletions</button>` : ""}
         ${recoveryPoints.length ? `<button class="button" onclick="showRecoveryPoints()">Recovery points (${recoveryPoints.length})</button>` : ""}
         ${hasChangeLog ? `

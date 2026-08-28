@@ -1,0 +1,269 @@
+#!/usr/bin/env python3
+"""Build an AutoCurator location HTML from a Scout candidate package.
+
+Example:
+  python3 make-autocurator mesa-candidates.zip --category employment \
+    --seed auto-mesa-employment-resource-package.json --output autoMesa.html
+
+The candidate package establishes the research location and completed category.
+The seed contains AutoCurator's curated resources. The generated file is the
+regular TSO Resources app, uses storage separate from the office file, embeds
+only the selected category and its resources, and saves a category-only package.
+"""
+from __future__ import annotations
+
+import argparse
+import copy
+import hashlib
+import html as html_module
+import json
+import re
+import subprocess
+import sys
+import zipfile
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parent
+CANDIDATE_PACKAGE_MEMBER = "scout-candidates.json"
+
+
+def slugify(value: str) -> str:
+    parts = re.findall(r"[A-Za-z0-9]+", value.strip())
+    if not parts:
+        raise SystemExit("Location must contain at least one letter or number.")
+    return "-".join(part.lower() for part in parts)
+
+
+def replace_once(pattern: str, replacement: str, text: str, description: str) -> str:
+    updated, count = re.subn(
+        pattern,
+        lambda _match: replacement,
+        text,
+        count=1,
+        flags=re.IGNORECASE,
+    )
+    if count != 1:
+        raise SystemExit(f"Could not update {description}; expected exactly one match.")
+    return updated
+
+
+def current_commit() -> str:
+    try:
+        commit = subprocess.run(
+            ["git", "rev-parse", "--short=7", "HEAD"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+    except subprocess.CalledProcessError as error:
+        raise SystemExit("Could not determine the Git commit for this build.") from error
+    if not re.fullmatch(r"[0-9a-f]{7}", commit):
+        raise SystemExit("Git returned an invalid commit hash for this build.")
+    return commit
+
+
+def read_candidate_package(path: Path, category_id: str) -> tuple[dict, str, str]:
+    try:
+        with zipfile.ZipFile(path) as archive:
+            if CANDIDATE_PACKAGE_MEMBER not in archive.namelist():
+                raise SystemExit(
+                    f"Candidate package must contain {CANDIDATE_PACKAGE_MEMBER}."
+                )
+            try:
+                package = json.loads(archive.read(CANDIDATE_PACKAGE_MEMBER))
+            except json.JSONDecodeError as error:
+                raise SystemExit(f"Candidate package JSON is invalid: {error}") from error
+    except FileNotFoundError as error:
+        raise SystemExit(f"Candidate package not found: {path}") from error
+    except zipfile.BadZipFile as error:
+        raise SystemExit(f"Candidate package is not a valid ZIP file: {path}") from error
+    if not isinstance(package, dict):
+        raise SystemExit("Candidate package must contain one JSON object.")
+    if package.get("candidatePackageSchemaVersion") != 1:
+        raise SystemExit("Candidate package uses an unsupported schema version.")
+    location = package.get("location")
+    location_name = str(location.get("name", "")).strip() if isinstance(location, dict) else ""
+    if not location_name:
+        raise SystemExit("Candidate package has no research location name.")
+    manifest = package.get("categoryManifest")
+    if not isinstance(manifest, list):
+        raise SystemExit("Candidate package has no category manifest.")
+    category = next(
+        (item for item in manifest if str(item.get("id", "")) == category_id),
+        None,
+    )
+    if not category:
+        raise SystemExit(f"Candidate package does not contain category '{category_id}'.")
+    category_label = str(category.get("label", "")).strip() or category_id
+    if category.get("researchStatus") != "completed":
+        raise SystemExit(f"Scout research for '{category_label}' is not completed.")
+    if int(category.get("candidateCount") or 0) < 1:
+        raise SystemExit(f"Candidate package has no candidates for '{category_label}'.")
+    return package, location_name, hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def category_seed(
+    package: dict,
+    candidate_package: dict,
+    category_id: str,
+) -> tuple[dict, str]:
+    categories = package.get("categories")
+    resources = package.get("resources")
+    if not isinstance(categories, list) or not isinstance(resources, list):
+        raise SystemExit("Seed JSON must contain categories and resources arrays.")
+    category = next(
+        (item for item in categories if str(item.get("id", "")) == category_id),
+        None,
+    )
+    if not category:
+        raise SystemExit(f"Seed JSON does not contain category '{category_id}'.")
+    category_label = str(category.get("label", "")).strip()
+    if not category_label:
+        raise SystemExit(f"Category '{category_id}' has no label.")
+
+    selected_resources = []
+    for item in resources:
+        if category_id not in [str(value) for value in item.get("categories", [])]:
+            continue
+        resource = copy.deepcopy(item)
+        resource["categories"] = [category_id]
+        filters = resource.get("categoryFilters")
+        resource["categoryFilters"] = (
+            {category_id: filters[category_id]}
+            if isinstance(filters, dict) and category_id in filters
+            else {}
+        )
+        selected_resources.append(resource)
+    if not selected_resources:
+        raise SystemExit(f"Seed JSON has no resources for '{category_label}'.")
+
+    referenced_for_groups = {
+        str(label)
+        for resource in selected_resources
+        for label in resource.get("forGroups", [])
+    }
+    scoped = copy.deepcopy(package)
+    candidate_categories = candidate_package.get("categories")
+    if not isinstance(candidate_categories, list) or not candidate_categories:
+        raise SystemExit("Candidate package has no category definitions.")
+    scoped["categories"] = [
+        {
+            "id": str(item.get("id", "")),
+            "label": str(item.get("label", "")),
+            "active": bool(item.get("active", True)),
+            "filters": list(item.get("types", item.get("filters", []))),
+        }
+        for item in candidate_categories
+        if str(item.get("id", "")) and str(item.get("label", ""))
+    ]
+    if not any(item["id"] == category_id for item in scoped["categories"]):
+        raise SystemExit(f"Candidate package has no definition for '{category_label}'.")
+    scoped["resources"] = selected_resources
+    candidate_for_groups = candidate_package.get("forGroups")
+    scoped["forGroups"] = (
+        list(candidate_for_groups)
+        if isinstance(candidate_for_groups, list)
+        else [
+            label for label in package.get("forGroups", [])
+            if str(label) in referenced_for_groups
+        ]
+    )
+    scoped["categoryMigrations"] = []
+    scoped["changes"] = []
+    scoped["deletionRequests"] = []
+    scoped["deletions"] = []
+    scoped.pop("appChanges", None)
+    scoped.pop("lastLoadedPackageInfo", None)
+    return scoped, category_label
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Create an AutoCurator location HTML.")
+    parser.add_argument("candidates", help="Scout candidate package, such as mesa-candidates.zip")
+    parser.add_argument("--category", required=True, help="Category id, such as employment")
+    parser.add_argument("--seed", required=True, help="AutoCurator's curated resource JSON")
+    parser.add_argument("--output", "-o", help="Destination HTML file")
+    parser.add_argument("--source", "-s", help="Built template HTML; defaults to new.html")
+    args = parser.parse_args()
+
+    candidate_package, location_name, candidate_package_sha256 = read_candidate_package(
+        Path(args.candidates), args.category
+    )
+    location_slug = slugify(location_name)
+    seed_path = Path(args.seed)
+    try:
+        package = json.loads(seed_path.read_text(encoding="utf-8"))
+    except FileNotFoundError as error:
+        raise SystemExit(f"Seed JSON not found: {seed_path}") from error
+    except json.JSONDecodeError as error:
+        raise SystemExit(f"Seed JSON is invalid: {error}") from error
+    if not isinstance(package, dict):
+        raise SystemExit("Seed JSON must contain one object.")
+    scoped_seed, category_label = category_seed(package, candidate_package, args.category)
+    manifest_category = next(
+        item for item in candidate_package["categoryManifest"]
+        if str(item.get("id", "")) == args.category
+    )
+    manifest_label = str(manifest_category.get("label", "")).strip()
+    if manifest_label and manifest_label != category_label:
+        raise SystemExit(
+            f"Candidate package calls category '{args.category}' '{manifest_label}', "
+            f"but the curated seed calls it '{category_label}'."
+        )
+
+    source_path = Path(args.source) if args.source else ROOT / "new.html"
+    if args.source is None:
+        subprocess.run([sys.executable, str(ROOT / "build-tso-resources")], check=True)
+    if not source_path.exists():
+        raise SystemExit(f"Template not found: {source_path}")
+
+    default_output = f"auto{location_name.replace(' ', '')}.html"
+    destination_path = Path(args.output or default_output)
+    if source_path.resolve() == destination_path.resolve():
+        raise SystemExit("Refusing to overwrite the master template.")
+
+    document = source_path.read_text(encoding="utf-8")
+    meta_values = {
+        "tso-storage-id": f"autocurator-{location_slug}",
+        "tso-office-name": f"Auto{location_name.replace(' ', '')}",
+        "tso-sharepoint-package-url": "",
+        "tso-commit": current_commit(),
+        "autocurator-location-name": location_name,
+        "autocurator-category-id": args.category,
+        "autocurator-category-label": category_label,
+        "autocurator-candidate-package-sha256": candidate_package_sha256,
+    }
+    for name, value in meta_values.items():
+        document = replace_once(
+            rf'<meta\s+name=["\']{re.escape(name)}["\']\s+content=["\'][^"\']*["\']\s*>',
+            f'<meta name="{name}" content="{html_module.escape(value, quote=True)}">',
+            document,
+            f"{name} meta tag",
+        )
+    title = f"Auto{location_name.replace(' ', '')} TSO Resources"
+    document = replace_once(
+        r"<title>.*?</title>",
+        f"<title>{html_module.escape(title)}</title>",
+        document,
+        "page title",
+    )
+    seed_json = json.dumps(scoped_seed, ensure_ascii=False, indent=2).replace("</", "<\\/")
+    document = replace_once(
+        r'<script\s+id=["\']seed-data["\']\s+type=["\']application/json["\']>[\s\S]*?</script>',
+        f'<script id="seed-data" type="application/json">\n{seed_json}\n</script>',
+        document,
+        "seed data",
+    )
+    destination_path.write_text(document, encoding="utf-8")
+    print(
+        f"Wrote {destination_path} for AutoCurator {location_name}, "
+        f"category {category_label}, from {manifest_category['candidateCount']} Scout "
+        f"candidates, with {len(scoped_seed['resources'])} curated resources."
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

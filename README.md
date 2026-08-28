@@ -151,6 +151,15 @@ failure rules.
 
 Admin edits are saved in the browser first. They are not shared with anyone else until a new resource package is exported.
 
+## AutoCurator
+
+AutoCurator accepts a location candidate package saved by Resource Scout and
+creates a normal TSO Resources HTML file populated with curated resources. Its
+category package save is scoped to the category under review, so the result can
+be merged into the regular office HTML without including unrelated empty
+categories. See [`docs/autocurator.md`](docs/autocurator.md) for the first-cut
+Mesa Employment flow and package boundary.
+
 ## Convert a resource package between JSON and ZIP
 
 Use `convert-resource-package` to change only the package container. A JSON input

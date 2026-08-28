@@ -51,6 +51,23 @@ function getConfiguredCommitHash(){
   return /^[0-9a-f]{7}$/i.test(commit) ? commit.toLowerCase() : "";
 }
 
+function getMetaContent(name){
+  const meta = document.querySelector(`meta[name="${name}"]`);
+  return meta ? String(meta.getAttribute("content") || "").trim() : "";
+}
+
+function getAutoCuratorConfig(){
+  const locationName = getMetaContent("autocurator-location-name");
+  const categoryId = getMetaContent("autocurator-category-id");
+  const categoryLabel = getMetaContent("autocurator-category-label");
+  if(!locationName || !categoryId || !categoryLabel) return null;
+  return { locationName, categoryId, categoryLabel };
+}
+
+function isAutoCuratorMode(){
+  return Boolean(getAutoCuratorConfig());
+}
+
 function getStorageKeyPrefix(fileName = getCurrentHtmlFileName()){
   const configured = getConfiguredStorageId();
   if(configured) return configured;

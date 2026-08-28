@@ -93,6 +93,72 @@ async function runSelfTests(){
   });
 
   tests.push({
+    name: "AUTOCURATOR EXPORT IS CATEGORY ONLY",
+    fn: () => {
+      const packageData = buildAutoCuratorCategoryPackageData({
+        resourcePackageSchemaVersion:3,
+        packageVersion:7,
+        categories:[
+          { id:"employment", label:"Employment", active:true, filters:["Résumé assistance"] },
+          { id:"food", label:"Food", active:true, filters:["Pantry"] }
+        ],
+        categoryMigrations:[],
+        forGroups:["Veterans", "Families with children"],
+        resources:[
+          {
+            id:"employment-resource",
+            name:"Employment Help",
+            phone:"",
+            address:"",
+            website:"https://example.org/work",
+            hours:"",
+            description:"Employment help.",
+            informationText:"",
+            verifiedOn:null,
+            categories:["employment", "food"],
+            categoryFilters:{ employment:["Résumé assistance"], food:["Pantry"] },
+            forGroups:["Veterans"],
+            pdfs:[],
+            lastModified:"2026-08-28T12:00:00.000Z"
+          },
+          {
+            id:"food-resource",
+            name:"Food Help",
+            categories:["food"],
+            categoryFilters:{ food:["Pantry"] },
+            forGroups:["Families with children"]
+          }
+        ],
+        changes:[],
+        deletionRequests:[],
+        deletions:[]
+      }, {
+        locationName:"Mesa",
+        categoryId:"employment",
+        categoryLabel:"Employment"
+      });
+      if(packageData.categories.length !== 1 || packageData.categories[0].id !== "employment"){
+        throw new Error("category-only package should include only Employment");
+      }
+      if(packageData.resources.length !== 1 || packageData.resources[0].id !== "employment-resource"){
+        throw new Error("category-only package should include only Employment resources");
+      }
+      if(packageData.resources[0].categories.join(",") !== "employment"){
+        throw new Error("exported resources should be scoped to Employment");
+      }
+      if(Object.keys(packageData.resources[0].categoryFilters).join(",") !== "employment"){
+        throw new Error("unrelated category filters should not be exported");
+      }
+      if(packageData.forGroups.join(",") !== "Veterans"){
+        throw new Error("only referenced For values should be exported");
+      }
+      if(packageData.packageVersion !== 7){
+        throw new Error("category-only export should preserve the current package version");
+      }
+    }
+  });
+
+  tests.push({
     name: "STORAGE KEYS USE META ID THEN HTML FILENAME",
     fn: () => {
       const meta = document.querySelector('meta[name="tso-storage-id"]');

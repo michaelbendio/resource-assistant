@@ -1,9 +1,14 @@
 {
-  "version": "2.3.3",
-  "build": 149,
-  "date": "2026-08-20",
-  "message": "Publish Mesa with active office files",
+  "version": "2.3.4",
+  "build": 150,
+  "date": "2026-08-28",
+  "message": "Add AutoCurator category package workflow",
   "appChanges": [
+    {
+      "date": "2026-08-28",
+      "version": "2.3.4",
+      "message": "Create AutoCurator review files that save one category as a mergeable resource package"
+    },
     {
       "date": "2026-08-20",
       "version": "2.3.3",
