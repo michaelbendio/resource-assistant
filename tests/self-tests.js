@@ -9,6 +9,60 @@
 
 async function runSelfTests(){
   const tests = [];
+  const questionFixture = () => ({id:"q1", question:"Which office handles intake?", explanation:"The pages disagree.", status:"open", resolution:"", source:{kind:"test"}});
+  const decidedQuestion = (base, status, resolution, changedAt) => ({...structuredClone(base), status, resolution,
+    history:[...(base.history || []), {status, resolution, changedAt}]});
+  tests.push({name:"QUESTIONS SURVIVE NEWER LEGACY RESOURCE EDIT", fn:() => {
+    const q = decidedQuestion(questionFixture(), "resolved", "Use the local office.", "2026-09-05T01:00:00Z");
+    const local = {id:"r", phone:"old", openQuestions:[q], lastModified:"2026-09-05T01:00:00Z"};
+    const incoming = {id:"r", phone:"new", lastModified:"2026-09-06T01:00:00Z"};
+    const result = mergeItemsById([local], [incoming], {kind:"resources"});
+    if(result.merged[0].phone !== "new" || result.merged[0].openQuestions[0].resolution !== q.resolution || result.updated !== 1) throw Error("New contact edit erased a saved decision");
+    const reversed = mergeItemsById([incoming], [local], {kind:"resources"});
+    if(reversed.merged[0].phone !== "new" || reversed.merged[0].openQuestions[0].status !== "resolved" || reversed.updated !== 1) throw Error("Older questions were not preserved or counted");
+  }});
+  tests.push({name:"QUESTION DECISION ANCESTRY AND REOPENING", fn:() => {
+    const base = questionFixture();
+    const resolved = decidedQuestion(base, "resolved", "Use local office", "2026-09-05T01:00:00Z");
+    const reopened = decidedQuestion(resolved, "open", "New contradictory evidence", "2026-09-06T01:00:00Z");
+    for(const pair of [[base,resolved],[resolved,base]])
+      if(mergeResourceQuestions([pair[0]],[pair[1]])[0].status !== "resolved") throw Error("Baseline erased resolution");
+    for(const pair of [[resolved,reopened],[reopened,resolved]]){
+      const q = mergeResourceQuestions([pair[0]],[pair[1]])[0];
+      if(q.status !== "open" || q.resolutionConflict || q.history.length !== 2) throw Error("Reopened decision was lost");
+    }
+  }});
+  tests.push({name:"CONCURRENT QUESTION DECISIONS STAY VISIBLE UNTIL SETTLED", fn:() => {
+    const a = decidedQuestion(questionFixture(), "resolved", "Office A", "2026-09-05T01:00:00Z");
+    const b = decidedQuestion(questionFixture(), "resolved", "Office B", "2026-09-06T01:00:00Z");
+    const conflict = mergeResourceQuestions([a],[b])[0];
+    if(conflict.status !== "open" || !conflict.resolutionConflict || conflict.decisionAlternatives.length !== 2 || conflict.history.length !== 2) throw Error("Concurrent notes were silently settled");
+    const html = renderResourceQuestionsSection({openQuestions:[conflict]});
+    if(!html.includes("Saved decisions disagree") || !html.includes("Office A") || !html.includes("Office B")) throw Error("Competing notes hidden");
+    const record = {openQuestions:[conflict]};
+    applyResourceQuestions(record, {openQuestions:[{...conflict, status:"resolved", resolution:"Curator settled both notes"}]});
+    const settled = record.openQuestions[0];
+    if(settled.resolutionConflict || settled.history.length !== 3) throw Error("Curator could not settle conflict");
+    for(const old of [a,b,conflict]){
+      const again = mergeResourceQuestions([old],[settled])[0];
+      if(again.status !== "resolved" || again.resolutionConflict || again.resolution !== settled.resolution) throw Error("Old decision undid settlement");
+    }
+  }});
+  tests.push({name:"INVALID QUESTION DATA FAILS BEFORE PACKAGE REPLACEMENT", fn:() => {
+    const q = questionFixture();
+    for(const questions of [null, {}, [null], [{futureField:1}], [q,q], [{...q,status:"unknown"}], [{...q,history:[null]}], [{...q,status:"resolved"}], [{...q,resolutionConflict:true}], [{...q,id:[]}]] ){
+      const packageData = {resourcePackageSchemaVersion:RESOURCE_PACKAGE_SCHEMA_VERSION, categories:[], resources:[{id:"r",name:"Test",openQuestions:questions}], forGroups:[], deletionRequests:[], deletions:[]};
+      if(validateResourcePackageData(packageData).ok) throw Error("Invalid questions accepted: " + JSON.stringify(questions));
+    }
+    if(resourceQuestionErrors([{...q,futureField:{preserve:true}}]).length) throw Error("Valid unknown extension was rejected");
+  }});
+  tests.push({name:"QUESTION IDS CANNOT SILENTLY REFER TO DIFFERENT TEXT", fn:() => {
+    let failed = false;
+    try{ mergeResourceQuestions([questionFixture()], [{...questionFixture(),question:"Different question"}]); }catch(error){ failed = error.message.includes("different text"); }
+    if(!failed) throw Error("Question identity mismatch was hidden");
+  }});
+
+
 
   function withSelfTestHtmlFileName(fileName, callback){
     const previousGetCurrentHtmlFileName = getCurrentHtmlFileName;
@@ -3187,7 +3241,7 @@ async function runSelfTests(){
       if(JSON.stringify(processed.stages) !== JSON.stringify(expected)){
         throw new Error(`unexpected package pipeline ${JSON.stringify(processed.stages)}`);
       }
-      if(processed.fromVersion !== 2 || JSON.stringify(processed.appliedMigrations) !== JSON.stringify(["2->3"])){
+      if(processed.fromVersion !== 2 || JSON.stringify(processed.appliedMigrations) !== JSON.stringify(["2->3", "3->4"])){
         throw new Error("schema 2 migration was not explicit");
       }
     }
@@ -3202,7 +3256,7 @@ async function runSelfTests(){
       );
       const migrated = processed.data;
       if(processed.fromVersion !== 1
-        || JSON.stringify(processed.appliedMigrations) !== JSON.stringify(["1->2", "2->3"])){
+        || JSON.stringify(processed.appliedMigrations) !== JSON.stringify(["1->2", "2->3", "3->4"])){
         throw new Error("unversioned package did not run both migrations");
       }
       if(migrated.resourcePackageSchemaVersion !== RESOURCE_PACKAGE_SCHEMA_VERSION){
@@ -3331,7 +3385,7 @@ async function runSelfTests(){
       const cases = [
         [PACKAGE_MIGRATION_FIXTURES.malformedContainers, /cannot be migrated safely.*categories/is],
         [PACKAGE_MIGRATION_FIXTURES.malformedDeletion, /cannot be migrated safely.*unsupported kind/is],
-        [PACKAGE_MIGRATION_FIXTURES.unsupportedSchema, /unsupported resource package schema 4/is],
+        [PACKAGE_MIGRATION_FIXTURES.unsupportedSchema, /unsupported resource package schema 5/is],
         [PACKAGE_MIGRATION_FIXTURES.invalidPackageVersion, /cannot be migrated safely.*packageVersion/is],
         [{
           resourcePackageSchemaVersion:RESOURCE_PACKAGE_SCHEMA_VERSION,
@@ -3370,7 +3424,7 @@ async function runSelfTests(){
       const current = validateImportData({ ...base, resourcePackageSchemaVersion:RESOURCE_PACKAGE_SCHEMA_VERSION, deletionRequests:[], deletions:[] });
       const future = validateImportData({ ...base, resourcePackageSchemaVersion:RESOURCE_PACKAGE_SCHEMA_VERSION + 1 });
       if(!legacy.ok) throw new Error(`schema 2 package was rejected: ${legacy.errors.join(", ")}`);
-      if(!current.ok) throw new Error(`schema 3 package was rejected: ${current.errors.join(", ")}`);
+      if(!current.ok) throw new Error(`schema 4 package was rejected: ${current.errors.join(", ")}`);
       if(future.ok) throw new Error("unsupported future schema was accepted");
     }
   });
@@ -4307,7 +4361,44 @@ async function runSelfTests(){
   });
 
   tests.push({
-    name: "CATEGORY FILTER OR LOGIC",
+    name:"SCHEMA 4 RETIRED ALIASES AND SAFE EXTENSIONS",
+    fn:() => {
+      const fixture = PACKAGE_MIGRATION_FIXTURES.schema3RetiredAliases;
+      const original = JSON.stringify(fixture);
+      const migrated = processResourcePackageData(fixture).data;
+      if(migrated.categoryMigrations.some(entry => entry.toId)) throw new Error("retired alias chain survived migration");
+      if(JSON.stringify(fixture) !== original) throw new Error("migration mutated its input");
+      if(JSON.stringify(migrated.customPackageField) !== JSON.stringify(fixture.customPackageField)
+        || migrated.resources[0].informationText !== fixture.resources[0].informationText
+        || migrated.resources[0].pdfs[0].checksum !== "keep"
+        || !migrated.resources[0].customResourceField.keep) throw new Error("safe content lost");
+      const older = structuredClone(fixture);
+      older.categories.push({ id:"seniors", label:"Seniors" });
+      older.categoryMigrations = [{ fromId:"Seniors", toId:"seniors" }, { fromId:"older", toId:"seniors" }];
+      // The old package has a direct alias rather than the retired chain.
+      older.resources[0].categories.push("Seniors");
+      for(const [left, right] of [[migrated, older], [older, migrated]]){
+        let merged = mergeResourcePackages(left, right).mergedData;
+        merged = mergeResourcePackages(merged, older).mergedData;
+        if(merged.categories.some(category => category.id === "seniors") || merged.categoryMigrations.some(entry => entry.toId)) throw new Error("old package restored retirement aliases");
+        if(merged.resources[0].categories.some(id => id !== "food")) throw new Error("orphan category membership");
+        const output = buildResourcePackageData(merged);
+        if(!output.customPackageField.keep) throw new Error("safe extension lost in export");
+      }
+      const tombstoned = structuredClone(older);
+      tombstoned.deletions = [{ kind:"category", targetId:"seniors", deletedAt:"2026-09-06T00:00:00Z" }];
+      const deleted = processResourcePackageData(tombstoned).data;
+      if(deleted.categoryMigrations.some(entry => entry.toId) || deleted.resources[0].categories.some(id => id !== "food")) throw new Error("category tombstone left an alias or orphan");
+      for(const broken of [PACKAGE_MIGRATION_FIXTURES.schema3BrokenAlias]){
+        let rejected = false;
+        try { processResourcePackageData(broken); } catch(error) { rejected = error instanceof ResourcePackageError; }
+        if(!rejected) throw new Error("unsafe package accepted");
+      }
+    }
+  });
+
+  tests.push({
+    name: "CATEGORY FILTER AND BETWEEN DIMENSIONS",
     fn: () => {
       const resources = [
         { name:"Women Only", forGroups:["Women"] },
@@ -4319,10 +4410,12 @@ async function runSelfTests(){
         makeForGroupFilterKey("Women"),
         makeCategorySpecificFilterKey("Shelter")
       ]).map(r => r.name);
-      ["Women Only", "Shelter Only", "Both"].forEach(name => {
-        if(!matching.includes(name)) throw new Error(`${name} was excluded`);
-      });
-      if(matching.includes("Neither")) throw new Error("resource without selected filters was included");
+      if(JSON.stringify(matching) !== JSON.stringify(["Both"])) throw new Error("Types and groups must both match");
+      const groupsOnly = filterResourcesBySelectedCategoryFilters(resources, "housing", [makeForGroupFilterKey("Women"), makeForGroupFilterKey("Food")]);
+      if(groupsOnly.length !== 3) throw new Error("Groups must use OR");
+      const typesOnly = [{ categoryFilters:{ housing:["Shelter"] } }, { categoryFilters:{ housing:["Rent"] } }];
+      if(filterResourcesBySelectedCategoryFilters(typesOnly, "housing", [makeCategorySpecificFilterKey("Shelter"), makeCategorySpecificFilterKey("Rent")]).length !== 2) throw new Error("Types must use OR");
+
     }
   });
 
@@ -4678,14 +4771,31 @@ async function runSelfTests(){
         render();
         const text = appView.textContent || "";
         if(!text.includes("Type")) throw new Error("Type heading was not rendered");
-        if(!text.includes("For")) throw new Error("For heading was not rendered");
+        if(!text.includes("Groups")) throw new Error("Groups heading was not rendered");
         const buttons = Array.from(appView.querySelectorAll("button")).map(button => button.textContent);
-        if(!buttons.includes("Career Training")) throw new Error("category filter button was missing");
-        if(!buttons.includes("Veterans")) throw new Error("For group button was missing");
+        if(!buttons.includes("Career Training (1)")) throw new Error("category filter button was missing");
+        if(!buttons.includes("Veterans (1)")) throw new Error("For group button was missing");
         if(buttons.includes("Unused Filter")) throw new Error("unused category filter button should not render");
-        if(buttons.includes("Unused Group")) throw new Error("unused For group button should not render");
+        if(buttons.some(label => label.startsWith("Unused Group"))) throw new Error("zero-match group should not render");
+        if(text.includes("All groups") || text.includes("across office")) throw new Error("unrelated office groups leaked into category navigation");
         if(buttons.some(label => label === "For: Veterans")) throw new Error("For button label should not include prefix");
-        if(/\bresult(s)?\b/.test(text)) throw new Error("category filter area should not show result counts");
+        if(!text.includes("2 resources shown.")) throw new Error("matching resource count missing");
+        data.forGroupPreferences = { prominent:[], lastModified:"2026-09-06T00:00:00Z" };
+        render();
+        if(!appView.textContent.includes("Veterans (1)")) throw new Error("old prominence setting still hides a matching group");
+        setSelectedCategoryFilters("employment", [makeCategorySpecificFilterKey("Career Training")]);
+        render();
+        if(appView.querySelector('[data-filter-key="for:veterans"]')) throw new Error("unselected group with no Type matches should be hidden");
+        setSelectedCategoryFilters("employment", [makeCategorySpecificFilterKey("Career Training"), makeForGroupFilterKey("Veterans")]);
+        render();
+        if(getSelectedCategoryFilters("employment").length !== 2) throw new Error("zero-match selection was silently removed");
+        const selectedGroup = [...appView.querySelectorAll("[data-filter-key]")].find(button => button.dataset.filterKey === makeForGroupFilterKey("Veterans"));
+        if(!selectedGroup || selectedGroup.closest("details") || selectedGroup.getAttribute("aria-pressed") !== "true") throw new Error("selected rare group is hidden");
+        if(!selectedGroup.textContent.includes("(0)")) throw new Error("context count did not respect Type selection");
+        if(!appView.textContent.includes("It remains selected")) throw new Error("zero-match explanation missing");
+        const clear = [...appView.querySelectorAll("button")].find(button => button.textContent === "Clear filters");
+        clear.click();
+        if(getSelectedCategoryFilters("employment").length || !appView.textContent.includes("2 resources shown.")) throw new Error("clear did not restore category resources");
       }finally{
         data = previousData;
         view = previousView;
@@ -4878,8 +4988,8 @@ async function runSelfTests(){
           makeForGroupFilterKey("Veterans"),
           makeCategorySpecificFilterKey("GED")
         ]).map(r => r.id);
-        if(!matching.includes("shared") || !matching.includes("ged")){
-          throw new Error("OR category filtering missed expected education resources");
+        if(matching.length){
+          throw new Error("A resource must match both GED and Veterans in Education");
         }
       }finally{
         data = previousData;

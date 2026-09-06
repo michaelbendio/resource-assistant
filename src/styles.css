@@ -1023,3 +1023,33 @@ textarea.information-editor { min-height:320px; resize:vertical; }
     display: none !important;
   }
 }
+
+/* Office group navigation: comfortable touch targets, visible keyboard focus. */
+.category-filter-group { border:0; padding:0; margin:12px 0; min-width:0; }
+.category-filter-group legend { font-weight:bold; margin-bottom:6px; }
+.category-filter-buttons { display:flex; flex-wrap:wrap; gap:8px; }
+.category-filter-buttons button, .category-filter-controls > button { min-height:44px; }
+.category-filter-controls :focus-visible { outline:3px solid #155ea0; outline-offset:3px; }
+.category-filter-note { font-size:0.95rem; }
+@media print { .category-filter-controls { display:none !important; } }
+
+/* Open questions are administrative handoff, not resource verification. */
+.resource-open-question-label,
+.resource-open-question-text {
+  color: #b00020;
+  font-weight: 700;
+}
+.resource-open-question-label {
+  background: #fff;
+  padding: 0 .2em;
+  border-radius: 2px;
+}
+
+#res_open_questions {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+#res_open_questions textarea {
+  box-sizing: border-box;
+  max-width: 100%;
+}

@@ -1040,6 +1040,36 @@ textarea.information-editor { min-height:320px; resize:vertical; }
     display: none !important;
   }
 }
+
+/* Office group navigation: comfortable touch targets, visible keyboard focus. */
+.category-filter-group { border:0; padding:0; margin:12px 0; min-width:0; }
+.category-filter-group legend { font-weight:bold; margin-bottom:6px; }
+.category-filter-buttons { display:flex; flex-wrap:wrap; gap:8px; }
+.category-filter-buttons button, .category-filter-controls > button { min-height:44px; }
+.category-filter-controls :focus-visible { outline:3px solid #155ea0; outline-offset:3px; }
+.category-filter-note { font-size:0.95rem; }
+@media print { .category-filter-controls { display:none !important; } }
+
+/* Open questions are administrative handoff, not resource verification. */
+.resource-open-question-label,
+.resource-open-question-text {
+  color: #b00020;
+  font-weight: 700;
+}
+.resource-open-question-label {
+  background: #fff;
+  padding: 0 .2em;
+  border-radius: 2px;
+}
+
+#res_open_questions {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+#res_open_questions textarea {
+  box-sizing: border-box;
+  max-width: 100%;
+}
 </style>
 <!-- ===== APP CSS END ===== -->
 </head>
@@ -1135,9 +1165,19 @@ textarea.information-editor { min-height:320px; resize:vertical; }
 
 <script id="app-release-data" type="application/json">
 {
-  "version": "2.3.4",
-  "build": 150,
+  "version": "2.3.7",
+  "build": 153,
   "changes": [
+    {
+      "date": "2026-09-06",
+      "version": "2.3.7",
+      "message": "See Scout\u2019s open questions beside resources in Admin mode, with explanations and saved resolution notes in the resource editor."
+    },
+    {
+      "date": "2026-09-06",
+      "version": "2.3.6",
+      "message": "Narrow resources by Type and group, with matching counts and Clear filters."
+    },
     {
       "date": "2026-08-28",
       "version": "2.3.4",
@@ -1162,16 +1202,6 @@ textarea.information-editor { min-height:320px; resize:vertical; }
       "date": "2026-08-10",
       "version": "2.3.2",
       "message": "Print each resource's Description along with its Information"
-    },
-    {
-      "date": "2026-08-10",
-      "version": "2.3.1",
-      "message": "Toggle the Favorites view with the navigation star"
-    },
-    {
-      "date": "2026-08-06",
-      "version": "2.3.0",
-      "message": "Add persistent resource favorites"
     }
   ]
 }
@@ -1965,6 +1995,12 @@ function applyDeletionTombstones(packageData, records = null){
       });
     }
   });
+  const retiredCategories = tombstones.filter(record => record.kind === "category")
+    .map(record => ({ fromId:record.targetId }));
+  if(retiredCategories.length){
+    packageData.categoryMigrations = mergeCategoryMigrations(packageData.categoryMigrations, retiredCategories);
+    applyCategoryMigrations(packageData, packageData.categoryMigrations);
+  }
   return packageData;
 }
 
@@ -1978,7 +2014,7 @@ function applyDeletionTombstones(packageData, records = null){
 
 const UNVERSIONED_RESOURCE_PACKAGE_SCHEMA_VERSION = 1;
 const LEGACY_RESOURCE_PACKAGE_SCHEMA_VERSION = 2;
-const RESOURCE_PACKAGE_SCHEMA_VERSION = 3;
+const RESOURCE_PACKAGE_SCHEMA_VERSION = 4;
 const RESOURCE_PACKAGE_PIPELINE_STAGES = Object.freeze([
   "read",
   "migrate",
@@ -2146,7 +2182,16 @@ function migrateResourcePackageSchema1To2(packageData){
 function migrateResourcePackageSchema2To3(packageData){
   if(packageData.deletionRequests == null) packageData.deletionRequests = [];
   if(packageData.deletions == null) packageData.deletions = [];
-  packageData.resourcePackageSchemaVersion = RESOURCE_PACKAGE_SCHEMA_VERSION;
+  packageData.resourcePackageSchemaVersion = 3;
+  return packageData;
+}
+
+function migrateResourcePackageSchema3To4(packageData){
+  // A retired target also retires its old aliases. Preserve every source ID.
+  if(Array.isArray(packageData.categoryMigrations)){
+    packageData.categoryMigrations = resolveRetiredCategoryAliases(packageData.categoryMigrations);
+  }
+  packageData.resourcePackageSchemaVersion = 4;
   return packageData;
 }
 
@@ -2156,9 +2201,10 @@ const RESOURCE_PACKAGE_SCHEMA_MIGRATIONS = new Map([
     migrate:migrateResourcePackageSchema1To2
   }],
   [LEGACY_RESOURCE_PACKAGE_SCHEMA_VERSION, {
-    toVersion:RESOURCE_PACKAGE_SCHEMA_VERSION,
+    toVersion:3,
     migrate:migrateResourcePackageSchema2To3
-  }]
+  }],
+  [3, { toVersion:4, migrate:migrateResourcePackageSchema3To4 }]
 ]);
 
 function migrateResourcePackageData(packageData, options = {}){
@@ -2392,6 +2438,7 @@ function validateResourcePackageData(packageData){
     }
     if(id && resourceIds.has(id)) errors.push(`Duplicate resource id '${id}'.`);
     if(id) resourceIds.add(id);
+    resourceQuestionErrors(resource && resource.openQuestions).forEach(error => errors.push(`Resource '${id || index}': ${error}`));
     (Array.isArray(resource && resource.categories) ? resource.categories : []).forEach(categoryId => {
       if(!categoryIds.has(String(categoryId))){
         warnings.push(`Resource '${id || index}' references unknown category '${categoryId}'.`);
@@ -3766,27 +3813,27 @@ function makeForGroupFilterKey(group){
 }
 
 function getCategoryFilterOptions(categoryId){
-  const cat = (Array.isArray(data.categories) ? data.categories : []).find(category => category && category.id === categoryId);
-  const options = [];
+  const cat = (data.categories || []).find(category => category && category.id === categoryId);
   const resources = getCategoryResources(categoryId);
-  const usedCategoryFilterKeys = new Set();
-  const usedForGroupKeys = new Set();
-
-  resources.forEach(resource => {
-    getResourceCategoryFilterKeys(resource, categoryId).forEach(key => usedCategoryFilterKeys.add(key));
-    getResourceForGroupFilterKeys(resource).forEach(key => usedForGroupKeys.add(key));
-  });
-
-  normalizeCategoryFilters(cat && cat.filters).forEach(filter => {
-    const key = makeCategorySpecificFilterKey(filter);
-    if(usedCategoryFilterKeys.has(key)){
-      options.push({ key, label:filter, kind:"filter" });
-    }
-  });
-  normalizeTaxonomyLabels(data.forGroups).forEach(group => {
-    const key = makeForGroupFilterKey(group);
-    if(usedForGroupKeys.has(key)){
-      options.push({ key, label:group, kind:"for" });
+  const active = getSelectedCategoryFilters(categoryId);
+  const options = [];
+  function add(label, kind){
+    const key = kind === "for" ? makeForGroupFilterKey(label) : makeCategorySpecificFilterKey(label);
+    const opposite = active.filter(selected => kind === "for" ? selected.startsWith("filter:") : selected.startsWith("for:"));
+    const has = resource => (kind === "for" ? getResourceForGroupFilterKeys(resource) : getResourceCategoryFilterKeys(resource, categoryId)).has(key);
+    const count = resources.filter(resource => has(resource) && resourceMatchesSelectedCategoryFilters(resource, categoryId, opposite)).length;
+    const categoryCount = resources.filter(has).length;
+    if(kind === "filter" && !categoryCount && !active.includes(key)) return;
+    if(kind === "for" && !count && !active.includes(key)) return;
+    options.push({ key, label, kind, count });
+  }
+  normalizeCategoryFilters(cat && cat.filters).forEach(label => add(label, "filter"));
+  normalizeTaxonomyLabels(data.forGroups).forEach(label => add(label, "for"));
+  // A package update must never silently remove a user's selection.
+  active.forEach(key => {
+    if(!options.some(option => option.key === key)){
+      options.push({ key, label:key.slice(key.indexOf(":") + 1), kind:key.startsWith("for:") ? "for" : "filter",
+        count:0 });
     }
   });
   return options;
@@ -3816,7 +3863,12 @@ function countSelectedCategoryFilterMatches(resource, categoryId, activeFilterKe
 
 function resourceMatchesSelectedCategoryFilters(resource, categoryId, selectedFilterKeys){
   const activeFilterKeys = new Set(normalizeTaxonomyLabels(selectedFilterKeys));
-  return !activeFilterKeys.size || countSelectedCategoryFilterMatches(resource, categoryId, activeFilterKeys) > 0;
+  const types = [...activeFilterKeys].filter(key => key.startsWith("filter:"));
+  const groups = [...activeFilterKeys].filter(key => key.startsWith("for:"));
+  const typeKeys = getResourceCategoryFilterKeys(resource, categoryId);
+  const groupKeys = getResourceForGroupFilterKeys(resource);
+  return (!types.length || types.some(key => typeKeys.has(key)))
+    && (!groups.length || groups.some(key => groupKeys.has(key)));
 }
 
 function filterResourcesBySelectedCategoryFilters(resources, categoryId, selectedFilterKeys){
@@ -4263,51 +4315,38 @@ function renderCategoryTitle(){
   if(cat) renderPublicResourceTitle(cat.label);
 }
 
-function getActiveCategoryFilters(categoryFilterOptions){
-  const selectedFilters = getSelectedCategoryFilters(currentCategory);
-  const activeFilters = selectedFilters.filter(filterKey =>
-    categoryFilterOptions.some(option => option.key === filterKey)
-  );
-  if(activeFilters.length !== selectedFilters.length){
-    setSelectedCategoryFilters(currentCategory, activeFilters);
-  }
-  return activeFilters;
+function getActiveCategoryFilters(){
+  return getSelectedCategoryFilters(currentCategory);
 }
 
 function appendCategoryFilterGroup(filterArea, title, options, activeFilters){
   if(!options.length) return;
-  const group = document.createElement("div");
-  group.style.margin = "0 0 8px";
-
-  const heading = document.createElement("div");
+  const group = document.createElement("fieldset");
+  group.className = "category-filter-group";
+  const heading = document.createElement("legend");
   heading.textContent = title;
-  heading.style.fontWeight = "bold";
-  heading.style.fontSize = "14px";
-  heading.style.marginBottom = "4px";
   group.appendChild(heading);
-
   const buttons = document.createElement("div");
-  buttons.style.display = "flex";
-  buttons.style.flexWrap = "wrap";
-  buttons.style.gap = "8px";
-  buttons.style.alignItems = "center";
-
+  buttons.className = "category-filter-buttons";
   options.forEach(option => {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = activeFilters.includes(option.key) ? "button primary" : "button";
-    btn.textContent = option.label;
+    const selected = activeFilters.includes(option.key);
+    btn.className = selected ? "button primary" : "button";
+    btn.dataset.filterKey = option.key;
+    btn.textContent = `${option.label} (${option.count})`;
+    btn.setAttribute("aria-pressed", String(selected));
+    btn.setAttribute("aria-label", `${option.label}: ${option.count} matching resources${selected ? ", selected; press to remove" : ""}`);
+    btn.title = `${option.count} matching resources with the other selections.`;
     btn.onclick = () => {
-      const selected = activeFilters.includes(option.key);
-      const nextFilters = selected
-        ? activeFilters.filter(active => active !== option.key)
-        : [...activeFilters, option.key];
-      setSelectedCategoryFilters(currentCategory, nextFilters);
+      setSelectedCategoryFilters(currentCategory, selected ? activeFilters.filter(key => key !== option.key) : [...activeFilters, option.key]);
       safeRender();
+      const replacement = [...appView.querySelectorAll("[data-filter-key]")].find(button => button.dataset.filterKey === option.key);
+      const focusTarget = replacement || appView.querySelector("[data-filter-key]");
+      if(focusTarget) focusTarget.focus();
     };
     buttons.appendChild(btn);
   });
-
   group.appendChild(buttons);
   filterArea.appendChild(group);
 }
@@ -4315,11 +4354,38 @@ function appendCategoryFilterGroup(filterArea, title, options, activeFilters){
 function renderCategoryFilterControls(categoryFilterOptions, activeFilters){
   if(!categoryFilterOptions.length) return;
   const filterArea = document.createElement("div");
-  filterArea.style.marginBottom = "12px";
-
+  filterArea.className = "category-filter-controls";
+  const explanation = document.createElement("p");
+  explanation.className = "category-filter-note";
+  explanation.textContent = "Choose any Types and any groups. Resources must match both when you use both. Counts reflect the other selections.";
+  filterArea.appendChild(explanation);
   appendCategoryFilterGroup(filterArea, "Type", categoryFilterOptions.filter(option => option.kind === "filter"), activeFilters);
-  appendCategoryFilterGroup(filterArea, "For", categoryFilterOptions.filter(option => option.kind === "for"), activeFilters);
-
+  const groups = categoryFilterOptions.filter(option => option.kind === "for");
+  appendCategoryFilterGroup(filterArea, "Groups", groups, activeFilters);
+  const count = filterResourcesBySelectedCategoryFilters(getCategoryResources(currentCategory), currentCategory, activeFilters).length;
+  const status = document.createElement("p");
+  status.className = "category-filter-status";
+  status.setAttribute("role", "status");
+  status.textContent = `${count} ${count === 1 ? "resource" : "resources"} shown.`;
+  filterArea.appendChild(status);
+  if(activeFilters.length){
+    if(categoryFilterOptions.some(option => activeFilters.includes(option.key) && !option.count)){
+      const zero = document.createElement("p");
+      zero.textContent = "A selected filter has no matches with the other selections. It remains selected. Press it again to remove it, or clear filters.";
+      filterArea.appendChild(zero);
+    }
+    const clear = document.createElement("button");
+    clear.className = "button";
+    clear.type = "button";
+    clear.textContent = "Clear filters";
+    clear.onclick = () => {
+      setSelectedCategoryFilters(currentCategory, []);
+      safeRender();
+      const first = appView.querySelector("[data-filter-key]");
+      if(first) first.focus();
+    };
+    filterArea.appendChild(clear);
+  }
   appView.appendChild(filterArea);
 }
 
@@ -4376,8 +4442,7 @@ function renderCategoryResources(filtered, activeFilters){
 }
 
 function renderCategoryView(){
-  // Public category detail screen. Category filters and For buttons are OR'd
-  // together by filterResourcesBySelectedCategoryFilters().
+  // OR within Types and within groups; AND between the two dimensions.
   renderCategoryBackButton();
   renderCategoryTitle();
   const categoryFilterOptions = getCategoryFilterOptions(currentCategory);
@@ -5350,6 +5415,29 @@ function normalizeCategoryMigrations(packageData){
   packageData.categoryMigrations = normalized;
 }
 
+function resolveRetiredCategoryAliases(migrations){
+  // Do not sanitize invalid input here: the package validator must still see it.
+  const retired = new Set(migrations.filter(entry => entry && typeof entry === "object"
+    && entry.fromId && !entry.toId && !entry.toFilter).map(entry => entry.fromId));
+  let changed = true;
+  while(changed){
+    changed = false;
+    migrations.forEach(entry => {
+      if(entry && entry.toId && retired.has(entry.toId) && !retired.has(entry.fromId)){
+        retired.add(entry.fromId);
+        changed = true;
+      }
+    });
+  }
+  return migrations.map(entry => {
+    if(!entry || !retired.has(entry.fromId)) return entry;
+    const result = { ...entry };
+    delete result.toId;
+    delete result.toFilter;
+    return result;
+  });
+}
+
 function mergeCategoryMigrations(localMigrations, incomingMigrations){
   const holder = {
     categoryMigrations: [
@@ -5357,6 +5445,7 @@ function mergeCategoryMigrations(localMigrations, incomingMigrations){
       ...(Array.isArray(incomingMigrations) ? incomingMigrations : [])
     ]
   };
+  holder.categoryMigrations = resolveRetiredCategoryAliases(holder.categoryMigrations);
   normalizeCategoryMigrations(holder);
   return holder.categoryMigrations;
 }
@@ -5534,9 +5623,14 @@ function mergeItemsById(localItems, incomingItems, options = {}){
     if(!id) return;
     const incomingItem = incomingById.get(id);
     const choice = chooseMergeObject(localItem, incomingItem);
-    merged.push(cloneDataObject(choice.item));
+    const mergedItem = cloneDataObject(choice.item);
+    if(options.kind === "resources"){
+      const questions = mergeResourceQuestions(localItem.openQuestions, incomingItem && incomingItem.openQuestions);
+      if(questions !== undefined) mergedItem.openQuestions = questions;
+    }
+    merged.push(mergedItem);
     seen.add(id);
-    if(incomingItem && choice.item === incomingItem && choice.changed){
+    if(incomingItem && objectsDiffer(localItem, mergedItem)){
       updated += 1;
       updatedIds.push(id);
       updatedNames.push(String(incomingItem.name || incomingItem.title || id));
@@ -7114,6 +7208,7 @@ function resourceEditorDraft(){
     hours: hoursEl.value.trim(),
     description: descEl.value,
     informationText: composeInformationText(informationDraft),
+    openQuestions: resourceQuestionDraft(),
     verifiedOn,
     categories,
     categoryFilters,
@@ -7401,6 +7496,7 @@ function applyResourceDraft(idx, draft){
   res.hours = draft.hours;
   res.description = draft.description;
   res.informationText = draft.informationText;
+  applyResourceQuestions(res, draft);
   const verifiedValidation = validateVerifiedOnInput(draft.verifiedOn);
   res.verifiedOn = verifiedValidation.valid ? verifiedValidation.normalized : null;
   if("reviewedOn" in res) delete res.reviewedOn;
@@ -7532,6 +7628,7 @@ function commitPendingEditsIfChanged(){
       if(verifiedInput) verifiedInput.focus();
       return false;
     }
+    if(!validateResourceQuestions(draft)) return false;
     if(nextSnapshot !== editorSnapshot){
       if(!confirmBlankUpdateDescription(draft)) return false;
       const resource = data.resources[editing.idx];
@@ -8082,6 +8179,14 @@ function populateResourceBrowseOptions(sel, preferredResourceId){
     btn.textContent = hasDeletionRequest("resource", { targetId:r.id })
       ? `${baseLabel} — tagged for deletion`
       : baseLabel;
+    const questionLabel = resourceOpenQuestionLabel(r);
+    if(questionLabel){
+      btn.appendChild(document.createTextNode(" — "));
+      const label = document.createElement("strong");
+      label.className = "resource-open-question-label";
+      label.textContent = questionLabel;
+      btn.appendChild(label);
+    }
     sel.appendChild(btn);
   });
 
@@ -8418,6 +8523,7 @@ function renderResourceEditorMarkup(res){
   const informationDraft = parseInformationText(res.informationText || "");
   return [
     renderResourceBasicsSection(res, verifiedDisplay),
+    renderResourceQuestionsSection(res),
     renderResourceUpdateSection(),
     renderResourceForGroupsSection(renderResourceForGroupChecks(res)),
     renderResourceCategoriesSection(renderResourceCategoryChecks(res)),
@@ -8506,7 +8612,8 @@ function validateResourceEditorState(idx){
   const verifiedValidation = validateVerifiedOnInput(draft.verifiedOn);
   showResourceNameWarning(nameValidation.message);
   showResourceVerifiedWarning(verifiedValidation.message);
-  const shouldDisableDone = !(nameValidation.valid && verifiedValidation.valid);
+  const questionValidation = validateResourceQuestions(draft);
+  const shouldDisableDone = !(nameValidation.valid && verifiedValidation.valid && questionValidation);
   updateResourceEditorActionBar(shouldDisableDone);
   const doneBtn = document.getElementById("res_done_btn");
   if(doneBtn) doneBtn.disabled = shouldDisableDone;
@@ -8645,6 +8752,10 @@ function editResource(idx){
   setupResourceCategoryControls(editor, validateEditorState);
   setupResourceVerifiedControls(elements, validateEditorState);
   setupResourceEditorValidation(editor, elements, validateEditorState);
+  editor.querySelectorAll("[data-question-note], [data-question-resolved]").forEach(field => {
+    field.addEventListener("input", validateEditorState);
+    field.addEventListener("change", validateEditorState);
+  });
   setupResourcePDFControls(idx);
 
   editorSnapshot = snapshotResourceEditor();
@@ -8758,7 +8869,7 @@ function addForGroupRow(value){
   list.appendChild(row);
   row.addEventListener("click", () => selectForGroupRow(index));
   row.addEventListener("keydown", event => {
-    if(event.key !== "Enter" && event.key !== " ") return;
+    if(event.target !== row || (event.key !== "Enter" && event.key !== " ")) return;
     event.preventDefault();
     selectForGroupRow(index);
     if(input) input.focus();
@@ -8838,6 +8949,137 @@ function renderAdminForGroups(container){
     };
   }
   refreshForGroupDetails();
+}
+
+// Source: src/js/100f-admin-open-questions.js
+// Validate optional administrative data before it can replace an office package.
+function resourceQuestionErrors(questions){
+  if(questions === undefined) return [];
+  if(!Array.isArray(questions)) return ["openQuestions must be an array."];
+  const errors = [], ids = new Set();
+  const text = value => typeof value === "string" && value.trim();
+  const decision = value => value && typeof value === "object" && !Array.isArray(value)
+    && ["open", "resolved"].includes(value.status) && typeof value.resolution === "string"
+    && (value.status !== "resolved" || text(value.resolution));
+  questions.forEach((q, index) => {
+    if(!q || typeof q !== "object" || Array.isArray(q)){
+      errors.push(`Question ${index + 1} must be an object.`); return;
+    }
+    if(!text(q.id) || !text(q.question) || !text(q.explanation) || !decision(q))
+      errors.push(`Question ${index + 1} needs an id, question, explanation, valid status and resolution note.`);
+    if(ids.has(q.id)) errors.push(`Duplicate question id '${q.id}'.`);
+    ids.add(q.id);
+    if(q.history !== undefined && (!Array.isArray(q.history) || q.history.some(h => !decision(h) || !text(h.changedAt) || !Number.isFinite(Date.parse(h.changedAt)))))
+      errors.push(`Question ${index + 1} has invalid decision history.`);
+    if(q.resolutionConflict !== undefined && typeof q.resolutionConflict !== "boolean")
+      errors.push(`Question ${index + 1} has an invalid conflict flag.`);
+    if(q.decisionAlternatives !== undefined && (!Array.isArray(q.decisionAlternatives) || q.decisionAlternatives.some(h => !decision(h))))
+      errors.push(`Question ${index + 1} has invalid competing decisions.`);
+    if(q.resolutionConflict && (q.status !== "open" || !Array.isArray(q.decisionAlternatives) || q.decisionAlternatives.length < 2))
+      errors.push(`Question ${index + 1} must keep competing decisions open for the curator.`);
+  });
+  return errors;
+}
+
+function questionDecisionKey(q){ return JSON.stringify([q.status, q.resolution]); }
+function questionHistoryKey(h){ return JSON.stringify([h.changedAt, h.status, h.resolution]); }
+function mergeResourceQuestions(local, incoming){
+  if(local === undefined && incoming === undefined) return undefined;
+  const result = JSON.parse(JSON.stringify(local || []));
+  for(const q of incoming || []){
+    const index = result.findIndex(old => old.id === q.id);
+    if(index < 0){ result.push(JSON.parse(JSON.stringify(q))); continue; }
+    const old = result[index];
+    if(old.question !== q.question || old.explanation !== q.explanation)
+      throw new Error(`Question '${q.id}' has different text in these packages. Keep both original packages and settle its identity before merging.`);
+    const a = new Set((old.history || []).map(questionHistoryKey));
+    const b = new Set((q.history || []).map(questionHistoryKey));
+    const descendant = (x, y) => x.size > y.size && [...y].every(key => x.has(key));
+    // Decision ancestry is independent of a resource's unrelated lastModified.
+    let chosen = descendant(a, b) ? old : descendant(b, a) ? q : null;
+    if(!chosen && !old.resolutionConflict && !q.resolutionConflict && questionDecisionKey(old) === questionDecisionKey(q)) chosen = old;
+    const history = [...new Map([...(old.history || []), ...(q.history || [])].map(h => [questionHistoryKey(h), h])).values()]
+      .sort((x, y) => questionHistoryKey(x).localeCompare(questionHistoryKey(y)));
+    const merged = {...q, ...old};
+    if(old.history !== undefined || q.history !== undefined) merged.history = history;
+    if(chosen){
+      merged.status = chosen.status; merged.resolution = chosen.resolution;
+      delete merged.resolutionConflict; delete merged.decisionAlternatives;
+      if(chosen.resolutionConflict){ merged.resolutionConflict = true; merged.decisionAlternatives = chosen.decisionAlternatives; }
+    }else{
+      merged.status = "open"; merged.resolution = ""; merged.resolutionConflict = true;
+      const alternatives = value => value.resolutionConflict ? value.decisionAlternatives : [{status:value.status, resolution:value.resolution}];
+      merged.decisionAlternatives = [...new Map([...alternatives(old), ...alternatives(q)].map(h => [questionDecisionKey(h), h])).values()];
+    }
+    result[index] = JSON.parse(JSON.stringify(merged));
+  }
+  return result;
+}
+
+// Curator handoff travels with each resource; it never enters patron text.
+function resourceQuestions(resource){
+  return (Array.isArray(resource && resource.openQuestions) ? resource.openQuestions : [])
+    .filter(q => q && typeof q.id === "string" && typeof q.question === "string" && q.question.trim());
+}
+
+function resourceOpenQuestionLabel(resource){
+  const count = resourceQuestions(resource).filter(q => q.status !== "resolved").length;
+  return count ? (count === 1 ? "open question" : `${count} open questions`) : "";
+}
+
+function renderResourceQuestionsSection(resource){
+  const questions = resourceQuestions(resource);
+  if(!questions.length) return "";
+  return `<section id="res_open_questions" style="padding:14px;border:1px solid #b7791f;border-radius:8px;margin:12px 0;">
+    <h3 style="margin-top:0;">Questions for the curator</h3>
+    <p>Scout found specific questions it could not settle. These notes do not appear in patron handouts.</p>
+    ${questions.map(q => `<div data-question-id="${escapeHTML(q.id)}" style="margin:16px 0;">
+      <strong class="${q.status === "resolved" ? "" : "resource-open-question-text"}">${escapeHTML(q.question)}</strong>
+      <p style="white-space:pre-wrap;">${escapeHTML(q.explanation || "")}</p>
+      ${q.resolutionConflict ? `<p class="resource-open-question-text">Saved decisions disagree. Review both notes and record the decision to use.</p>${q.decisionAlternatives.map(h => `<p>${escapeHTML(h.status)}: ${escapeHTML(h.resolution || "No resolution note")}</p>`).join("")}` : ""}
+      <label>Resolution note<br><textarea data-question-note style="width:100%;min-height:60px;">${escapeHTML(q.resolution || "")}</textarea></label>
+      <label style="display:block;"><input type="checkbox" data-question-resolved ${q.status === "resolved" ? "checked" : ""}> Resolved</label>
+      ${Array.isArray(q.history) && q.history.length ? `<details><summary>Earlier question decisions</summary>${q.history.map(h => `<p>${escapeHTML(h.changedAt || "")} · ${escapeHTML(h.status || "")}<br>${escapeHTML(h.resolution || "")}</p>`).join("")}</details>` : ""}
+    </div>`).join("")}
+    <p id="res_question_warning" role="alert" style="color:#a00;"></p>
+  </section>`;
+}
+
+function resourceQuestionDraft(){
+  const resource = editing && editing.kind === "resource" ? data.resources[editing.idx] : null;
+  if(!Array.isArray(resource && resource.openQuestions)) return undefined;
+  const questions = JSON.parse(JSON.stringify(resource.openQuestions));
+  document.querySelectorAll("#res_open_questions [data-question-id]").forEach(row => {
+    const q = questions.find(q => q && q.id === row.dataset.questionId);
+    if(q){
+      q.status = row.querySelector("[data-question-resolved]").checked ? "resolved" : "open";
+      q.resolution = row.querySelector("[data-question-note]").value.trim();
+    }
+  });
+  return questions;
+}
+
+function validateResourceQuestions(draft){
+  const invalid = (draft.openQuestions || []).some(q => q && q.status === "resolved" && !String(q.resolution || "").trim());
+  const warning = document.getElementById("res_question_warning");
+  if(warning) warning.textContent = invalid ? "Add a short resolution note before marking a question resolved." : "";
+  return !invalid;
+}
+
+function applyResourceQuestions(resource, draft){
+  if(!Array.isArray(draft.openQuestions)) return;
+  const previous = Array.isArray(resource.openQuestions) ? resource.openQuestions : [];
+  resource.openQuestions = draft.openQuestions.map(q => {
+    if(!q || typeof q !== "object") return q;
+    const old = previous.find(x => x && x.id === q.id);
+    const next = JSON.parse(JSON.stringify(q));
+    if(old && ((old.status || "open") !== (q.status || "open") || (old.resolution || "") !== (q.resolution || ""))){
+      delete next.resolutionConflict; delete next.decisionAlternatives;
+      next.history = [...(Array.isArray(old.history) ? old.history : []),
+        {changedAt:nowISO(), status:q.status || "open", resolution:q.resolution || ""}];
+    }
+    return next;
+  });
 }
 
 // Source: src/js/102-office-context.js

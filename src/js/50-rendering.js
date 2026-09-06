@@ -878,27 +878,27 @@ function makeForGroupFilterKey(group){
 }
 
 function getCategoryFilterOptions(categoryId){
-  const cat = (Array.isArray(data.categories) ? data.categories : []).find(category => category && category.id === categoryId);
-  const options = [];
+  const cat = (data.categories || []).find(category => category && category.id === categoryId);
   const resources = getCategoryResources(categoryId);
-  const usedCategoryFilterKeys = new Set();
-  const usedForGroupKeys = new Set();
-
-  resources.forEach(resource => {
-    getResourceCategoryFilterKeys(resource, categoryId).forEach(key => usedCategoryFilterKeys.add(key));
-    getResourceForGroupFilterKeys(resource).forEach(key => usedForGroupKeys.add(key));
-  });
-
-  normalizeCategoryFilters(cat && cat.filters).forEach(filter => {
-    const key = makeCategorySpecificFilterKey(filter);
-    if(usedCategoryFilterKeys.has(key)){
-      options.push({ key, label:filter, kind:"filter" });
-    }
-  });
-  normalizeTaxonomyLabels(data.forGroups).forEach(group => {
-    const key = makeForGroupFilterKey(group);
-    if(usedForGroupKeys.has(key)){
-      options.push({ key, label:group, kind:"for" });
+  const active = getSelectedCategoryFilters(categoryId);
+  const options = [];
+  function add(label, kind){
+    const key = kind === "for" ? makeForGroupFilterKey(label) : makeCategorySpecificFilterKey(label);
+    const opposite = active.filter(selected => kind === "for" ? selected.startsWith("filter:") : selected.startsWith("for:"));
+    const has = resource => (kind === "for" ? getResourceForGroupFilterKeys(resource) : getResourceCategoryFilterKeys(resource, categoryId)).has(key);
+    const count = resources.filter(resource => has(resource) && resourceMatchesSelectedCategoryFilters(resource, categoryId, opposite)).length;
+    const categoryCount = resources.filter(has).length;
+    if(kind === "filter" && !categoryCount && !active.includes(key)) return;
+    if(kind === "for" && !count && !active.includes(key)) return;
+    options.push({ key, label, kind, count });
+  }
+  normalizeCategoryFilters(cat && cat.filters).forEach(label => add(label, "filter"));
+  normalizeTaxonomyLabels(data.forGroups).forEach(label => add(label, "for"));
+  // A package update must never silently remove a user's selection.
+  active.forEach(key => {
+    if(!options.some(option => option.key === key)){
+      options.push({ key, label:key.slice(key.indexOf(":") + 1), kind:key.startsWith("for:") ? "for" : "filter",
+        count:0 });
     }
   });
   return options;
@@ -928,7 +928,12 @@ function countSelectedCategoryFilterMatches(resource, categoryId, activeFilterKe
 
 function resourceMatchesSelectedCategoryFilters(resource, categoryId, selectedFilterKeys){
   const activeFilterKeys = new Set(normalizeTaxonomyLabels(selectedFilterKeys));
-  return !activeFilterKeys.size || countSelectedCategoryFilterMatches(resource, categoryId, activeFilterKeys) > 0;
+  const types = [...activeFilterKeys].filter(key => key.startsWith("filter:"));
+  const groups = [...activeFilterKeys].filter(key => key.startsWith("for:"));
+  const typeKeys = getResourceCategoryFilterKeys(resource, categoryId);
+  const groupKeys = getResourceForGroupFilterKeys(resource);
+  return (!types.length || types.some(key => typeKeys.has(key)))
+    && (!groups.length || groups.some(key => groupKeys.has(key)));
 }
 
 function filterResourcesBySelectedCategoryFilters(resources, categoryId, selectedFilterKeys){

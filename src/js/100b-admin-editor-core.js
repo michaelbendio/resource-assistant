@@ -72,6 +72,7 @@ function resourceEditorDraft(){
     hours: hoursEl.value.trim(),
     description: descEl.value,
     informationText: composeInformationText(informationDraft),
+    openQuestions: resourceQuestionDraft(),
     verifiedOn,
     categories,
     categoryFilters,
@@ -359,6 +360,7 @@ function applyResourceDraft(idx, draft){
   res.hours = draft.hours;
   res.description = draft.description;
   res.informationText = draft.informationText;
+  applyResourceQuestions(res, draft);
   const verifiedValidation = validateVerifiedOnInput(draft.verifiedOn);
   res.verifiedOn = verifiedValidation.valid ? verifiedValidation.normalized : null;
   if("reviewedOn" in res) delete res.reviewedOn;
@@ -490,6 +492,7 @@ function commitPendingEditsIfChanged(){
       if(verifiedInput) verifiedInput.focus();
       return false;
     }
+    if(!validateResourceQuestions(draft)) return false;
     if(nextSnapshot !== editorSnapshot){
       if(!confirmBlankUpdateDescription(draft)) return false;
       const resource = data.resources[editing.idx];

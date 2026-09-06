@@ -108,6 +108,14 @@ function populateResourceBrowseOptions(sel, preferredResourceId){
     btn.textContent = hasDeletionRequest("resource", { targetId:r.id })
       ? `${baseLabel} — tagged for deletion`
       : baseLabel;
+    const questionLabel = resourceOpenQuestionLabel(r);
+    if(questionLabel){
+      btn.appendChild(document.createTextNode(" — "));
+      const label = document.createElement("strong");
+      label.className = "resource-open-question-label";
+      label.textContent = questionLabel;
+      btn.appendChild(label);
+    }
     sel.appendChild(btn);
   });
 
@@ -444,6 +452,7 @@ function renderResourceEditorMarkup(res){
   const informationDraft = parseInformationText(res.informationText || "");
   return [
     renderResourceBasicsSection(res, verifiedDisplay),
+    renderResourceQuestionsSection(res),
     renderResourceUpdateSection(),
     renderResourceForGroupsSection(renderResourceForGroupChecks(res)),
     renderResourceCategoriesSection(renderResourceCategoryChecks(res)),
@@ -532,7 +541,8 @@ function validateResourceEditorState(idx){
   const verifiedValidation = validateVerifiedOnInput(draft.verifiedOn);
   showResourceNameWarning(nameValidation.message);
   showResourceVerifiedWarning(verifiedValidation.message);
-  const shouldDisableDone = !(nameValidation.valid && verifiedValidation.valid);
+  const questionValidation = validateResourceQuestions(draft);
+  const shouldDisableDone = !(nameValidation.valid && verifiedValidation.valid && questionValidation);
   updateResourceEditorActionBar(shouldDisableDone);
   const doneBtn = document.getElementById("res_done_btn");
   if(doneBtn) doneBtn.disabled = shouldDisableDone;
@@ -671,6 +681,10 @@ function editResource(idx){
   setupResourceCategoryControls(editor, validateEditorState);
   setupResourceVerifiedControls(elements, validateEditorState);
   setupResourceEditorValidation(editor, elements, validateEditorState);
+  editor.querySelectorAll("[data-question-note], [data-question-resolved]").forEach(field => {
+    field.addEventListener("input", validateEditorState);
+    field.addEventListener("change", validateEditorState);
+  });
   setupResourcePDFControls(idx);
 
   editorSnapshot = snapshotResourceEditor();

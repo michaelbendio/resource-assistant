@@ -149,5 +149,11 @@ function applyDeletionTombstones(packageData, records = null){
       });
     }
   });
+  const retiredCategories = tombstones.filter(record => record.kind === "category")
+    .map(record => ({ fromId:record.targetId }));
+  if(retiredCategories.length){
+    packageData.categoryMigrations = mergeCategoryMigrations(packageData.categoryMigrations, retiredCategories);
+    applyCategoryMigrations(packageData, packageData.categoryMigrations);
+  }
   return packageData;
 }

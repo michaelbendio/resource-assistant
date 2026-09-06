@@ -348,6 +348,29 @@ function normalizeCategoryMigrations(packageData){
   packageData.categoryMigrations = normalized;
 }
 
+function resolveRetiredCategoryAliases(migrations){
+  // Do not sanitize invalid input here: the package validator must still see it.
+  const retired = new Set(migrations.filter(entry => entry && typeof entry === "object"
+    && entry.fromId && !entry.toId && !entry.toFilter).map(entry => entry.fromId));
+  let changed = true;
+  while(changed){
+    changed = false;
+    migrations.forEach(entry => {
+      if(entry && entry.toId && retired.has(entry.toId) && !retired.has(entry.fromId)){
+        retired.add(entry.fromId);
+        changed = true;
+      }
+    });
+  }
+  return migrations.map(entry => {
+    if(!entry || !retired.has(entry.fromId)) return entry;
+    const result = { ...entry };
+    delete result.toId;
+    delete result.toFilter;
+    return result;
+  });
+}
+
 function mergeCategoryMigrations(localMigrations, incomingMigrations){
   const holder = {
     categoryMigrations: [
@@ -355,6 +378,7 @@ function mergeCategoryMigrations(localMigrations, incomingMigrations){
       ...(Array.isArray(incomingMigrations) ? incomingMigrations : [])
     ]
   };
+  holder.categoryMigrations = resolveRetiredCategoryAliases(holder.categoryMigrations);
   normalizeCategoryMigrations(holder);
   return holder.categoryMigrations;
 }
@@ -532,9 +556,14 @@ function mergeItemsById(localItems, incomingItems, options = {}){
     if(!id) return;
     const incomingItem = incomingById.get(id);
     const choice = chooseMergeObject(localItem, incomingItem);
-    merged.push(cloneDataObject(choice.item));
+    const mergedItem = cloneDataObject(choice.item);
+    if(options.kind === "resources"){
+      const questions = mergeResourceQuestions(localItem.openQuestions, incomingItem && incomingItem.openQuestions);
+      if(questions !== undefined) mergedItem.openQuestions = questions;
+    }
+    merged.push(mergedItem);
     seen.add(id);
-    if(incomingItem && choice.item === incomingItem && choice.changed){
+    if(incomingItem && objectsDiffer(localItem, mergedItem)){
       updated += 1;
       updatedIds.push(id);
       updatedNames.push(String(incomingItem.name || incomingItem.title || id));

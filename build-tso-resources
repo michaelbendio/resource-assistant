@@ -32,6 +32,7 @@ APP_JS_SOURCES = [
     "src/js/100c-admin-category-editor.js",
     "src/js/100d-admin-resource-editor.js",
     "src/js/100e-admin-for-groups-editor.js",
+    "src/js/100f-admin-open-questions.js",
     "src/js/102-office-context.js",
     "src/js/105-sharepoint-publishing.js",
     "src/js/110-shortcuts.js",

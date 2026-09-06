@@ -129,10 +129,24 @@ const PACKAGE_MIGRATION_FIXTURES = Object.freeze({
     deletions:[]
   },
   unsupportedSchema: {
-    resourcePackageSchemaVersion:4,
+    resourcePackageSchemaVersion:5,
     packageVersion:1,
     categories:[],
     resources:[]
+  },
+  schema3RetiredAliases: {
+    resourcePackageSchemaVersion:3, packageVersion:41,
+    categories:[{ id:"food", label:"Food", filters:["Pantries"] }],
+    categoryMigrations:[{ fromId:"Seniors", toId:"seniors" }, { fromId:"older", toId:"Seniors" }, { fromId:"seniors" }],
+    forGroups:["Seniors"], changes:[],
+    customPackageField:{ keep:true },
+    resources:[{ id:"pantry", name:"Pantry", categories:["food"], categoryFilters:{ food:["Pantries"] },
+      informationText:"Bring identification. Call before visiting.", forGroups:["Seniors"],
+      customResourceField:{ keep:true }, pdfs:[{ id:"guide", path:"pdfs/guide.pdf", name:"Guide", checksum:"keep" }] }]
+  },
+  schema3BrokenAlias: {
+    resourcePackageSchemaVersion:3, packageVersion:1, categories:[], resources:[],
+    categoryMigrations:[{ fromId:"old", toId:"missing" }]
   },
   invalidPackageVersion: {
     resourcePackageSchemaVersion:3,

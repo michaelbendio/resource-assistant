@@ -7,7 +7,7 @@
 
 const UNVERSIONED_RESOURCE_PACKAGE_SCHEMA_VERSION = 1;
 const LEGACY_RESOURCE_PACKAGE_SCHEMA_VERSION = 2;
-const RESOURCE_PACKAGE_SCHEMA_VERSION = 3;
+const RESOURCE_PACKAGE_SCHEMA_VERSION = 4;
 const RESOURCE_PACKAGE_PIPELINE_STAGES = Object.freeze([
   "read",
   "migrate",
@@ -175,7 +175,16 @@ function migrateResourcePackageSchema1To2(packageData){
 function migrateResourcePackageSchema2To3(packageData){
   if(packageData.deletionRequests == null) packageData.deletionRequests = [];
   if(packageData.deletions == null) packageData.deletions = [];
-  packageData.resourcePackageSchemaVersion = RESOURCE_PACKAGE_SCHEMA_VERSION;
+  packageData.resourcePackageSchemaVersion = 3;
+  return packageData;
+}
+
+function migrateResourcePackageSchema3To4(packageData){
+  // A retired target also retires its old aliases. Preserve every source ID.
+  if(Array.isArray(packageData.categoryMigrations)){
+    packageData.categoryMigrations = resolveRetiredCategoryAliases(packageData.categoryMigrations);
+  }
+  packageData.resourcePackageSchemaVersion = 4;
   return packageData;
 }
 
@@ -185,9 +194,10 @@ const RESOURCE_PACKAGE_SCHEMA_MIGRATIONS = new Map([
     migrate:migrateResourcePackageSchema1To2
   }],
   [LEGACY_RESOURCE_PACKAGE_SCHEMA_VERSION, {
-    toVersion:RESOURCE_PACKAGE_SCHEMA_VERSION,
+    toVersion:3,
     migrate:migrateResourcePackageSchema2To3
-  }]
+  }],
+  [3, { toVersion:4, migrate:migrateResourcePackageSchema3To4 }]
 ]);
 
 function migrateResourcePackageData(packageData, options = {}){
@@ -421,6 +431,7 @@ function validateResourcePackageData(packageData){
     }
     if(id && resourceIds.has(id)) errors.push(`Duplicate resource id '${id}'.`);
     if(id) resourceIds.add(id);
+    resourceQuestionErrors(resource && resource.openQuestions).forEach(error => errors.push(`Resource '${id || index}': ${error}`));
     (Array.isArray(resource && resource.categories) ? resource.categories : []).forEach(categoryId => {
       if(!categoryIds.has(String(categoryId))){
         warnings.push(`Resource '${id || index}' references unknown category '${categoryId}'.`);

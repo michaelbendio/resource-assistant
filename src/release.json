@@ -1,9 +1,19 @@
 {
-  "version": "2.3.4",
-  "build": 150,
-  "date": "2026-08-28",
-  "message": "Add AutoCurator category package workflow",
+  "version": "2.3.7",
+  "build": 153,
+  "date": "2026-09-06",
+  "message": "Add Scout navigation and curator open-question handoff",
   "appChanges": [
+    {
+      "date": "2026-09-06",
+      "version": "2.3.7",
+      "message": "See Scout’s open questions beside resources in Admin mode, with explanations and saved resolution notes in the resource editor."
+    },
+    {
+      "date": "2026-09-06",
+      "version": "2.3.6",
+      "message": "Narrow resources by Type and group, with matching counts and Clear filters."
+    },
     {
       "date": "2026-08-28",
       "version": "2.3.4",
