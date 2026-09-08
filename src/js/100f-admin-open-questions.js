@@ -76,17 +76,22 @@ function resourceOpenQuestionLabel(resource){
 function renderResourceQuestionsSection(resource){
   const questions = resourceQuestions(resource);
   if(!questions.length) return "";
-  return `<section id="res_open_questions" style="padding:14px;border:1px solid #b7791f;border-radius:8px;margin:12px 0;">
-    <h3 style="margin-top:0;">Questions for the curator</h3>
-    <p>Scout found specific questions it could not settle. These notes do not appear in patron handouts.</p>
-    ${questions.map(q => `<div data-question-id="${escapeHTML(q.id)}" style="margin:16px 0;">
+  const renderQuestion = q => `<div data-question-id="${escapeHTML(q.id)}" style="margin:16px 0;">
       <strong class="${q.status === "resolved" ? "" : "resource-open-question-text"}">${escapeHTML(q.question)}</strong>
       <p style="white-space:pre-wrap;">${escapeHTML(q.explanation || "")}</p>
       ${q.resolutionConflict ? `<p class="resource-open-question-text">Saved decisions disagree. Review both notes and record the decision to use.</p>${q.decisionAlternatives.map(h => `<p>${escapeHTML(h.status)}: ${escapeHTML(h.resolution || "No resolution note")}</p>`).join("")}` : ""}
-      <label>Resolution note<br><textarea data-question-note style="width:100%;min-height:60px;">${escapeHTML(q.resolution || "")}</textarea></label>
+      <label>What did you find out?<br><textarea data-question-note style="width:100%;min-height:60px;">${escapeHTML(q.resolution || "")}</textarea></label>
+      <p>Include how you checked and, if you contacted someone, when. Update the resource’s information or categories if needed.</p>
       <label style="display:block;"><input type="checkbox" data-question-resolved ${q.status === "resolved" ? "checked" : ""}> Resolved</label>
       ${Array.isArray(q.history) && q.history.length ? `<details><summary>Earlier question decisions</summary>${q.history.map(h => `<p>${escapeHTML(h.changedAt || "")} · ${escapeHTML(h.status || "")}<br>${escapeHTML(h.resolution || "")}</p>`).join("")}</details>` : ""}
-    </div>`).join("")}
+    </div>`;
+  const open = questions.filter(q => q.status !== "resolved");
+  const resolved = questions.filter(q => q.status === "resolved");
+  return `<section id="res_open_questions" style="padding:14px;border:1px solid #b7791f;border-radius:8px;margin:12px 0;">
+    <h3 style="margin-top:0;">Questions for the curator</h3>
+    <p>Scout found specific questions it could not settle. These notes do not appear in patron handouts.</p>
+    ${open.map(renderQuestion).join("")}
+    ${resolved.length ? `<details data-resolved-questions><summary>Resolved questions (${resolved.length})</summary>${resolved.map(renderQuestion).join("")}</details>` : ""}
     <p id="res_question_warning" role="alert" style="color:#a00;"></p>
   </section>`;
 }

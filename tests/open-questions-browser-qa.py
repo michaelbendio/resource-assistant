@@ -28,6 +28,8 @@ with sync_playwright() as pw:
         assert page.evaluate('document.documentElement.scrollWidth<=innerWidth'), ('question editor overflow',width)
     page.set_viewport_size({'width':768,'height':1024})
     assert 'Every resource still needs' not in page.locator('#res_open_questions').inner_text()
+    assert 'What did you find out?' in page.locator('#res_open_questions').inner_text()
+    assert 'Include how you checked and, if you contacted someone, when.' in page.locator('#res_open_questions').inner_text()
     assert page.locator('.resource-open-question-text').first.evaluate("e=>getComputedStyle(e).color")== 'rgb(176, 0, 32)'
     page.locator('[data-question-resolved]').first.check()
     assert page.locator('#res_done_btn').is_disabled()
@@ -38,6 +40,12 @@ with sync_playwright() as pw:
     page.locator('#res_cancel_btn').click()
     assert page.evaluate("data.resources.find(r=>r.id==='provo-city-housing-authority').openQuestions[0].status")=='open'
     page.get_by_role('button',name='Edit',exact=True).click()
+    page.locator('[data-question-note]').first.fill('Synthetic partial research; answer is not settled.')
+    page.locator('#res_update_description').fill('Synthetic QA progress note')
+    page.locator('#res_done_btn').click()
+    assert page.evaluate("data.resources.find(r=>r.id==='provo-city-housing-authority').openQuestions[0].status")=='open'
+    page.get_by_role('button',name='Edit',exact=True).click()
+    assert page.locator('[data-question-note]').first.input_value()=='Synthetic partial research; answer is not settled.'
     page.locator('[data-question-note]').first.fill('Synthetic QA decision, not a real provider call.')
     page.locator('[data-question-resolved]').first.check()
     page.locator('#res_update_description').fill('Synthetic QA question resolution')
@@ -62,9 +70,14 @@ with sync_playwright() as pw:
     handout=page.evaluate("()=>{const c=document.createElement('div');PrintWorkflow.renderPrintableResourceCards(c,[data.resources.find(r=>r.id==='provo-city-housing-authority')]);return c.textContent;}")
     assert question not in handout and 'Synthetic QA decision' not in handout
     page.get_by_role('button',name='Edit',exact=True).click()
-    page.locator('[data-question-resolved]').first.uncheck();page.locator('#res_update_description').fill('Synthetic QA reopen');page.locator('#res_done_btn').click()
+    resolved=page.locator('[data-resolved-questions]')
+    assert resolved.get_attribute('open') is None
+    assert not resolved.locator('[data-question-note]').is_visible()
+    resolved.locator(':scope > summary').click()
+    assert resolved.locator('[data-question-note]').input_value()=='Synthetic QA decision, not a real provider call.'
+    resolved.locator('[data-question-resolved]').uncheck();page.locator('#res_update_description').fill('Synthetic QA reopen');page.locator('#res_done_btn').click()
     assert page.locator('[data-resource-id="provo-city-housing-authority"]').inner_text().endswith('2 open questions')
-    assert page.evaluate("data.resources.find(r=>r.id==='provo-city-housing-authority').openQuestions[0].history.length")==2
+    assert page.evaluate("data.resources.find(r=>r.id==='provo-city-housing-authority').openQuestions[0].history.length")==3
     for width in (390,768,1200):
         page.set_viewport_size({'width':width,'height':950});assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
     assert not errors,errors

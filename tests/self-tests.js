@@ -12,6 +12,17 @@ async function runSelfTests(){
   const questionFixture = () => ({id:"q1", question:"Which office handles intake?", explanation:"The pages disagree.", status:"open", resolution:"", source:{kind:"test"}});
   const decidedQuestion = (base, status, resolution, changedAt) => ({...structuredClone(base), status, resolution,
     history:[...(base.history || []), {status, resolution, changedAt}]});
+  tests.push({name:"RESOLVED QUESTIONS REMAIN EDITABLE INSIDE COLLAPSED GROUP", fn:() => {
+    const open = questionFixture();
+    const resolved = decidedQuestion({...open,id:"q2"}, "resolved", "Use the local office.", "2026-09-05T01:00:00Z");
+    const container = document.createElement("div");
+    container.innerHTML = renderResourceQuestionsSection({openQuestions:[resolved,open]});
+    const group = container.querySelector("[data-resolved-questions]");
+    if(!group || group.open || group.querySelector("[data-question-id]").dataset.questionId !== "q2") throw Error("Resolved answer was lost or not collapsed");
+    if(group.querySelector("textarea").value !== resolved.resolution || !group.querySelector("input").checked) throw Error("Saved decision cannot be edited");
+    if(container.querySelector('[data-question-id="q1"]').closest("[data-resolved-questions]")) throw Error("Open question was hidden");
+    if(!container.textContent.includes("What did you find out?")) throw Error("Curator guidance missing");
+  }});
   tests.push({name:"QUESTIONS SURVIVE NEWER LEGACY RESOURCE EDIT", fn:() => {
     const q = decidedQuestion(questionFixture(), "resolved", "Use the local office.", "2026-09-05T01:00:00Z");
     const local = {id:"r", phone:"old", openQuestions:[q], lastModified:"2026-09-05T01:00:00Z"};

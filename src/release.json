@@ -1,8 +1,8 @@
 {
   "version": "2.3.7",
-  "build": 153,
-  "date": "2026-09-06",
-  "message": "Add Scout navigation and curator open-question handoff",
+  "build": 154,
+  "date": "2026-09-07",
+  "message": "Clarify curator answers and group resolved questions",
   "appChanges": [
     {
       "date": "2026-09-06",
