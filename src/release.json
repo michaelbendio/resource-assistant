@@ -1,8 +1,8 @@
 {
-  "version": "2.3.4",
-  "build": 150,
-  "date": "2026-08-28",
-  "message": "Add AutoCurator category package workflow",
+  "version": "2.3.5",
+  "build": 152,
+  "date": "2026-09-09",
+  "message": "Clear starter taxonomy and fix two-word office package names",
   "appChanges": [
     {
       "date": "2026-08-28",

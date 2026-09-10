@@ -52,7 +52,7 @@ function changeSharePointPublishingDestinationButtonHTML(){
 
 function getSharePointPublishingOfficeName(storageId = STORAGE_KEY_PREFIX){
   const normalized = normalizeStorageId(storageId);
-  if(normalized === STORAGE_KEY_PREFIX){
+  if(normalized === normalizeStorageId(STORAGE_KEY_PREFIX)){
     return getTsoName() || getTsoNameFromHtmlFileName(getCurrentHtmlFileName()) || "This office";
   }
   return String(normalized || "")
@@ -65,7 +65,7 @@ function getSharePointPublishingOfficeName(storageId = STORAGE_KEY_PREFIX){
 
 function getExpectedSharePointPackageFileName(storageId = STORAGE_KEY_PREFIX){
   const normalized = normalizeStorageId(storageId);
-  if(normalized === STORAGE_KEY_PREFIX && isSharePointPublishingAvailable(getConfiguredStorageId())){
+  if(normalized === normalizeStorageId(STORAGE_KEY_PREFIX) && isSharePointPublishingAvailable(getConfiguredStorageId())){
     return getResourcePackageZipFilename();
   }
   const stem = String(normalized || "tso")

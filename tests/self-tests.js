@@ -650,6 +650,37 @@ async function runSelfTests(){
   });
 
   tests.push({
+    name: "TWO-WORD OFFICE PACKAGE NAME MATCHES SHAREPOINT",
+    fn: () => {
+      // Run the real naming functions with the startup prefix produced for a
+      // two-word office. Keep browser storage normalization unchanged.
+      const naming = new Function(
+        "STORAGE_KEY_PREFIX", "normalizeStorageId", "getConfiguredStorageId",
+        "isSharePointPublishingAvailable", "getResourcePackageZipFilename",
+        "getTsoName", "getTsoNameFromHtmlFileName", "getCurrentHtmlFileName",
+        `${getExpectedSharePointPackageFileName.toString()}
+         ${getSharePointPublishingOfficeName.toString()}
+         return { file:getExpectedSharePointPackageFileName(),
+                  office:getSharePointPublishingOfficeName() };`
+      );
+      const result = naming(
+        "welfareSquare", normalizeStorageId, () => "welfareSquare",
+        isSharePointPublishingAvailable, () => "welfare-square-resource-package.zip",
+        () => "Welfare Square", () => "Welfaresquare", () => "welfareSquare.html"
+      );
+      if(result.file !== "welfare-square-resource-package.zip"){
+        throw new Error(`two-word office expected the wrong package: ${result.file}`);
+      }
+      if(result.office !== "Welfare Square"){
+        throw new Error(`two-word office lost its display name: ${result.office}`);
+      }
+      const url = "https://churchofjesuschrist.sharepoint.com/sites/WSR_TSO/Welfare%20Square%20TSO/Forms/AllItems.aspx?id=%2Fsites%2FWSR_TSO%2FWelfare%20Square%20TSO%2Fwelfare-square-resource-package.zip&parent=%2Fsites%2FWSR_TSO%2FWelfare%20Square%20TSO";
+      const target = parseSharePointPublishingUrl(url, result.file, result.office);
+      if(target.officeName !== "Welfare Square") throw new Error("wrong publishing office");
+    }
+  });
+
+  tests.push({
     name: "SHAREPOINT DESTINATION URL VALIDATION",
     fn: () => {
       const provoUrl = "https://churchofjesuschrist.sharepoint.com/sites/WSR_TSO/Provo%20TSO/Forms/AllItems.aspx?id=%2Fsites%2FWSR_TSO%2FProvo%20TSO%2Fprovo-resource-package.zip&parent=%2Fsites%2FWSR_TSO%2FProvo%20TSO&share=tracking&CT=123";
