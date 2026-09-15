@@ -823,7 +823,7 @@ async function runSelfTests(){
       const previousSafeRender = safeRender;
       const previousRenderPublishingModal = renderSharePointPublishingModal;
       const previousGetPDF = getPDF;
-      const previousSavePDF = savePDF;
+      const previousCommitMergeAssets = commitMergeAssets;
       const previousAlert = window.alert;
       try{
         const localPdfPath = "pdfs/prepared-local.pdf";
@@ -832,7 +832,10 @@ async function runSelfTests(){
           [localPdfPath, new Blob(["prepared PDF"], { type:"application/pdf" })]
         ]);
         getPDF = async path => assets.get(path) || null;
-        savePDF = async (path, blob) => { assets.set(path, blob); };
+        commitMergeAssets = async (entries, commitResources) => {
+          commitResources();
+          entries.forEach(({key, blob}) => assets.set(key, blob));
+        };
         safeRender = () => {};
         renderSharePointPublishingModal = () => {};
         window.alert = message => { throw new Error(`unexpected alert: ${message}`); };
@@ -999,7 +1002,7 @@ async function runSelfTests(){
       }finally{
         window.alert = previousAlert;
         getPDF = previousGetPDF;
-        savePDF = previousSavePDF;
+        commitMergeAssets = previousCommitMergeAssets;
         safeRender = previousSafeRender;
         renderSharePointPublishingModal = previousRenderPublishingModal;
         sharePointPublishRun = previousPublishRun;

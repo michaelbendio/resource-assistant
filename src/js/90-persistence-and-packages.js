@@ -423,9 +423,9 @@ function applyCategoryMigrations(packageData, migrations){
   });
 }
 
-function getRecentChanges(){
-  normalizeChanges(data);
-  return data.changes.slice().sort((a,b)=>String(b.timestamp||"").localeCompare(String(a.timestamp||"")));
+function getRecentChanges(packageData = data){
+  normalizeChanges(packageData);
+  return packageData.changes.slice().sort((a,b)=>String(b.timestamp||"").localeCompare(String(a.timestamp||"")));
 }
 
 function markChangesViewed(changeIds){
@@ -764,33 +764,124 @@ function mergeResourcePackages(localData, incomingData){
   };
 }
 
-async function mergeZipAssets(zip, mergedData){
-  const pdfKeys = collectPDFPathsFromResources(mergedData.resources);
-  const missing = [];
+function mergeStorageError(error, area){
+  const quota = error && (error.name === "QuotaExceededError" || error.code === 22);
+  const wrapped = new Error(quota
+    ? `Browser storage is full while saving ${area}.`
+    : `Could not save ${area}: ${error && error.message || "Storage is unavailable."}`);
+  wrapped.cause = error;
+  return wrapped;
+}
 
-  for(const key of pdfKeys){
-    const entry = zip.file(key);
-    if(entry && key.toLowerCase().endsWith(".pdf")){
-      const blob = await entry.async("blob");
-      await savePDF(key, blob);
-    }else{
-      let existing = null;
-      try{
-        existing = await getPDF(key);
-      }catch(_err){}
-      if(!existing) missing.push(key);
+async function prepareMergeAssets(zip, mergedData){
+  const entries = [];
+  const missing = [];
+  try{
+    for(const key of collectPDFPathsFromResources(mergedData.resources)){
+      const entry = zip.file(key);
+      if(entry && key.toLowerCase().endsWith(".pdf")){
+        entries.push({key, blob:ensurePDFBlob(await entry.async("blob"))});
+      }else if(!await getPDF(key)){
+        missing.push(key);
+      }
     }
+  }catch(error){
+    throw mergeStorageError(error, "PDF attachments");
   }
-  return missing;
+  return {entries, missing};
+}
+
+// All PDFs are written in one transaction. A failed write (including an abort
+// after the last request succeeds) restores every old PDF and removes new ones.
+async function commitMergeAssets(entries, commitResourceStorage){
+  if(!entries.length){
+    commitResourceStorage();
+    return;
+  }
+  let db;
+  try{ db = await openAssetsDB(); }
+  catch(error){ throw mergeStorageError(error, "PDF attachments"); }
+  return new Promise((resolve, reject) => {
+    let tx;
+    let failure = null;
+    try{
+      tx = db.transaction("files", "readwrite");
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onabort = () => {
+        db.close();
+        reject(failure || mergeStorageError(tx.error, "PDF attachments"));
+      };
+      let remaining = entries.length;
+      for(const {key, blob} of entries){
+        const request = tx.objectStore("files").put(blob, key);
+        request.onsuccess = () => {
+          remaining -= 1;
+          if(remaining) return;
+          try{ commitResourceStorage(); }
+          catch(error){ failure = error; tx.abort(); }
+        };
+      }
+    }catch(error){
+      failure = mergeStorageError(error, "PDF attachments");
+      if(tx){ tx.abort(); }
+      else{ db.close(); reject(failure); }
+    }
+  });
+}
+
+function prepareMergedResourceStorage(mergedData, options = {}){
+  const candidate = processResourcePackageData(mergedData, {
+    sourceName:"Merged resource package"
+  }).data;
+  candidate.appVersion = APP_VERSION;
+  candidate.lastModified = nowISO();
+  const ids = new Set(candidate.resources.map(resource => String(resource.id)));
+  const favorites = normalizeStoredResourceIds(favoriteResourceIds).filter(id => ids.has(id));
+  const selection = printSelection.filter(id => ids.has(String(id)));
+  const keys = [DATA_STORAGE_KEY, PRE_MERGE_STORAGE_KEY, DELETION_REVIEW_STORAGE_KEY,
+    UNDO_STORAGE_KEY, FAVORITE_RESOURCE_IDS_STORAGE_KEY, PRINT_SELECTION_STORAGE_KEY];
+  let previous = null;
+  return {
+    commit(){
+      previous = new Map(keys.map(key => [key, localStorage.getItem(key)]));
+      let area = "resources and merge settings";
+      try{
+        if(options.fileName && !options.skipPreMergeSnapshot){
+          area = "pre-merge recovery copies";
+          AdminRecoveryStore.add(options.fileName);
+        }
+        area = "resources and merge settings";
+        if(options.fileName && !options.skipDeletionReview){
+          saveDeletionReview(options.fileName, options.packageVersion, options.deletionRequests);
+        }
+        // A completed merge expires deletion Undo. Do not discard it on failure.
+        localStorage.removeItem(UNDO_STORAGE_KEY);
+        localStorage.setItem(FAVORITE_RESOURCE_IDS_STORAGE_KEY, JSON.stringify(favorites));
+        localStorage.setItem(PRINT_SELECTION_STORAGE_KEY, JSON.stringify(selection));
+        localStorage.setItem(DATA_STORAGE_KEY, JSON.stringify(candidate));
+      }catch(error){ throw mergeStorageError(error, area); }
+    },
+    rollback(){
+      if(!previous) return;
+      // Release only changed keys before restoring, so rollback needs no extra
+      // quota beyond the storage that existed before this attempt.
+      const changed = [...previous].filter(([key, value]) => localStorage.getItem(key) !== value);
+      changed.forEach(([key]) => localStorage.removeItem(key));
+      changed.forEach(([key, value]) => { if(value !== null) localStorage.setItem(key, value); });
+    },
+    activate(){
+      data = candidate;
+      favoriteResourceIds = favorites;
+      printSelection = selection;
+    }
+  };
 }
 
 function applyMergedData(mergedData){
-  data = processResourcePackageData(mergedData, {
-    sourceName:"Merged resource package"
-  }).data;
-  sanitizeFavoriteResourceIds();
-  sanitizePrintSelection();
-  persist();
+  const storage = prepareMergedResourceStorage(mergedData);
+  try{ storage.commit(); }
+  catch(error){ storage.rollback(); throw error; }
+  storage.activate();
   safeRender();
 }
 
@@ -995,7 +1086,6 @@ async function mergeImportPackage(event, options = {}){
     const preparedPackageInfo = options.preservePreparedChanges && data && data.lastLoadedPackageInfo
       ? cloneDataObject(data.lastLoadedPackageInfo)
       : null;
-    if(!options.skipPreMergeSnapshot && !savePreMergeSnapshot(file.name)) return;
     const importedChangeIds = new Set((imported.changes || []).map(entry => String(entry && entry.id || "")).filter(Boolean));
     const importedPackageVersion = normalizePackageVersionValue(imported.packageVersion);
     const currentPackageInfo = (data && data.lastLoadedPackageInfo && typeof data.lastLoadedPackageInfo === "object")
@@ -1007,13 +1097,6 @@ async function mergeImportPackage(event, options = {}){
       .filter(item => item.paths.length);
     const { mergedData, summary:mergeSummary } = mergeResourcePackages(data, imported);
     const mergedPendingDeletionKeys = new Set((mergedData.deletionRequests || []).map(request => request.key));
-    if(!options.skipDeletionReview){
-      saveDeletionReview(
-        file.name,
-        importedPackageVersion,
-        incomingDeletionRequests.filter(request => mergedPendingDeletionKeys.has(request.key))
-      );
-    }
     const mergedById = new Map((mergedData.resources || []).map(r => [String(r && r.id || ""), r]));
     const resourcesWithPdf = localResourcesWithPdf
       .filter(item => {
@@ -1023,15 +1106,14 @@ async function mergeImportPackage(event, options = {}){
       })
       .map(item => item.resource.name);
 
-    const missingPdfPaths = await mergeZipAssets(zip, mergedData);
-    applyMergedData(mergedData);
+    const {entries:pdfEntries, missing:missingPdfPaths} = await prepareMergeAssets(zip, mergedData);
     const mergedTargetKeys = new Set([
       ...(mergeSummary.resourceIdsAdded || []).map(id => `resource:${id}`),
       ...(mergeSummary.resourceIdsUpdated || []).map(id => `resource:${id}`),
       ...(mergeSummary.categoryIdsAdded || []).map(id => `category:${id}`),
       ...(mergeSummary.categoryIdsUpdated || []).map(id => `category:${id}`)
     ]);
-    const loadedChanges = getRecentChanges().filter(entry => {
+    const loadedChanges = getRecentChanges(mergedData).filter(entry => {
       const changeId = String(entry && entry.id || "");
       const targetKey = `${String(entry && entry.type || "")}:${String(entry && entry.targetId || "")}`;
       return importedChangeIds.has(changeId) && mergedTargetKeys.has(targetKey);
@@ -1040,23 +1122,37 @@ async function mergeImportPackage(event, options = {}){
       ? loadedChanges.map(formatPackageChangeSummary)
       : buildPackageMergeSummary(mergeSummary);
     if(options.preservePreparedChanges){
-      data.lastLoadedPackageInfo = preparedPackageInfo;
+      mergedData.lastLoadedPackageInfo = preparedPackageInfo;
     }else if(shouldReplaceLatestPackageInfo(currentPackageInfo, importedPackageVersion)){
       const persistentChangeSummaries = !loadedChangeSummaries.length
         ? (imported.changes || []).map(formatPackageChangeSummary)
         : loadedChangeSummaries;
-      data.lastLoadedPackageInfo = {
+      mergedData.lastLoadedPackageInfo = {
         sourcePackageVersion: importedPackageVersion,
         loadedAt: nowISO(),
         sourcePackageCreatedAt: getResourcePackageCreatedAt(imported),
         changes: persistentChangeSummaries
       };
     }else{
-      data.lastLoadedPackageInfo = currentPackageInfo;
+      mergedData.lastLoadedPackageInfo = currentPackageInfo;
     }
-    normalizeLastLoadedPackageInfo(data);
-    data.changes = options.preservePreparedChanges ? preparedChanges : [];
-    persist();
+    normalizeLastLoadedPackageInfo(mergedData);
+    mergedData.changes = options.preservePreparedChanges ? preparedChanges : [];
+    const storage = prepareMergedResourceStorage(mergedData, {
+      ...options, fileName:file.name, packageVersion:importedPackageVersion,
+      deletionRequests:incomingDeletionRequests.filter(request => mergedPendingDeletionKeys.has(request.key))
+    });
+    try{
+      await commitMergeAssets(pdfEntries, () => storage.commit());
+    }catch(error){
+      try{ storage.rollback(); }
+      catch(rollbackError){
+        throw new Error(`${error.message} Browser storage could not be restored. Keep this tab open and save a resource package before reloading. ${rollbackError.message}`);
+      }
+      throw new Error(`${error.message} The merge was not applied; your existing resources and PDFs are unchanged.`);
+    }
+    storage.activate();
+    safeRender();
     if(!options.silent && loadedChangeSummaries.length){
       pendingRecentUpdates = [];
       recentUpdateDetail = null;
