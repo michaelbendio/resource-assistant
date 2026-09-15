@@ -365,12 +365,12 @@ function renderCategoriesGrid(){
 }
 
 function renderCategoriesView(){
-  // Main public landing screen: tip, update notice, category grid,
+  // Main public landing screen: contact reminder, tip, update notice, category grid,
   // and resource-package merge entry point.
+  renderCategoryReminder();
   renderCategoryTip();
   renderPendingUpdatesNotice();
   renderBrowseModeSwitch();
-  if(categoryBrowseMode === "need") renderCategoryReminder();
   renderLandingSearch();
   if(categoryBrowseMode === "need"){
     renderCategoriesGrid();

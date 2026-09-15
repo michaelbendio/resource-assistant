@@ -4774,9 +4774,10 @@ async function runSelfTests(){
         }
         const landingChildren = Array.from(appView.children);
         if(!categoryTip || !categoryReminder || !landingSearch
-          || landingChildren.indexOf(categoryTip) >= landingChildren.indexOf(categoryReminder)
-          || landingChildren.indexOf(categoryReminder) >= landingChildren.indexOf(landingSearch)){
-          throw new Error("bug-report reminder was not between the category tip and search field");
+          || landingChildren.indexOf(categoryReminder) !== 0
+          || landingChildren.indexOf(categoryTip) !== 1
+          || landingChildren.indexOf(categoryTip) >= landingChildren.indexOf(landingSearch)){
+          throw new Error("bug-report reminder was not first below the title and directly above the category tip");
         }
 
         landingInput.value = "pantry";

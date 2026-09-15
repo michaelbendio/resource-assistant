@@ -262,7 +262,7 @@ function createTip(tipId){
   const text = tip.querySelector(".red-tip-text");
   if(!text) return tip;
   text.textContent = "";
-  text.append("Click a category to see its resources and click a resource for details. Click ");
+  text.append("Choose a category under “Browse by need,” or select “Find resources for” and choose one or more groups. Click a resource for details. Click ");
   const printer = createInterfaceIcon("printer");
   printer.classList.add("tip-inline-icon", "tip-printer-icon");
   text.appendChild(printer);

@@ -1,8 +1,8 @@
 {
   "version": "2.3.8",
-  "build": 157,
+  "build": 158,
   "date": "2026-09-14",
-  "message": "Preserve resources and PDFs when a package merge cannot be saved",
+  "message": "Clarify browsing guidance and move the feedback reminder above the tip",
   "appChanges": [
     {
       "date": "2026-09-14",

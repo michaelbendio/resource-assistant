@@ -159,12 +159,12 @@ function freshStartFromSeed(){
 // Main persisted app data snapshot (categories/resources + metadata).
 let data = JSON.parse(localStorage.getItem(DATA_STORAGE_KEY) || "null");
 const TIP_TEXT = {
-  user: "Click a category to see its resources and click a resource for details. Use the printer button to select it for printing. Use the star to add it to or remove it from Favorites.",
+  user: "Choose a category under “Browse by need,” or select “Find resources for” and choose one or more groups. Click a resource for details. Use the printer button to select it for printing. Use the star to add it to or remove it from Favorites.",
   newAdminWelcome: "Welcome to you, new admin. Press Ctrl+Alt+A to enter admin mode",
   newAdminMode: "Click \"Office Setup\" to name this TSO Resources. Then close this tab or window and rename new.html to the changed name, keeping the .html extension. Open it and enter admin mode again."
 };
 const DEFAULT_RESOURCE_PACKAGE_FILENAME = "tso-resources.json";
-const CATEGORY_REMINDER_TEXT = "Report bugs or request enhancments to Elder Bendio (michaelbendio@gmail.com)"
+const CATEGORY_REMINDER_TEXT = "Report bugs or request enhancements to Elder Bendio (michaelbendio@gmail.com)"
 
 if(!data){
   data = seed;
