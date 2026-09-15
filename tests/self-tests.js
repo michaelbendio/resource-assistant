@@ -9,6 +9,14 @@
 
 async function runSelfTests(){
   const tests = [];
+  tests.push({name:"OPAQUE EXTENSIONS SURVIVE ORDINARY OFFICE PACKAGE TRANSFERS", fn:() => {
+    const resource = {id:"r", name:"Test", categories:[], forGroups:[], pdfs:[], informationText:"",
+      externalMetadata:{notes:["Opaque data"], revision:1}, lastModified:"2026-09-14T10:00:00Z"};
+    const packet = buildResourcePackageData({categories:[], forGroups:[], resources:[resource]});
+    const reopened = processResourcePackageData(packet, {sourceName:"Extension preservation test"}).data;
+    const merged = mergeItemsById([], reopened.resources, {kind:"resources"}).merged;
+    if(JSON.stringify(merged[0].externalMetadata) !== JSON.stringify(resource.externalMetadata)) throw Error("Opaque metadata changed during transfer");
+  }});
 
   function withSelfTestHtmlFileName(fileName, callback){
     const previousGetCurrentHtmlFileName = getCurrentHtmlFileName;
@@ -89,72 +97,6 @@ async function runSelfTests(){
       if(normalizePackageVersionValue("") !== "Unknown") throw new Error("blank packageVersion should fallback");
       if(normalizePackageVersionValue(12) !== 12) throw new Error("numeric packageVersion should be preserved");
       if(normalizePackageVersionValue("13") !== 13) throw new Error("string numeric packageVersion should normalize to number");
-    }
-  });
-
-  tests.push({
-    name: "AUTOCURATOR EXPORT IS CATEGORY ONLY",
-    fn: () => {
-      const packageData = buildAutoCuratorCategoryPackageData({
-        resourcePackageSchemaVersion:3,
-        packageVersion:7,
-        categories:[
-          { id:"employment", label:"Employment", active:true, filters:["Résumé assistance"] },
-          { id:"food", label:"Food", active:true, filters:["Pantry"] }
-        ],
-        categoryMigrations:[],
-        forGroups:["Veterans", "Families with children"],
-        resources:[
-          {
-            id:"employment-resource",
-            name:"Employment Help",
-            phone:"",
-            address:"",
-            website:"https://example.org/work",
-            hours:"",
-            description:"Employment help.",
-            informationText:"",
-            verifiedOn:null,
-            categories:["employment", "food"],
-            categoryFilters:{ employment:["Résumé assistance"], food:["Pantry"] },
-            forGroups:["Veterans"],
-            pdfs:[],
-            lastModified:"2026-08-28T12:00:00.000Z"
-          },
-          {
-            id:"food-resource",
-            name:"Food Help",
-            categories:["food"],
-            categoryFilters:{ food:["Pantry"] },
-            forGroups:["Families with children"]
-          }
-        ],
-        changes:[],
-        deletionRequests:[],
-        deletions:[]
-      }, {
-        locationName:"Mesa",
-        categoryId:"employment",
-        categoryLabel:"Employment"
-      });
-      if(packageData.categories.length !== 1 || packageData.categories[0].id !== "employment"){
-        throw new Error("category-only package should include only Employment");
-      }
-      if(packageData.resources.length !== 1 || packageData.resources[0].id !== "employment-resource"){
-        throw new Error("category-only package should include only Employment resources");
-      }
-      if(packageData.resources[0].categories.join(",") !== "employment"){
-        throw new Error("exported resources should be scoped to Employment");
-      }
-      if(Object.keys(packageData.resources[0].categoryFilters).join(",") !== "employment"){
-        throw new Error("unrelated category filters should not be exported");
-      }
-      if(packageData.forGroups.join(",") !== "Veterans"){
-        throw new Error("only referenced For values should be exported");
-      }
-      if(packageData.packageVersion !== 7){
-        throw new Error("category-only export should preserve the current package version");
-      }
     }
   });
 
@@ -3218,7 +3160,7 @@ async function runSelfTests(){
       if(JSON.stringify(processed.stages) !== JSON.stringify(expected)){
         throw new Error(`unexpected package pipeline ${JSON.stringify(processed.stages)}`);
       }
-      if(processed.fromVersion !== 2 || JSON.stringify(processed.appliedMigrations) !== JSON.stringify(["2->3"])){
+      if(processed.fromVersion !== 2 || JSON.stringify(processed.appliedMigrations) !== JSON.stringify(["2->3", "3->4"])){
         throw new Error("schema 2 migration was not explicit");
       }
     }
@@ -3233,7 +3175,7 @@ async function runSelfTests(){
       );
       const migrated = processed.data;
       if(processed.fromVersion !== 1
-        || JSON.stringify(processed.appliedMigrations) !== JSON.stringify(["1->2", "2->3"])){
+        || JSON.stringify(processed.appliedMigrations) !== JSON.stringify(["1->2", "2->3", "3->4"])){
         throw new Error("unversioned package did not run both migrations");
       }
       if(migrated.resourcePackageSchemaVersion !== RESOURCE_PACKAGE_SCHEMA_VERSION){
@@ -3362,7 +3304,7 @@ async function runSelfTests(){
       const cases = [
         [PACKAGE_MIGRATION_FIXTURES.malformedContainers, /cannot be migrated safely.*categories/is],
         [PACKAGE_MIGRATION_FIXTURES.malformedDeletion, /cannot be migrated safely.*unsupported kind/is],
-        [PACKAGE_MIGRATION_FIXTURES.unsupportedSchema, /unsupported resource package schema 4/is],
+        [PACKAGE_MIGRATION_FIXTURES.unsupportedSchema, /unsupported resource package schema 5/is],
         [PACKAGE_MIGRATION_FIXTURES.invalidPackageVersion, /cannot be migrated safely.*packageVersion/is],
         [{
           resourcePackageSchemaVersion:RESOURCE_PACKAGE_SCHEMA_VERSION,
@@ -3401,7 +3343,7 @@ async function runSelfTests(){
       const current = validateImportData({ ...base, resourcePackageSchemaVersion:RESOURCE_PACKAGE_SCHEMA_VERSION, deletionRequests:[], deletions:[] });
       const future = validateImportData({ ...base, resourcePackageSchemaVersion:RESOURCE_PACKAGE_SCHEMA_VERSION + 1 });
       if(!legacy.ok) throw new Error(`schema 2 package was rejected: ${legacy.errors.join(", ")}`);
-      if(!current.ok) throw new Error(`schema 3 package was rejected: ${current.errors.join(", ")}`);
+      if(!current.ok) throw new Error(`schema 4 package was rejected: ${current.errors.join(", ")}`);
       if(future.ok) throw new Error("unsupported future schema was accepted");
     }
   });
@@ -4338,7 +4280,44 @@ async function runSelfTests(){
   });
 
   tests.push({
-    name: "CATEGORY FILTER OR LOGIC",
+    name:"SCHEMA 4 RETIRED ALIASES AND SAFE EXTENSIONS",
+    fn:() => {
+      const fixture = PACKAGE_MIGRATION_FIXTURES.schema3RetiredAliases;
+      const original = JSON.stringify(fixture);
+      const migrated = processResourcePackageData(fixture).data;
+      if(migrated.categoryMigrations.some(entry => entry.toId)) throw new Error("retired alias chain survived migration");
+      if(JSON.stringify(fixture) !== original) throw new Error("migration mutated its input");
+      if(JSON.stringify(migrated.customPackageField) !== JSON.stringify(fixture.customPackageField)
+        || migrated.resources[0].informationText !== fixture.resources[0].informationText
+        || migrated.resources[0].pdfs[0].checksum !== "keep"
+        || !migrated.resources[0].customResourceField.keep) throw new Error("safe content lost");
+      const older = structuredClone(fixture);
+      older.categories.push({ id:"seniors", label:"Seniors" });
+      older.categoryMigrations = [{ fromId:"Seniors", toId:"seniors" }, { fromId:"older", toId:"seniors" }];
+      // The old package has a direct alias rather than the retired chain.
+      older.resources[0].categories.push("Seniors");
+      for(const [left, right] of [[migrated, older], [older, migrated]]){
+        let merged = mergeResourcePackages(left, right).mergedData;
+        merged = mergeResourcePackages(merged, older).mergedData;
+        if(merged.categories.some(category => category.id === "seniors") || merged.categoryMigrations.some(entry => entry.toId)) throw new Error("old package restored retirement aliases");
+        if(merged.resources[0].categories.some(id => id !== "food")) throw new Error("orphan category membership");
+        const output = buildResourcePackageData(merged);
+        if(!output.customPackageField.keep) throw new Error("safe extension lost in export");
+      }
+      const tombstoned = structuredClone(older);
+      tombstoned.deletions = [{ kind:"category", targetId:"seniors", deletedAt:"2026-09-06T00:00:00Z" }];
+      const deleted = processResourcePackageData(tombstoned).data;
+      if(deleted.categoryMigrations.some(entry => entry.toId) || deleted.resources[0].categories.some(id => id !== "food")) throw new Error("category tombstone left an alias or orphan");
+      for(const broken of [PACKAGE_MIGRATION_FIXTURES.schema3BrokenAlias]){
+        let rejected = false;
+        try { processResourcePackageData(broken); } catch(error) { rejected = error instanceof ResourcePackageError; }
+        if(!rejected) throw new Error("unsafe package accepted");
+      }
+    }
+  });
+
+  tests.push({
+    name: "CATEGORY FILTER AND BETWEEN DIMENSIONS",
     fn: () => {
       const resources = [
         { name:"Women Only", forGroups:["Women"] },
@@ -4350,10 +4329,12 @@ async function runSelfTests(){
         makeForGroupFilterKey("Women"),
         makeCategorySpecificFilterKey("Shelter")
       ]).map(r => r.name);
-      ["Women Only", "Shelter Only", "Both"].forEach(name => {
-        if(!matching.includes(name)) throw new Error(`${name} was excluded`);
-      });
-      if(matching.includes("Neither")) throw new Error("resource without selected filters was included");
+      if(JSON.stringify(matching) !== JSON.stringify(["Both"])) throw new Error("Types and groups must both match");
+      const groupsOnly = filterResourcesBySelectedCategoryFilters(resources, "housing", [makeForGroupFilterKey("Women"), makeForGroupFilterKey("Food")]);
+      if(groupsOnly.length !== 3) throw new Error("Groups must use OR");
+      const typesOnly = [{ categoryFilters:{ housing:["Shelter"] } }, { categoryFilters:{ housing:["Rent"] } }];
+      if(filterResourcesBySelectedCategoryFilters(typesOnly, "housing", [makeCategorySpecificFilterKey("Shelter"), makeCategorySpecificFilterKey("Rent")]).length !== 2) throw new Error("Types must use OR");
+
     }
   });
 
@@ -4709,14 +4690,31 @@ async function runSelfTests(){
         render();
         const text = appView.textContent || "";
         if(!text.includes("Type")) throw new Error("Type heading was not rendered");
-        if(!text.includes("For")) throw new Error("For heading was not rendered");
+        if(!text.includes("Groups")) throw new Error("Groups heading was not rendered");
         const buttons = Array.from(appView.querySelectorAll("button")).map(button => button.textContent);
-        if(!buttons.includes("Career Training")) throw new Error("category filter button was missing");
-        if(!buttons.includes("Veterans")) throw new Error("For group button was missing");
+        if(!buttons.includes("Career Training (1)")) throw new Error("category filter button was missing");
+        if(!buttons.includes("Veterans (1)")) throw new Error("For group button was missing");
         if(buttons.includes("Unused Filter")) throw new Error("unused category filter button should not render");
-        if(buttons.includes("Unused Group")) throw new Error("unused For group button should not render");
+        if(buttons.some(label => label.startsWith("Unused Group"))) throw new Error("zero-match group should not render");
+        if(text.includes("All groups") || text.includes("across office")) throw new Error("unrelated office groups leaked into category navigation");
         if(buttons.some(label => label === "For: Veterans")) throw new Error("For button label should not include prefix");
-        if(/\bresult(s)?\b/.test(text)) throw new Error("category filter area should not show result counts");
+        if(!text.includes("2 resources shown.")) throw new Error("matching resource count missing");
+        data.forGroupPreferences = { prominent:[], lastModified:"2026-09-06T00:00:00Z" };
+        render();
+        if(!appView.textContent.includes("Veterans (1)")) throw new Error("old prominence setting still hides a matching group");
+        setSelectedCategoryFilters("employment", [makeCategorySpecificFilterKey("Career Training")]);
+        render();
+        if(appView.querySelector('[data-filter-key="for:veterans"]')) throw new Error("unselected group with no Type matches should be hidden");
+        setSelectedCategoryFilters("employment", [makeCategorySpecificFilterKey("Career Training"), makeForGroupFilterKey("Veterans")]);
+        render();
+        if(getSelectedCategoryFilters("employment").length !== 2) throw new Error("zero-match selection was silently removed");
+        const selectedGroup = [...appView.querySelectorAll("[data-filter-key]")].find(button => button.dataset.filterKey === makeForGroupFilterKey("Veterans"));
+        if(!selectedGroup || selectedGroup.closest("details") || selectedGroup.getAttribute("aria-pressed") !== "true") throw new Error("selected rare group is hidden");
+        if(!selectedGroup.textContent.includes("(0)")) throw new Error("context count did not respect Type selection");
+        if(!appView.textContent.includes("It remains selected")) throw new Error("zero-match explanation missing");
+        const clear = [...appView.querySelectorAll("button")].find(button => button.textContent === "Clear filters");
+        clear.click();
+        if(getSelectedCategoryFilters("employment").length || !appView.textContent.includes("2 resources shown.")) throw new Error("clear did not restore category resources");
       }finally{
         data = previousData;
         view = previousView;
@@ -4909,8 +4907,8 @@ async function runSelfTests(){
           makeForGroupFilterKey("Veterans"),
           makeCategorySpecificFilterKey("GED")
         ]).map(r => r.id);
-        if(!matching.includes("shared") || !matching.includes("ged")){
-          throw new Error("OR category filtering missed expected education resources");
+        if(matching.length){
+          throw new Error("A resource must match both GED and Veterans in Education");
         }
       }finally{
         data = previousData;

@@ -38,11 +38,32 @@ before the deletion workflow. Its migration adds the deletion-request and
 tombstone containers required by schema 3. Existing string or array `forGroups`
 and category-filter values are normalized afterward.
 
-### Schema 3 — current packages
+### Schema 3 — deletion workflow
 
 Schema 3 stores pending deletion requests and approved deletion tombstones.
 Tombstones are normalized and applied before final validation so older package
 content cannot recreate an approved deletion.
+
+### Schema 4 — retirement compatibility
+
+The focused 3 → 4 migration turns aliases that ultimately point at a retired
+category into retirement records too. It retains each source ID. During merges,
+retirement wins over an older redirect for the same ID in either package order.
+Approved category tombstones also retire their aliases. Missing redirect targets
+still fail validation; they are not guessed or discarded.
+
+Category navigation shows groups with matches under the current Type selection,
+plus already-selected groups even if their count has reached zero. No prominence
+setting is needed. The first development preview's `forGroupPreferences` field
+is now an unused extension: normal package round trips preserve it without using
+it to hide groups or creating new preference records. Transient filter selections
+remain browser UI state and do not travel in packages.
+
+Schema 4 requires the updated location reader; older readers reject it rather than
+mishandling retired aliases. Scout accepts schemas
+3 and 4, preserves their fields and assets, and only allows an alias-retirement
+export after reconnecting a schema 4 package and obtaining every existing human
+mapping and whole-plan approval. Saving a package does not grant those approvals.
 
 ## Package versions
 
@@ -88,3 +109,12 @@ When the package structure must change:
 5. Add regression tests for migration, tombstones, validation failures, and
    unknown-field preservation.
 6. Run `verify-tso-release` before requesting version approval.
+
+## Office package boundary
+
+Resource Assistant imports ordinary resource packages. It has no Scout curation
+controls, question schema, answer history, or research feedback protocol.
+Unknown safe extension fields receive the ordinary package-field treatment;
+the app does not interpret them. Resource records still merge by their usual
+ID and modification-time rules. Clean curated exports are the responsibility
+of the exporting workbench.

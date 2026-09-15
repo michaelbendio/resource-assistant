@@ -7,10 +7,6 @@
 <meta name="tso-office-name" content="">
 <meta name="tso-sharepoint-package-url" content="">
 <meta name="tso-commit" content="">
-<meta name="autocurator-location-name" content="">
-<meta name="autocurator-category-id" content="">
-<meta name="autocurator-category-label" content="">
-<meta name="autocurator-candidate-package-sha256" content="">
 <title>&lt;New&gt; TSO Resources</title>
 
 <!-- ===== APP CSS START ===== -->
@@ -1040,6 +1036,15 @@ textarea.information-editor { min-height:320px; resize:vertical; }
     display: none !important;
   }
 }
+
+/* Office group navigation: comfortable touch targets, visible keyboard focus. */
+.category-filter-group { border:0; padding:0; margin:12px 0; min-width:0; }
+.category-filter-group legend { font-weight:bold; margin-bottom:6px; }
+.category-filter-buttons { display:flex; flex-wrap:wrap; gap:8px; }
+.category-filter-buttons button, .category-filter-controls > button { min-height:44px; }
+.category-filter-controls :focus-visible { outline:3px solid #155ea0; outline-offset:3px; }
+.category-filter-note { font-size:0.95rem; }
+@media print { .category-filter-controls { display:none !important; } }
 </style>
 <!-- ===== APP CSS END ===== -->
 </head>
@@ -1127,13 +1132,13 @@ textarea.information-editor { min-height:320px; resize:vertical; }
 
 <script id="app-release-data" type="application/json">
 {
-  "version": "2.3.5",
-  "build": 152,
+  "version": "2.3.8",
+  "build": 155,
   "changes": [
     {
-      "date": "2026-08-28",
-      "version": "2.3.4",
-      "message": "Create AutoCurator review files that save one category as a mergeable resource package"
+      "date": "2026-09-06",
+      "version": "2.3.6",
+      "message": "Narrow resources by Type and group, with matching counts and Clear filters."
     },
     {
       "date": "2026-08-20",
@@ -1957,6 +1962,12 @@ function applyDeletionTombstones(packageData, records = null){
       });
     }
   });
+  const retiredCategories = tombstones.filter(record => record.kind === "category")
+    .map(record => ({ fromId:record.targetId }));
+  if(retiredCategories.length){
+    packageData.categoryMigrations = mergeCategoryMigrations(packageData.categoryMigrations, retiredCategories);
+    applyCategoryMigrations(packageData, packageData.categoryMigrations);
+  }
   return packageData;
 }
 
@@ -1970,7 +1981,7 @@ function applyDeletionTombstones(packageData, records = null){
 
 const UNVERSIONED_RESOURCE_PACKAGE_SCHEMA_VERSION = 1;
 const LEGACY_RESOURCE_PACKAGE_SCHEMA_VERSION = 2;
-const RESOURCE_PACKAGE_SCHEMA_VERSION = 3;
+const RESOURCE_PACKAGE_SCHEMA_VERSION = 4;
 const RESOURCE_PACKAGE_PIPELINE_STAGES = Object.freeze([
   "read",
   "migrate",
@@ -2138,7 +2149,16 @@ function migrateResourcePackageSchema1To2(packageData){
 function migrateResourcePackageSchema2To3(packageData){
   if(packageData.deletionRequests == null) packageData.deletionRequests = [];
   if(packageData.deletions == null) packageData.deletions = [];
-  packageData.resourcePackageSchemaVersion = RESOURCE_PACKAGE_SCHEMA_VERSION;
+  packageData.resourcePackageSchemaVersion = 3;
+  return packageData;
+}
+
+function migrateResourcePackageSchema3To4(packageData){
+  // A retired target also retires its old aliases. Preserve every source ID.
+  if(Array.isArray(packageData.categoryMigrations)){
+    packageData.categoryMigrations = resolveRetiredCategoryAliases(packageData.categoryMigrations);
+  }
+  packageData.resourcePackageSchemaVersion = 4;
   return packageData;
 }
 
@@ -2148,9 +2168,10 @@ const RESOURCE_PACKAGE_SCHEMA_MIGRATIONS = new Map([
     migrate:migrateResourcePackageSchema1To2
   }],
   [LEGACY_RESOURCE_PACKAGE_SCHEMA_VERSION, {
-    toVersion:RESOURCE_PACKAGE_SCHEMA_VERSION,
+    toVersion:3,
     migrate:migrateResourcePackageSchema2To3
-  }]
+  }],
+  [3, { toVersion:4, migrate:migrateResourcePackageSchema3To4 }]
 ]);
 
 function migrateResourcePackageData(packageData, options = {}){
@@ -2504,23 +2525,6 @@ function getConfiguredCommitHash(){
   const meta = document.querySelector('meta[name="tso-commit"]');
   const commit = meta ? String(meta.getAttribute("content") || "").trim() : "";
   return /^[0-9a-f]{7}$/i.test(commit) ? commit.toLowerCase() : "";
-}
-
-function getMetaContent(name){
-  const meta = document.querySelector(`meta[name="${name}"]`);
-  return meta ? String(meta.getAttribute("content") || "").trim() : "";
-}
-
-function getAutoCuratorConfig(){
-  const locationName = getMetaContent("autocurator-location-name");
-  const categoryId = getMetaContent("autocurator-category-id");
-  const categoryLabel = getMetaContent("autocurator-category-label");
-  if(!locationName || !categoryId || !categoryLabel) return null;
-  return { locationName, categoryId, categoryLabel };
-}
-
-function isAutoCuratorMode(){
-  return Boolean(getAutoCuratorConfig());
 }
 
 function getStorageKeyPrefix(fileName = getCurrentHtmlFileName()){
@@ -3090,12 +3094,6 @@ function getResourcePackageFilename(){
 }
 
 function getResourcePackageZipFilename(){
-  const autoCurator = getAutoCuratorConfig();
-  if(autoCurator){
-    const locationStem = slugifyFileStem(autoCurator.locationName, "location");
-    const categoryStem = slugifyFileStem(autoCurator.categoryLabel, "category");
-    return `${locationStem}-${categoryStem}-resource-package.zip`;
-  }
   const baseName = getTsoName() || (isNewTemplateFile() ? "tso" : getTsoNameFromHtmlFileName(getCurrentHtmlFileName()));
   const stem = slugifyFileStem(baseName, "tso");
   return `${stem}-resource-package.zip`;
@@ -3758,27 +3756,27 @@ function makeForGroupFilterKey(group){
 }
 
 function getCategoryFilterOptions(categoryId){
-  const cat = (Array.isArray(data.categories) ? data.categories : []).find(category => category && category.id === categoryId);
-  const options = [];
+  const cat = (data.categories || []).find(category => category && category.id === categoryId);
   const resources = getCategoryResources(categoryId);
-  const usedCategoryFilterKeys = new Set();
-  const usedForGroupKeys = new Set();
-
-  resources.forEach(resource => {
-    getResourceCategoryFilterKeys(resource, categoryId).forEach(key => usedCategoryFilterKeys.add(key));
-    getResourceForGroupFilterKeys(resource).forEach(key => usedForGroupKeys.add(key));
-  });
-
-  normalizeCategoryFilters(cat && cat.filters).forEach(filter => {
-    const key = makeCategorySpecificFilterKey(filter);
-    if(usedCategoryFilterKeys.has(key)){
-      options.push({ key, label:filter, kind:"filter" });
-    }
-  });
-  normalizeTaxonomyLabels(data.forGroups).forEach(group => {
-    const key = makeForGroupFilterKey(group);
-    if(usedForGroupKeys.has(key)){
-      options.push({ key, label:group, kind:"for" });
+  const active = getSelectedCategoryFilters(categoryId);
+  const options = [];
+  function add(label, kind){
+    const key = kind === "for" ? makeForGroupFilterKey(label) : makeCategorySpecificFilterKey(label);
+    const opposite = active.filter(selected => kind === "for" ? selected.startsWith("filter:") : selected.startsWith("for:"));
+    const has = resource => (kind === "for" ? getResourceForGroupFilterKeys(resource) : getResourceCategoryFilterKeys(resource, categoryId)).has(key);
+    const count = resources.filter(resource => has(resource) && resourceMatchesSelectedCategoryFilters(resource, categoryId, opposite)).length;
+    const categoryCount = resources.filter(has).length;
+    if(kind === "filter" && !categoryCount && !active.includes(key)) return;
+    if(kind === "for" && !count && !active.includes(key)) return;
+    options.push({ key, label, kind, count });
+  }
+  normalizeCategoryFilters(cat && cat.filters).forEach(label => add(label, "filter"));
+  normalizeTaxonomyLabels(data.forGroups).forEach(label => add(label, "for"));
+  // A package update must never silently remove a user's selection.
+  active.forEach(key => {
+    if(!options.some(option => option.key === key)){
+      options.push({ key, label:key.slice(key.indexOf(":") + 1), kind:key.startsWith("for:") ? "for" : "filter",
+        count:0 });
     }
   });
   return options;
@@ -3808,7 +3806,12 @@ function countSelectedCategoryFilterMatches(resource, categoryId, activeFilterKe
 
 function resourceMatchesSelectedCategoryFilters(resource, categoryId, selectedFilterKeys){
   const activeFilterKeys = new Set(normalizeTaxonomyLabels(selectedFilterKeys));
-  return !activeFilterKeys.size || countSelectedCategoryFilterMatches(resource, categoryId, activeFilterKeys) > 0;
+  const types = [...activeFilterKeys].filter(key => key.startsWith("filter:"));
+  const groups = [...activeFilterKeys].filter(key => key.startsWith("for:"));
+  const typeKeys = getResourceCategoryFilterKeys(resource, categoryId);
+  const groupKeys = getResourceForGroupFilterKeys(resource);
+  return (!types.length || types.some(key => typeKeys.has(key)))
+    && (!groups.length || groups.some(key => groupKeys.has(key)));
 }
 
 function filterResourcesBySelectedCategoryFilters(resources, categoryId, selectedFilterKeys){
@@ -4255,51 +4258,38 @@ function renderCategoryTitle(){
   if(cat) renderPublicResourceTitle(cat.label);
 }
 
-function getActiveCategoryFilters(categoryFilterOptions){
-  const selectedFilters = getSelectedCategoryFilters(currentCategory);
-  const activeFilters = selectedFilters.filter(filterKey =>
-    categoryFilterOptions.some(option => option.key === filterKey)
-  );
-  if(activeFilters.length !== selectedFilters.length){
-    setSelectedCategoryFilters(currentCategory, activeFilters);
-  }
-  return activeFilters;
+function getActiveCategoryFilters(){
+  return getSelectedCategoryFilters(currentCategory);
 }
 
 function appendCategoryFilterGroup(filterArea, title, options, activeFilters){
   if(!options.length) return;
-  const group = document.createElement("div");
-  group.style.margin = "0 0 8px";
-
-  const heading = document.createElement("div");
+  const group = document.createElement("fieldset");
+  group.className = "category-filter-group";
+  const heading = document.createElement("legend");
   heading.textContent = title;
-  heading.style.fontWeight = "bold";
-  heading.style.fontSize = "14px";
-  heading.style.marginBottom = "4px";
   group.appendChild(heading);
-
   const buttons = document.createElement("div");
-  buttons.style.display = "flex";
-  buttons.style.flexWrap = "wrap";
-  buttons.style.gap = "8px";
-  buttons.style.alignItems = "center";
-
+  buttons.className = "category-filter-buttons";
   options.forEach(option => {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = activeFilters.includes(option.key) ? "button primary" : "button";
-    btn.textContent = option.label;
+    const selected = activeFilters.includes(option.key);
+    btn.className = selected ? "button primary" : "button";
+    btn.dataset.filterKey = option.key;
+    btn.textContent = `${option.label} (${option.count})`;
+    btn.setAttribute("aria-pressed", String(selected));
+    btn.setAttribute("aria-label", `${option.label}: ${option.count} matching resources${selected ? ", selected; press to remove" : ""}`);
+    btn.title = `${option.count} matching resources with the other selections.`;
     btn.onclick = () => {
-      const selected = activeFilters.includes(option.key);
-      const nextFilters = selected
-        ? activeFilters.filter(active => active !== option.key)
-        : [...activeFilters, option.key];
-      setSelectedCategoryFilters(currentCategory, nextFilters);
+      setSelectedCategoryFilters(currentCategory, selected ? activeFilters.filter(key => key !== option.key) : [...activeFilters, option.key]);
       safeRender();
+      const replacement = [...appView.querySelectorAll("[data-filter-key]")].find(button => button.dataset.filterKey === option.key);
+      const focusTarget = replacement || appView.querySelector("[data-filter-key]");
+      if(focusTarget) focusTarget.focus();
     };
     buttons.appendChild(btn);
   });
-
   group.appendChild(buttons);
   filterArea.appendChild(group);
 }
@@ -4307,11 +4297,38 @@ function appendCategoryFilterGroup(filterArea, title, options, activeFilters){
 function renderCategoryFilterControls(categoryFilterOptions, activeFilters){
   if(!categoryFilterOptions.length) return;
   const filterArea = document.createElement("div");
-  filterArea.style.marginBottom = "12px";
-
+  filterArea.className = "category-filter-controls";
+  const explanation = document.createElement("p");
+  explanation.className = "category-filter-note";
+  explanation.textContent = "Choose any Types and any groups. Resources must match both when you use both. Counts reflect the other selections.";
+  filterArea.appendChild(explanation);
   appendCategoryFilterGroup(filterArea, "Type", categoryFilterOptions.filter(option => option.kind === "filter"), activeFilters);
-  appendCategoryFilterGroup(filterArea, "For", categoryFilterOptions.filter(option => option.kind === "for"), activeFilters);
-
+  const groups = categoryFilterOptions.filter(option => option.kind === "for");
+  appendCategoryFilterGroup(filterArea, "Groups", groups, activeFilters);
+  const count = filterResourcesBySelectedCategoryFilters(getCategoryResources(currentCategory), currentCategory, activeFilters).length;
+  const status = document.createElement("p");
+  status.className = "category-filter-status";
+  status.setAttribute("role", "status");
+  status.textContent = `${count} ${count === 1 ? "resource" : "resources"} shown.`;
+  filterArea.appendChild(status);
+  if(activeFilters.length){
+    if(categoryFilterOptions.some(option => activeFilters.includes(option.key) && !option.count)){
+      const zero = document.createElement("p");
+      zero.textContent = "A selected filter has no matches with the other selections. It remains selected. Press it again to remove it, or clear filters.";
+      filterArea.appendChild(zero);
+    }
+    const clear = document.createElement("button");
+    clear.className = "button";
+    clear.type = "button";
+    clear.textContent = "Clear filters";
+    clear.onclick = () => {
+      setSelectedCategoryFilters(currentCategory, []);
+      safeRender();
+      const first = appView.querySelector("[data-filter-key]");
+      if(first) first.focus();
+    };
+    filterArea.appendChild(clear);
+  }
   appView.appendChild(filterArea);
 }
 
@@ -4368,8 +4385,7 @@ function renderCategoryResources(filtered, activeFilters){
 }
 
 function renderCategoryView(){
-  // Public category detail screen. Category filters and For buttons are OR'd
-  // together by filterResourcesBySelectedCategoryFilters().
+  // OR within Types and within groups; AND between the two dimensions.
   renderCategoryBackButton();
   renderCategoryTitle();
   const categoryFilterOptions = getCategoryFilterOptions(currentCategory);
@@ -4908,15 +4924,11 @@ function renderAdmin(){
   const hasChangeLog = getRecentChanges().length > 0;
   const recoveryPoints = getRecoveryPoints();
   const deletionReview = getOutstandingDeletionReview();
-  const autoCurator = getAutoCuratorConfig();
-  const packageButtonLabel = autoCurator
-    ? `Save ${autoCurator.categoryLabel} Resource Package`
-    : "Save Resource Package";
 
   container.innerHTML = `
     <div class="admin-sticky-bar">
       <div class="admin-sticky-package-actions">
-        <button class="button primary" onclick="exportPackage()">${escapeHTML(packageButtonLabel)}</button>
+        <button class="button primary" onclick="exportPackage()">Save Resource Package</button>
         ${deletionReview ? `<button class="button" onclick="showDeletionReview()">Review tagged deletions</button>` : ""}
         ${recoveryPoints.length ? `<button class="button" onclick="showRecoveryPoints()">Recovery points (${recoveryPoints.length})</button>` : ""}
         ${hasChangeLog ? `
@@ -5342,6 +5354,29 @@ function normalizeCategoryMigrations(packageData){
   packageData.categoryMigrations = normalized;
 }
 
+function resolveRetiredCategoryAliases(migrations){
+  // Do not sanitize invalid input here: the package validator must still see it.
+  const retired = new Set(migrations.filter(entry => entry && typeof entry === "object"
+    && entry.fromId && !entry.toId && !entry.toFilter).map(entry => entry.fromId));
+  let changed = true;
+  while(changed){
+    changed = false;
+    migrations.forEach(entry => {
+      if(entry && entry.toId && retired.has(entry.toId) && !retired.has(entry.fromId)){
+        retired.add(entry.fromId);
+        changed = true;
+      }
+    });
+  }
+  return migrations.map(entry => {
+    if(!entry || !retired.has(entry.fromId)) return entry;
+    const result = { ...entry };
+    delete result.toId;
+    delete result.toFilter;
+    return result;
+  });
+}
+
 function mergeCategoryMigrations(localMigrations, incomingMigrations){
   const holder = {
     categoryMigrations: [
@@ -5349,6 +5384,7 @@ function mergeCategoryMigrations(localMigrations, incomingMigrations){
       ...(Array.isArray(incomingMigrations) ? incomingMigrations : [])
     ]
   };
+  holder.categoryMigrations = resolveRetiredCategoryAliases(holder.categoryMigrations);
   normalizeCategoryMigrations(holder);
   return holder.categoryMigrations;
 }
@@ -5526,9 +5562,10 @@ function mergeItemsById(localItems, incomingItems, options = {}){
     if(!id) return;
     const incomingItem = incomingById.get(id);
     const choice = chooseMergeObject(localItem, incomingItem);
-    merged.push(cloneDataObject(choice.item));
+    const mergedItem = cloneDataObject(choice.item);
+    merged.push(mergedItem);
     seen.add(id);
-    if(incomingItem && choice.item === incomingItem && choice.changed){
+    if(incomingItem && objectsDiffer(localItem, mergedItem)){
       updated += 1;
       updatedIds.push(id);
       updatedNames.push(String(incomingItem.name || incomingItem.title || id));
@@ -5673,46 +5710,6 @@ function buildResourcePackageData(sourceData){
   delete packageData.lastLoadedPackageInfo;
   delete packageData.categoryPresetVersion;
   return packageData;
-}
-
-function buildAutoCuratorCategoryPackageData(sourceData, config = getAutoCuratorConfig()){
-  if(!config) return buildResourcePackageData(sourceData);
-  const source = processResourcePackageData(sourceData || {}, {
-    sourceName:"Current AutoCurator resource data"
-  }).data;
-  const category = source.categories.find(item => String(item && item.id || "") === config.categoryId);
-  if(!category){
-    throw new Error(`AutoCurator category '${config.categoryLabel}' is missing.`);
-  }
-  const resources = source.resources.filter(resource =>
-    Array.isArray(resource && resource.categories)
-      && resource.categories.map(String).includes(config.categoryId)
-  ).map(resource => ({
-    ...resource,
-    categories:[config.categoryId],
-    categoryFilters:resource.categoryFilters && resource.categoryFilters[config.categoryId]
-      ? { [config.categoryId]:resource.categoryFilters[config.categoryId] }
-      : {}
-  }));
-  const resourceIds = new Set(resources.map(resource => String(resource.id || "")));
-  const referencedForGroups = new Set(resources.flatMap(resource =>
-    Array.isArray(resource.forGroups) ? resource.forGroups.map(String) : []
-  ));
-  const scopedData = {
-    ...source,
-    categories:[category],
-    categoryMigrations:[],
-    forGroups:source.forGroups.filter(label => referencedForGroups.has(String(label))),
-    resources,
-    changes:source.changes.filter(entry => {
-      if(resourceIds.has(String(entry && entry.targetId || ""))) return true;
-      return Array.isArray(entry && entry.resourceIds)
-        && entry.resourceIds.some(id => resourceIds.has(String(id)));
-    }),
-    deletionRequests:[],
-    deletions:[]
-  };
-  return buildResourcePackageData(scopedData);
 }
 
 function mergeResourcePackages(localData, incomingData){
@@ -5875,9 +5872,7 @@ async function saveCurrentResourcePackage(target, options = {}){
     data.packageVersion = getNextPackageVersionValue(data.packageVersion);
     packageVersionBumped = true;
 
-    const packageData = isAutoCuratorMode()
-      ? buildAutoCuratorCategoryPackageData(data)
-      : buildResourcePackageData(data);
+    const packageData = buildResourcePackageData(data);
     const resourceCount = Array.isArray(packageData.resources) ? packageData.resources.length : 0;
     if(resourceCount === 0){
       const shouldSaveEmpty = confirm("This resource package has no resources. Save it anyway?");
@@ -8750,7 +8745,7 @@ function addForGroupRow(value){
   list.appendChild(row);
   row.addEventListener("click", () => selectForGroupRow(index));
   row.addEventListener("keydown", event => {
-    if(event.key !== "Enter" && event.key !== " ") return;
+    if(event.target !== row || (event.key !== "Enter" && event.key !== " ")) return;
     event.preventDefault();
     selectForGroupRow(index);
     if(input) input.focus();

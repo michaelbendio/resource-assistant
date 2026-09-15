@@ -273,51 +273,38 @@ function renderCategoryTitle(){
   if(cat) renderPublicResourceTitle(cat.label);
 }
 
-function getActiveCategoryFilters(categoryFilterOptions){
-  const selectedFilters = getSelectedCategoryFilters(currentCategory);
-  const activeFilters = selectedFilters.filter(filterKey =>
-    categoryFilterOptions.some(option => option.key === filterKey)
-  );
-  if(activeFilters.length !== selectedFilters.length){
-    setSelectedCategoryFilters(currentCategory, activeFilters);
-  }
-  return activeFilters;
+function getActiveCategoryFilters(){
+  return getSelectedCategoryFilters(currentCategory);
 }
 
 function appendCategoryFilterGroup(filterArea, title, options, activeFilters){
   if(!options.length) return;
-  const group = document.createElement("div");
-  group.style.margin = "0 0 8px";
-
-  const heading = document.createElement("div");
+  const group = document.createElement("fieldset");
+  group.className = "category-filter-group";
+  const heading = document.createElement("legend");
   heading.textContent = title;
-  heading.style.fontWeight = "bold";
-  heading.style.fontSize = "14px";
-  heading.style.marginBottom = "4px";
   group.appendChild(heading);
-
   const buttons = document.createElement("div");
-  buttons.style.display = "flex";
-  buttons.style.flexWrap = "wrap";
-  buttons.style.gap = "8px";
-  buttons.style.alignItems = "center";
-
+  buttons.className = "category-filter-buttons";
   options.forEach(option => {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = activeFilters.includes(option.key) ? "button primary" : "button";
-    btn.textContent = option.label;
+    const selected = activeFilters.includes(option.key);
+    btn.className = selected ? "button primary" : "button";
+    btn.dataset.filterKey = option.key;
+    btn.textContent = `${option.label} (${option.count})`;
+    btn.setAttribute("aria-pressed", String(selected));
+    btn.setAttribute("aria-label", `${option.label}: ${option.count} matching resources${selected ? ", selected; press to remove" : ""}`);
+    btn.title = `${option.count} matching resources with the other selections.`;
     btn.onclick = () => {
-      const selected = activeFilters.includes(option.key);
-      const nextFilters = selected
-        ? activeFilters.filter(active => active !== option.key)
-        : [...activeFilters, option.key];
-      setSelectedCategoryFilters(currentCategory, nextFilters);
+      setSelectedCategoryFilters(currentCategory, selected ? activeFilters.filter(key => key !== option.key) : [...activeFilters, option.key]);
       safeRender();
+      const replacement = [...appView.querySelectorAll("[data-filter-key]")].find(button => button.dataset.filterKey === option.key);
+      const focusTarget = replacement || appView.querySelector("[data-filter-key]");
+      if(focusTarget) focusTarget.focus();
     };
     buttons.appendChild(btn);
   });
-
   group.appendChild(buttons);
   filterArea.appendChild(group);
 }
@@ -325,11 +312,38 @@ function appendCategoryFilterGroup(filterArea, title, options, activeFilters){
 function renderCategoryFilterControls(categoryFilterOptions, activeFilters){
   if(!categoryFilterOptions.length) return;
   const filterArea = document.createElement("div");
-  filterArea.style.marginBottom = "12px";
-
+  filterArea.className = "category-filter-controls";
+  const explanation = document.createElement("p");
+  explanation.className = "category-filter-note";
+  explanation.textContent = "Choose any Types and any groups. Resources must match both when you use both. Counts reflect the other selections.";
+  filterArea.appendChild(explanation);
   appendCategoryFilterGroup(filterArea, "Type", categoryFilterOptions.filter(option => option.kind === "filter"), activeFilters);
-  appendCategoryFilterGroup(filterArea, "For", categoryFilterOptions.filter(option => option.kind === "for"), activeFilters);
-
+  const groups = categoryFilterOptions.filter(option => option.kind === "for");
+  appendCategoryFilterGroup(filterArea, "Groups", groups, activeFilters);
+  const count = filterResourcesBySelectedCategoryFilters(getCategoryResources(currentCategory), currentCategory, activeFilters).length;
+  const status = document.createElement("p");
+  status.className = "category-filter-status";
+  status.setAttribute("role", "status");
+  status.textContent = `${count} ${count === 1 ? "resource" : "resources"} shown.`;
+  filterArea.appendChild(status);
+  if(activeFilters.length){
+    if(categoryFilterOptions.some(option => activeFilters.includes(option.key) && !option.count)){
+      const zero = document.createElement("p");
+      zero.textContent = "A selected filter has no matches with the other selections. It remains selected. Press it again to remove it, or clear filters.";
+      filterArea.appendChild(zero);
+    }
+    const clear = document.createElement("button");
+    clear.className = "button";
+    clear.type = "button";
+    clear.textContent = "Clear filters";
+    clear.onclick = () => {
+      setSelectedCategoryFilters(currentCategory, []);
+      safeRender();
+      const first = appView.querySelector("[data-filter-key]");
+      if(first) first.focus();
+    };
+    filterArea.appendChild(clear);
+  }
   appView.appendChild(filterArea);
 }
 
@@ -386,8 +400,7 @@ function renderCategoryResources(filtered, activeFilters){
 }
 
 function renderCategoryView(){
-  // Public category detail screen. Category filters and For buttons are OR'd
-  // together by filterResourcesBySelectedCategoryFilters().
+  // OR within Types and within groups; AND between the two dimensions.
   renderCategoryBackButton();
   renderCategoryTitle();
   const categoryFilterOptions = getCategoryFilterOptions(currentCategory);

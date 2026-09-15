@@ -348,6 +348,29 @@ function normalizeCategoryMigrations(packageData){
   packageData.categoryMigrations = normalized;
 }
 
+function resolveRetiredCategoryAliases(migrations){
+  // Do not sanitize invalid input here: the package validator must still see it.
+  const retired = new Set(migrations.filter(entry => entry && typeof entry === "object"
+    && entry.fromId && !entry.toId && !entry.toFilter).map(entry => entry.fromId));
+  let changed = true;
+  while(changed){
+    changed = false;
+    migrations.forEach(entry => {
+      if(entry && entry.toId && retired.has(entry.toId) && !retired.has(entry.fromId)){
+        retired.add(entry.fromId);
+        changed = true;
+      }
+    });
+  }
+  return migrations.map(entry => {
+    if(!entry || !retired.has(entry.fromId)) return entry;
+    const result = { ...entry };
+    delete result.toId;
+    delete result.toFilter;
+    return result;
+  });
+}
+
 function mergeCategoryMigrations(localMigrations, incomingMigrations){
   const holder = {
     categoryMigrations: [
@@ -355,6 +378,7 @@ function mergeCategoryMigrations(localMigrations, incomingMigrations){
       ...(Array.isArray(incomingMigrations) ? incomingMigrations : [])
     ]
   };
+  holder.categoryMigrations = resolveRetiredCategoryAliases(holder.categoryMigrations);
   normalizeCategoryMigrations(holder);
   return holder.categoryMigrations;
 }
@@ -532,9 +556,10 @@ function mergeItemsById(localItems, incomingItems, options = {}){
     if(!id) return;
     const incomingItem = incomingById.get(id);
     const choice = chooseMergeObject(localItem, incomingItem);
-    merged.push(cloneDataObject(choice.item));
+    const mergedItem = cloneDataObject(choice.item);
+    merged.push(mergedItem);
     seen.add(id);
-    if(incomingItem && choice.item === incomingItem && choice.changed){
+    if(incomingItem && objectsDiffer(localItem, mergedItem)){
       updated += 1;
       updatedIds.push(id);
       updatedNames.push(String(incomingItem.name || incomingItem.title || id));
@@ -679,46 +704,6 @@ function buildResourcePackageData(sourceData){
   delete packageData.lastLoadedPackageInfo;
   delete packageData.categoryPresetVersion;
   return packageData;
-}
-
-function buildAutoCuratorCategoryPackageData(sourceData, config = getAutoCuratorConfig()){
-  if(!config) return buildResourcePackageData(sourceData);
-  const source = processResourcePackageData(sourceData || {}, {
-    sourceName:"Current AutoCurator resource data"
-  }).data;
-  const category = source.categories.find(item => String(item && item.id || "") === config.categoryId);
-  if(!category){
-    throw new Error(`AutoCurator category '${config.categoryLabel}' is missing.`);
-  }
-  const resources = source.resources.filter(resource =>
-    Array.isArray(resource && resource.categories)
-      && resource.categories.map(String).includes(config.categoryId)
-  ).map(resource => ({
-    ...resource,
-    categories:[config.categoryId],
-    categoryFilters:resource.categoryFilters && resource.categoryFilters[config.categoryId]
-      ? { [config.categoryId]:resource.categoryFilters[config.categoryId] }
-      : {}
-  }));
-  const resourceIds = new Set(resources.map(resource => String(resource.id || "")));
-  const referencedForGroups = new Set(resources.flatMap(resource =>
-    Array.isArray(resource.forGroups) ? resource.forGroups.map(String) : []
-  ));
-  const scopedData = {
-    ...source,
-    categories:[category],
-    categoryMigrations:[],
-    forGroups:source.forGroups.filter(label => referencedForGroups.has(String(label))),
-    resources,
-    changes:source.changes.filter(entry => {
-      if(resourceIds.has(String(entry && entry.targetId || ""))) return true;
-      return Array.isArray(entry && entry.resourceIds)
-        && entry.resourceIds.some(id => resourceIds.has(String(id)));
-    }),
-    deletionRequests:[],
-    deletions:[]
-  };
-  return buildResourcePackageData(scopedData);
 }
 
 function mergeResourcePackages(localData, incomingData){
@@ -881,9 +866,7 @@ async function saveCurrentResourcePackage(target, options = {}){
     data.packageVersion = getNextPackageVersionValue(data.packageVersion);
     packageVersionBumped = true;
 
-    const packageData = isAutoCuratorMode()
-      ? buildAutoCuratorCategoryPackageData(data)
-      : buildResourcePackageData(data);
+    const packageData = buildResourcePackageData(data);
     const resourceCount = Array.isArray(packageData.resources) ? packageData.resources.length : 0;
     if(resourceCount === 0){
       const shouldSaveEmpty = confirm("This resource package has no resources. Save it anyway?");

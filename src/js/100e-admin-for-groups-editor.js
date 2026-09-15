@@ -102,7 +102,7 @@ function addForGroupRow(value){
   list.appendChild(row);
   row.addEventListener("click", () => selectForGroupRow(index));
   row.addEventListener("keydown", event => {
-    if(event.key !== "Enter" && event.key !== " ") return;
+    if(event.target !== row || (event.key !== "Enter" && event.key !== " ")) return;
     event.preventDefault();
     selectForGroupRow(index);
     if(input) input.focus();

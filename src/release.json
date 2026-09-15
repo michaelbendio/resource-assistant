@@ -1,13 +1,13 @@
 {
-  "version": "2.3.5",
-  "build": 152,
-  "date": "2026-09-09",
-  "message": "Clear starter taxonomy and fix two-word office package names",
+  "version": "2.3.8",
+  "build": 155,
+  "date": "2026-09-14",
+  "message": "Remove AutoCurator generation and Scout curation controls",
   "appChanges": [
     {
-      "date": "2026-08-28",
-      "version": "2.3.4",
-      "message": "Create AutoCurator review files that save one category as a mergeable resource package"
+      "date": "2026-09-06",
+      "version": "2.3.6",
+      "message": "Narrow resources by Type and group, with matching counts and Clear filters."
     },
     {
       "date": "2026-08-20",
