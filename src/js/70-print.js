@@ -127,6 +127,8 @@ const PrintWorkflow = {
   queue: [],
   currentIndex: -1,
   initiatedByButton: false,
+  editorPreview: false,
+  returnFocus: null,
 
   isListResource(res){
     return resourceMatchesListsHeuristic(res);
@@ -222,10 +224,10 @@ const PrintWorkflow = {
     this.openPreview(normalSelections);
   },
 
-  buildListFlyer(resource, shouldPageBreak){
+  buildListFlyer(resource, shouldPageBreak, { interactive = true } = {}){
     const flyer = document.createElement("section");
     flyer.className = "print-list-flyer" + (shouldPageBreak ? " print-list-flyer-page-break" : "");
-    flyer.classList.toggle("print-disabled", !isSelectedForPrinting(resource.id));
+    if(interactive) flyer.classList.toggle("print-disabled", !isSelectedForPrinting(resource.id));
 
     let html = `<div class="print-list-heading"><span class="print-list-actions-placeholder"></span><h2>${escapeHTML(resource.name || "")}</h2></div>`;
     if(resource.description) html += `<div class="print-list-field"><strong>Description:</strong> ${escapeHTML(resource.description)}</div>`;
@@ -237,17 +239,21 @@ const PrintWorkflow = {
     }
     flyer.innerHTML = html;
     const placeholder = flyer.querySelector(".print-list-actions-placeholder");
-    const actions = createResourceActionButtons(resource);
-    actions.classList.add("print-list-actions");
-    if(placeholder) placeholder.replaceWith(actions);
-    const toggle = flyer.querySelector(".print-selection-toggle");
-    if(toggle){
-      toggle.onclick = e => {
-        e.stopPropagation();
-        togglePrintSelection(resource.id, { rerender:false });
-        this.showStep();
-        safeRender();
-      };
+    if(interactive){
+      const actions = createResourceActionButtons(resource);
+      actions.classList.add("print-list-actions");
+      if(placeholder) placeholder.replaceWith(actions);
+      const toggle = flyer.querySelector(".print-selection-toggle");
+      if(toggle){
+        toggle.onclick = e => {
+          e.stopPropagation();
+          togglePrintSelection(resource.id, { rerender:false });
+          this.showStep();
+          safeRender();
+        };
+      }
+    }else if(placeholder){
+      placeholder.remove();
     }
     return flyer;
   },
@@ -272,6 +278,7 @@ const PrintWorkflow = {
   },
 
   startPrintSelection(){
+    this.editorPreview = false;
     this.queue = this.buildQueue();
     if(!this.queue.length){
       this.openPreviewContent(container => {
@@ -279,6 +286,29 @@ const PrintWorkflow = {
       });
       return;
     }
+    this.currentIndex = 0;
+    this.showStep();
+  },
+
+  previewSingleResource(resource){
+    if(!resource) return;
+    this.editorPreview = true;
+    this.returnFocus = document.activeElement;
+    this.queue = [{
+      label:"Resource Preview",
+      render: () => this.openPreviewContent(container => {
+        if(this.isListResource(resource)){
+          container.appendChild(this.buildListFlyer(resource, false, { interactive:false }));
+          return;
+        }
+        container.appendChild(buildResourceCard(resource, {
+          expanded:true,
+          showDescription:true,
+          showPrintToggle:false,
+          showFavoriteToggle:false
+        }));
+      })
+    }];
     this.currentIndex = 0;
     this.showStep();
   },
@@ -294,6 +324,9 @@ const PrintWorkflow = {
     this.currentIndex = -1;
     this.updateUI();
     printModal.classList.add("hidden");
+    if(this.returnFocus && this.returnFocus.isConnected) this.returnFocus.focus();
+    this.returnFocus = null;
+    this.editorPreview = false;
   },
 
   doPrint(){
@@ -301,7 +334,7 @@ const PrintWorkflow = {
     const disabled = Array.from(printContent.querySelectorAll(".print-disabled"));
     disabled.forEach(el => el.setAttribute("data-print-hidden", "true"));
     window.print();
-    clearAllCategoryFilters(false);
+    if(!this.editorPreview) clearAllCategoryFilters(false);
   },
 
   handleAfterPrint(){
@@ -314,3 +347,22 @@ function startPrintSelectionPreview(){ PrintWorkflow.startPrintSelection(); }
 function nextPrintStep(){ PrintWorkflow.next(); }
 function closePrintPreview(){ PrintWorkflow.close(); }
 function doPrint(){ PrintWorkflow.doPrint(); }
+
+function getCurrentResourcePrintPreviewData(){
+  const idx = getResourceIndexById(selectedResourceId);
+  const resource = idx >= 0 ? data.resources[idx] : null;
+  if(!resource) return null;
+  const draft = resourceEditorDraft();
+  if(!draft) return cloneDataObject(resource);
+  const preview = cloneDataObject(resource);
+  Object.entries(draft).forEach(([key, value]) => {
+    if(key !== "updateDescription") preview[key] = structuredClone(value);
+  });
+  return preview;
+}
+
+function printCurrentResource(){
+  const resource = getCurrentResourcePrintPreviewData();
+  if(!resource) return;
+  PrintWorkflow.previewSingleResource(resource);
+}

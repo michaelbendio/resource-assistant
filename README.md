@@ -169,3 +169,18 @@ By default, the output uses the input filename with the other extension. Use
 
 See [`docs/church-hosting.md`](docs/church-hosting.md) for the SharePoint document-library
 and guided publishing workflow.
+
+## Browsing and editor conveniences
+
+The home screen offers **Browse by need** and **Find resources for**. Select one
+or more For groups to see matching resources organized by need. Opening a need
+retains those groups so Type choices narrow the results further. Search remains
+a search across all resources.
+
+In the resource editor, **Print** previews the current draft without saving it
+or changing the print selection. **Open website** opens the current Website
+field in a separate tab. Standalone bold Information headings stay with the
+following text when printed.
+
+The focused browser checks in `tests/test_browsing_and_editor.py` require
+Playwright, Chrome/Chromium, and (for the printed-page check) `pdftotext`.

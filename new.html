@@ -1045,6 +1045,75 @@ textarea.information-editor { min-height:320px; resize:vertical; }
 .category-filter-controls :focus-visible { outline:3px solid #155ea0; outline-offset:3px; }
 .category-filter-note { font-size:0.95rem; }
 @media print { .category-filter-controls { display:none !important; } }
+
+.browse-mode-switch {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px;
+  margin:0 0 16px;
+}
+.browse-mode-option {
+  display:flex;
+  align-items:center;
+  gap:9px;
+  padding:12px 14px;
+  border:1px solid #9eafbf;
+  border-radius:10px;
+  background:#fff;
+  color:#17324d;
+  font-weight:700;
+  cursor:pointer;
+}
+.browse-mode-option.selected {
+  border-color:#2f6fab;
+  background:#e9f3fc;
+  box-shadow:0 0 0 2px rgba(47,111,171,.14);
+}
+.browse-mode-option input { margin:0; }
+.group-browse-panel {
+  margin:0 0 18px;
+  padding:15px 16px;
+  border:1px solid #cbd9e7;
+  border-radius:12px;
+  background:#f7fbff;
+}
+.group-browse-heading { margin:0 0 9px; font-weight:700; }
+.group-browse-buttons { display:flex; flex-wrap:wrap; gap:8px; }
+.group-browse-summary { margin:0 0 12px; color:var(--muted-text-color); }
+.category-match-count { color:var(--muted-text-color); font-size:14px; font-weight:500; }
+.group-browse-results { display:grid; gap:20px; }
+.group-browse-category {
+  padding:14px;
+  border:1px solid var(--border-color);
+  border-radius:12px;
+  background:#eef3f7;
+}
+.group-browse-category-heading {
+  display:flex;
+  width:100%;
+  justify-content:space-between;
+  gap:12px;
+  margin:0 0 10px;
+  padding:0;
+  border:0;
+  background:transparent;
+  color:#003366;
+  font:inherit;
+  font-size:20px;
+  font-weight:750;
+  text-align:left;
+  cursor:pointer;
+}
+.group-browse-category .resource-card { margin-top:10px; }
+
+@media (max-width:600px) { .browse-mode-switch { grid-template-columns:1fr; } }
+.group-browse-buttons button { min-height:44px; }
+.group-browse-panel :focus-visible, .group-browse-category-heading:focus-visible { outline:3px solid #155ea0; outline-offset:3px; }
+@media print {
+  .information-heading { break-after:avoid; page-break-after:avoid; }
+}
+
+.resource-website-editor { grid-column:1 / -1; min-width:0; }
 </style>
 <!-- ===== APP CSS END ===== -->
 </head>
@@ -1133,8 +1202,13 @@ textarea.information-editor { min-height:320px; resize:vertical; }
 <script id="app-release-data" type="application/json">
 {
   "version": "2.3.8",
-  "build": 155,
+  "build": 156,
   "changes": [
+    {
+      "date": "2026-09-14",
+      "version": "2.3.8",
+      "message": "Find resources for a group across categories, and preview or print resources directly from the editor."
+    },
     {
       "date": "2026-09-06",
       "version": "2.3.6",
@@ -1164,11 +1238,6 @@ textarea.information-editor { min-height:320px; resize:vertical; }
       "date": "2026-08-10",
       "version": "2.3.1",
       "message": "Toggle the Favorites view with the navigation star"
-    },
-    {
-      "date": "2026-08-06",
-      "version": "2.3.0",
-      "message": "Add persistent resource favorites"
     }
   ]
 }
@@ -1793,7 +1862,8 @@ function renderInformationMarkupHTML(text){
       out.push('<div class="information-line information-blank">&nbsp;</div>');
       return;
     }
-    out.push(`<div class="information-line">${renderInformationInlineHTML(line)}</div>`);
+    const headingClass = /^\*\*[^*]+\*\*$/.test(trimmed) ? " information-heading" : "";
+    out.push(`<div class="information-line${headingClass}">${renderInformationInlineHTML(line)}</div>`);
   });
 
   flushList();
@@ -2673,6 +2743,8 @@ let expandedSearchResourceId = "";
 let searchDetailResourceId = "";
 let searchResultReturnResourceId = "";
 let selectedCategoryFilters = {}; // categoryId -> transient selected category/For filters
+let categoryBrowseMode = "need";
+let selectedBrowseForGroups = [];
 let dismissedTipIds = (() => {
   try{
     const stored = JSON.parse(localStorage.getItem(DISMISSED_TIPS_STORAGE_KEY) || "[]");
@@ -4145,8 +4217,8 @@ function renderLandingSearch(){
   const input = document.createElement("input");
   input.type = "search";
   input.className = "landing-search-input";
-  input.placeholder = "Search resources";
-  input.setAttribute("aria-label", "Search resources");
+  input.placeholder = "Search all resources";
+  input.setAttribute("aria-label", "Search all resources");
 
   const search = document.createElement("button");
   search.type = "button";
@@ -4165,6 +4237,144 @@ function renderLandingSearch(){
   controls.appendChild(search);
   section.appendChild(controls);
   appView.appendChild(section);
+}
+
+function renderBrowseModeSwitch(){
+  const switcher = document.createElement("div");
+  switcher.className = "browse-mode-switch";
+  switcher.setAttribute("role", "radiogroup");
+  switcher.setAttribute("aria-label", "How to browse resources");
+  [
+    { value:"need", label:"Browse by need" },
+    { value:"for", label:"Find resources for" }
+  ].forEach(option => {
+    const label = document.createElement("label");
+    label.className = `browse-mode-option ${categoryBrowseMode === option.value ? "selected" : ""}`;
+    const input = document.createElement("input");
+    input.type = "radio";
+    input.name = "resource-browse-mode";
+    input.value = option.value;
+    input.checked = categoryBrowseMode === option.value;
+    input.onchange = () => {
+      categoryBrowseMode = option.value;
+      safeRender();
+      appView.querySelector(`input[name="resource-browse-mode"][value="${option.value}"]`)?.focus();
+    };
+    const text = document.createElement("span");
+    text.textContent = option.label;
+    label.appendChild(input);
+    label.appendChild(text);
+    switcher.appendChild(label);
+  });
+  appView.appendChild(switcher);
+}
+
+function selectedBrowseGroupKeys(){
+  return new Set(normalizeTaxonomyLabels(selectedBrowseForGroups).map(makeForGroupFilterKey));
+}
+
+function renderBrowseGroupButtons(){
+  const panel = document.createElement("section");
+  panel.className = "group-browse-panel";
+  const heading = document.createElement("p");
+  heading.className = "group-browse-heading";
+  heading.textContent = "Choose one or more groups";
+  panel.appendChild(heading);
+  const buttons = document.createElement("div");
+  buttons.className = "group-browse-buttons";
+  normalizeTaxonomyLabels(data.forGroups).forEach(group => {
+    const selected = selectedBrowseForGroups.includes(group);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = selected ? "button primary" : "button";
+    button.textContent = group;
+    button.setAttribute("aria-pressed", selected ? "true" : "false");
+    button.onclick = () => {
+      selectedBrowseForGroups = selected
+        ? selectedBrowseForGroups.filter(value => value !== group)
+        : [...selectedBrowseForGroups, group];
+      safeRender();
+      Array.from(appView.querySelectorAll(".group-browse-buttons button")).find(button => button.textContent === group)?.focus();
+    };
+    buttons.appendChild(button);
+  });
+  panel.appendChild(buttons);
+  appView.appendChild(panel);
+}
+
+function getGroupBrowseCategoryRows(){
+  const selectedKeys = selectedBrowseGroupKeys();
+  if(!selectedKeys.size) return [];
+  return getCategoryCardsForRender()
+    .filter(category => category.id !== LISTS_CATEGORY_ID)
+    .map(category => {
+      const seen = new Set();
+      const resources = getCategoryResources(category.id)
+        .filter(resource => {
+          const keys = getResourceForGroupFilterKeys(resource);
+          return Array.from(selectedKeys).some(key => keys.has(key));
+        })
+        .filter(resource => {
+          const id = String(resource && resource.id || "");
+          if(!id || seen.has(id)) return false;
+          seen.add(id);
+          return true;
+        })
+        .sort(compareResourcesByName);
+      return { ...category, resources };
+    })
+    .filter(category => category.resources.length);
+}
+
+function openCategoryFromGroupBrowse(categoryId){
+  currentCategory = categoryId;
+  expandedSearchResourceId = "";
+  setSelectedCategoryFilters(
+    currentCategory,
+    normalizeTaxonomyLabels(selectedBrowseForGroups).map(makeForGroupFilterKey)
+  );
+  view = "category";
+  safeRender();
+}
+
+function renderGroupBrowseResults(){
+  if(!selectedBrowseForGroups.length){
+    const prompt = document.createElement("p");
+    prompt.className = "group-browse-summary";
+    prompt.textContent = "Select a group to see matching resources organized by need.";
+    appView.appendChild(prompt);
+    return;
+  }
+  const rows = getGroupBrowseCategoryRows();
+  const summary = document.createElement("p");
+  summary.className = "group-browse-summary";
+  summary.textContent = rows.length
+    ? "Matching resources are organized below by the needs they address. Select a need to narrow it by Type."
+    : "No resources match the selected groups.";
+  appView.appendChild(summary);
+  if(!rows.length) return;
+  const results = document.createElement("div");
+  results.className = "group-browse-results";
+  rows.forEach(row => {
+    const section = document.createElement("section");
+    section.className = "group-browse-category";
+    const heading = document.createElement("button");
+    heading.type = "button";
+    heading.className = "group-browse-category-heading";
+    heading.setAttribute("aria-label", `Open ${row.label} and narrow by Type`);
+    const label = document.createElement("span");
+    label.textContent = row.label;
+    const count = document.createElement("span");
+    count.className = "category-match-count";
+    count.textContent = `${row.resources.length} ${row.resources.length === 1 ? "resource" : "resources"}`;
+    heading.appendChild(label);
+    heading.appendChild(count);
+    heading.onclick = () => openCategoryFromGroupBrowse(row.id);
+    section.appendChild(heading);
+    row.resources.forEach(resource => renderCategoryResourceCard(resource, section));
+    results.appendChild(section);
+  });
+  appView.appendChild(results);
 }
 
 function renderCategoriesGrid(){
@@ -4216,9 +4426,15 @@ function renderCategoriesView(){
   // and resource-package merge entry point.
   renderCategoryTip();
   renderPendingUpdatesNotice();
-  renderCategoryReminder();
+  renderBrowseModeSwitch();
+  if(categoryBrowseMode === "need") renderCategoryReminder();
   renderLandingSearch();
-  renderCategoriesGrid();
+  if(categoryBrowseMode === "need"){
+    renderCategoriesGrid();
+  }else{
+    renderBrowseGroupButtons();
+    renderGroupBrowseResults();
+  }
   renderMergeResourcesButton();
 }
 
@@ -4332,7 +4548,8 @@ function renderCategoryFilterControls(categoryFilterOptions, activeFilters){
   appView.appendChild(filterArea);
 }
 
-function renderCategoryResourceCard(res){
+function renderCategoryResourceCard(res, container = appView){
+  const target = container && typeof container.appendChild === "function" ? container : appView;
   let expanded = String(res && res.id || "") === String(expandedSearchResourceId || "");
   const card = buildResourceCard(res, { expanded, showDescription:true });
   card.classList.add("resource-card-interactive");
@@ -4370,7 +4587,7 @@ function renderCategoryResourceCard(res){
     event.stopPropagation();
     toggleExpanded();
   };
-  appView.appendChild(card);
+  target.appendChild(card);
 }
 
 function renderCategoryResources(filtered, activeFilters){
@@ -4698,6 +4915,8 @@ const PrintWorkflow = {
   queue: [],
   currentIndex: -1,
   initiatedByButton: false,
+  editorPreview: false,
+  returnFocus: null,
 
   isListResource(res){
     return resourceMatchesListsHeuristic(res);
@@ -4793,10 +5012,10 @@ const PrintWorkflow = {
     this.openPreview(normalSelections);
   },
 
-  buildListFlyer(resource, shouldPageBreak){
+  buildListFlyer(resource, shouldPageBreak, { interactive = true } = {}){
     const flyer = document.createElement("section");
     flyer.className = "print-list-flyer" + (shouldPageBreak ? " print-list-flyer-page-break" : "");
-    flyer.classList.toggle("print-disabled", !isSelectedForPrinting(resource.id));
+    if(interactive) flyer.classList.toggle("print-disabled", !isSelectedForPrinting(resource.id));
 
     let html = `<div class="print-list-heading"><span class="print-list-actions-placeholder"></span><h2>${escapeHTML(resource.name || "")}</h2></div>`;
     if(resource.description) html += `<div class="print-list-field"><strong>Description:</strong> ${escapeHTML(resource.description)}</div>`;
@@ -4808,17 +5027,21 @@ const PrintWorkflow = {
     }
     flyer.innerHTML = html;
     const placeholder = flyer.querySelector(".print-list-actions-placeholder");
-    const actions = createResourceActionButtons(resource);
-    actions.classList.add("print-list-actions");
-    if(placeholder) placeholder.replaceWith(actions);
-    const toggle = flyer.querySelector(".print-selection-toggle");
-    if(toggle){
-      toggle.onclick = e => {
-        e.stopPropagation();
-        togglePrintSelection(resource.id, { rerender:false });
-        this.showStep();
-        safeRender();
-      };
+    if(interactive){
+      const actions = createResourceActionButtons(resource);
+      actions.classList.add("print-list-actions");
+      if(placeholder) placeholder.replaceWith(actions);
+      const toggle = flyer.querySelector(".print-selection-toggle");
+      if(toggle){
+        toggle.onclick = e => {
+          e.stopPropagation();
+          togglePrintSelection(resource.id, { rerender:false });
+          this.showStep();
+          safeRender();
+        };
+      }
+    }else if(placeholder){
+      placeholder.remove();
     }
     return flyer;
   },
@@ -4843,6 +5066,7 @@ const PrintWorkflow = {
   },
 
   startPrintSelection(){
+    this.editorPreview = false;
     this.queue = this.buildQueue();
     if(!this.queue.length){
       this.openPreviewContent(container => {
@@ -4850,6 +5074,29 @@ const PrintWorkflow = {
       });
       return;
     }
+    this.currentIndex = 0;
+    this.showStep();
+  },
+
+  previewSingleResource(resource){
+    if(!resource) return;
+    this.editorPreview = true;
+    this.returnFocus = document.activeElement;
+    this.queue = [{
+      label:"Resource Preview",
+      render: () => this.openPreviewContent(container => {
+        if(this.isListResource(resource)){
+          container.appendChild(this.buildListFlyer(resource, false, { interactive:false }));
+          return;
+        }
+        container.appendChild(buildResourceCard(resource, {
+          expanded:true,
+          showDescription:true,
+          showPrintToggle:false,
+          showFavoriteToggle:false
+        }));
+      })
+    }];
     this.currentIndex = 0;
     this.showStep();
   },
@@ -4865,6 +5112,9 @@ const PrintWorkflow = {
     this.currentIndex = -1;
     this.updateUI();
     printModal.classList.add("hidden");
+    if(this.returnFocus && this.returnFocus.isConnected) this.returnFocus.focus();
+    this.returnFocus = null;
+    this.editorPreview = false;
   },
 
   doPrint(){
@@ -4872,7 +5122,7 @@ const PrintWorkflow = {
     const disabled = Array.from(printContent.querySelectorAll(".print-disabled"));
     disabled.forEach(el => el.setAttribute("data-print-hidden", "true"));
     window.print();
-    clearAllCategoryFilters(false);
+    if(!this.editorPreview) clearAllCategoryFilters(false);
   },
 
   handleAfterPrint(){
@@ -4885,6 +5135,25 @@ function startPrintSelectionPreview(){ PrintWorkflow.startPrintSelection(); }
 function nextPrintStep(){ PrintWorkflow.next(); }
 function closePrintPreview(){ PrintWorkflow.close(); }
 function doPrint(){ PrintWorkflow.doPrint(); }
+
+function getCurrentResourcePrintPreviewData(){
+  const idx = getResourceIndexById(selectedResourceId);
+  const resource = idx >= 0 ? data.resources[idx] : null;
+  if(!resource) return null;
+  const draft = resourceEditorDraft();
+  if(!draft) return cloneDataObject(resource);
+  const preview = cloneDataObject(resource);
+  Object.entries(draft).forEach(([key, value]) => {
+    if(key !== "updateDescription") preview[key] = structuredClone(value);
+  });
+  return preview;
+}
+
+function printCurrentResource(){
+  const resource = getCurrentResourcePrintPreviewData();
+  if(!resource) return;
+  PrintWorkflow.previewSingleResource(resource);
+}
 
 // Source: src/js/80-admin-shell.js
 // ============================================================
@@ -7218,6 +7487,7 @@ function setAdminEditorActions(kind, visible, doneDisabled = false, cancelDisabl
     `,
     resource: `
       <button id="res_cancel_btn" class="button" type="button" onclick="cancelResourceEditor()" ${cancelDisabled ? "disabled" : ""}>Cancel</button>
+      <button id="res_print_btn" class="button" type="button" onclick="printCurrentResource()">Print</button>
       <button id="res_done_btn" class="button primary" onclick="closeResourceEditor()" ${doneDisabled ? "disabled" : ""}>Done</button>
     `,
     forGroups: `
@@ -8280,6 +8550,7 @@ function renderResourceCategoryChecks(res){
 }
 
 function renderResourceBasicsSection(res, verifiedDisplay){
+  const websiteURL = resourceEditorWebsiteURL(res.website);
   return `
     <div>
       <label>Name<br>
@@ -8295,9 +8566,13 @@ function renderResourceBasicsSection(res, verifiedDisplay){
           <input id="res_address" value="${escapeHTML(res.address || "")}">
         </label>
 
-        <label>Website<br>
-          <input id="res_website" type="url" value="${escapeHTML(res.website || "")}">
-        </label>
+        <div class="resource-website-editor">
+          <label for="res_website">Website</label><br>
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <input id="res_website" type="url" value="${escapeHTML(res.website || "")}" style="flex:1; min-width:0;">
+            <a id="res_website_link" class="button" href="${escapeHTML(websiteURL)}" target="_blank" rel="noopener noreferrer" style="white-space:nowrap;${websiteURL ? "" : "display:none;"}">Open website</a>
+          </div>
+        </div>
         <label>Hours<br>
           <input id="res_hours" value="${escapeHTML(res.hours || "")}">
         </label>
@@ -8542,6 +8817,31 @@ function setupResourceVerifiedControls(elements, validateEditorState){
   elements.verifiedInput.addEventListener("input", () => updateResourceVerifiedDisplayAndWarning(elements));
 }
 
+function resourceEditorWebsiteURL(value){
+  const text = String(value || "").trim();
+  if(!text || /\s/.test(text) || (/^[a-z][a-z0-9+.-]*:/i.test(text) && !/^https?:\/\//i.test(text))) return "";
+  try{
+    const url = new URL(normalizeWebsiteURL(text));
+    return url.hostname && ["http:", "https:"].includes(url.protocol) ? url.href : "";
+  }catch(error){ return ""; }
+}
+
+function updateResourceWebsiteLink(){
+  const field = document.getElementById("res_website");
+  const link = document.getElementById("res_website_link");
+  if(!field || !link) return;
+  const websiteURL = resourceEditorWebsiteURL(field.value);
+  if(websiteURL){
+    link.href = websiteURL;
+    link.style.display = "";
+    link.setAttribute("aria-label", `Open ${field.value.trim()} in a new tab`);
+  }else{
+    link.removeAttribute("href");
+    link.style.display = "none";
+    link.removeAttribute("aria-label");
+  }
+}
+
 function setupResourceEditorValidation(editor, elements, validateEditorState){
   ["res_name", "res_phone", "res_address", "res_website", "res_hours", "res_description"].forEach(id => {
     const field = document.getElementById(id);
@@ -8550,6 +8850,9 @@ function setupResourceEditorValidation(editor, elements, validateEditorState){
   editor.querySelectorAll(".resForGroup").forEach(cb => {
     cb.addEventListener("change", validateEditorState);
   });
+  const websiteField = document.getElementById("res_website");
+  if(websiteField) websiteField.addEventListener("input", updateResourceWebsiteLink);
+  updateResourceWebsiteLink();
   if(elements.updateInput) elements.updateInput.addEventListener("input", validateEditorState);
   if(elements.verifiedInput) elements.verifiedInput.addEventListener("input", validateEditorState);
 }
@@ -10095,6 +10398,12 @@ window.addEventListener("keydown", (e) => {
   safeRender();
   if(shouldShowAdmin) flashAdminButton();
 }, true);
+
+window.addEventListener("keydown", event => {
+  if(event.key !== "Escape" || printModal.classList.contains("hidden")) return;
+  event.preventDefault();
+  closePrintPreview();
+});
 
 // Source: src/js/120-startup.js
 /* ---------- Start ---------- */

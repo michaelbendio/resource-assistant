@@ -319,6 +319,7 @@ function renderResourceCategoryChecks(res){
 }
 
 function renderResourceBasicsSection(res, verifiedDisplay){
+  const websiteURL = resourceEditorWebsiteURL(res.website);
   return `
     <div>
       <label>Name<br>
@@ -334,9 +335,13 @@ function renderResourceBasicsSection(res, verifiedDisplay){
           <input id="res_address" value="${escapeHTML(res.address || "")}">
         </label>
 
-        <label>Website<br>
-          <input id="res_website" type="url" value="${escapeHTML(res.website || "")}">
-        </label>
+        <div class="resource-website-editor">
+          <label for="res_website">Website</label><br>
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <input id="res_website" type="url" value="${escapeHTML(res.website || "")}" style="flex:1; min-width:0;">
+            <a id="res_website_link" class="button" href="${escapeHTML(websiteURL)}" target="_blank" rel="noopener noreferrer" style="white-space:nowrap;${websiteURL ? "" : "display:none;"}">Open website</a>
+          </div>
+        </div>
         <label>Hours<br>
           <input id="res_hours" value="${escapeHTML(res.hours || "")}">
         </label>
@@ -581,6 +586,31 @@ function setupResourceVerifiedControls(elements, validateEditorState){
   elements.verifiedInput.addEventListener("input", () => updateResourceVerifiedDisplayAndWarning(elements));
 }
 
+function resourceEditorWebsiteURL(value){
+  const text = String(value || "").trim();
+  if(!text || /\s/.test(text) || (/^[a-z][a-z0-9+.-]*:/i.test(text) && !/^https?:\/\//i.test(text))) return "";
+  try{
+    const url = new URL(normalizeWebsiteURL(text));
+    return url.hostname && ["http:", "https:"].includes(url.protocol) ? url.href : "";
+  }catch(error){ return ""; }
+}
+
+function updateResourceWebsiteLink(){
+  const field = document.getElementById("res_website");
+  const link = document.getElementById("res_website_link");
+  if(!field || !link) return;
+  const websiteURL = resourceEditorWebsiteURL(field.value);
+  if(websiteURL){
+    link.href = websiteURL;
+    link.style.display = "";
+    link.setAttribute("aria-label", `Open ${field.value.trim()} in a new tab`);
+  }else{
+    link.removeAttribute("href");
+    link.style.display = "none";
+    link.removeAttribute("aria-label");
+  }
+}
+
 function setupResourceEditorValidation(editor, elements, validateEditorState){
   ["res_name", "res_phone", "res_address", "res_website", "res_hours", "res_description"].forEach(id => {
     const field = document.getElementById(id);
@@ -589,6 +619,9 @@ function setupResourceEditorValidation(editor, elements, validateEditorState){
   editor.querySelectorAll(".resForGroup").forEach(cb => {
     cb.addEventListener("change", validateEditorState);
   });
+  const websiteField = document.getElementById("res_website");
+  if(websiteField) websiteField.addEventListener("input", updateResourceWebsiteLink);
+  updateResourceWebsiteLink();
   if(elements.updateInput) elements.updateInput.addEventListener("input", validateEditorState);
   if(elements.verifiedInput) elements.verifiedInput.addEventListener("input", validateEditorState);
 }

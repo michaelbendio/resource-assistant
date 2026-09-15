@@ -197,6 +197,8 @@ let expandedSearchResourceId = "";
 let searchDetailResourceId = "";
 let searchResultReturnResourceId = "";
 let selectedCategoryFilters = {}; // categoryId -> transient selected category/For filters
+let categoryBrowseMode = "need";
+let selectedBrowseForGroups = [];
 let dismissedTipIds = (() => {
   try{
     const stored = JSON.parse(localStorage.getItem(DISMISSED_TIPS_STORAGE_KEY) || "[]");

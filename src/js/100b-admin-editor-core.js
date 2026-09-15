@@ -189,6 +189,7 @@ function setAdminEditorActions(kind, visible, doneDisabled = false, cancelDisabl
     `,
     resource: `
       <button id="res_cancel_btn" class="button" type="button" onclick="cancelResourceEditor()" ${cancelDisabled ? "disabled" : ""}>Cancel</button>
+      <button id="res_print_btn" class="button" type="button" onclick="printCurrentResource()">Print</button>
       <button id="res_done_btn" class="button primary" onclick="closeResourceEditor()" ${doneDisabled ? "disabled" : ""}>Done</button>
     `,
     forGroups: `

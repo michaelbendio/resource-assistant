@@ -481,7 +481,8 @@ function renderInformationMarkupHTML(text){
       out.push('<div class="information-line information-blank">&nbsp;</div>');
       return;
     }
-    out.push(`<div class="information-line">${renderInformationInlineHTML(line)}</div>`);
+    const headingClass = /^\*\*[^*]+\*\*$/.test(trimmed) ? " information-heading" : "";
+    out.push(`<div class="information-line${headingClass}">${renderInformationInlineHTML(line)}</div>`);
   });
 
   flushList();

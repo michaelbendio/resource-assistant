@@ -1,9 +1,14 @@
 {
   "version": "2.3.8",
-  "build": 155,
+  "build": 156,
   "date": "2026-09-14",
-  "message": "Remove AutoCurator generation and Scout curation controls",
+  "message": "Add cross-category group browsing and printing from the resource editor",
   "appChanges": [
+    {
+      "date": "2026-09-14",
+      "version": "2.3.8",
+      "message": "Find resources for a group across categories, and preview or print resources directly from the editor."
+    },
     {
       "date": "2026-09-06",
       "version": "2.3.6",

@@ -41,3 +41,9 @@ window.addEventListener("keydown", (e) => {
   safeRender();
   if(shouldShowAdmin) flashAdminButton();
 }, true);
+
+window.addEventListener("keydown", event => {
+  if(event.key !== "Escape" || printModal.classList.contains("hidden")) return;
+  event.preventDefault();
+  closePrintPreview();
+});
