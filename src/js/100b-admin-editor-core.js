@@ -44,6 +44,7 @@ function resourceEditorDraft(){
   if(!nameEl || !phoneEl || !addressEl || !websiteEl || !hoursEl || !descEl) return null;
   const verifiedEl = document.getElementById("res_verified_on");
   const verifiedOn = verifiedEl ? verifiedEl.value.trim() : "";
+  syncApprovedForGroupSelections();
   const forGroups = Array.from(document.querySelectorAll(".resForGroup"))
     .filter(cb=>cb.checked)
     .map(cb=>cb.value)
@@ -64,7 +65,7 @@ function resourceEditorDraft(){
   const additionalEl = document.getElementById("res_info_additional");
   const informationDraft = { additional:additionalEl ? additionalEl.value : "" };
 
-  return {
+  const draft = {
     name: nameEl.value.trim(),
     phone: phoneEl.value.trim(),
     address: addressEl.value.trim(),
@@ -78,6 +79,8 @@ function resourceEditorDraft(){
     forGroups,
     updateDescription: updateEl ? updateEl.value.trim() : ""
   };
+  draft.forGroupReviewConfirmed = readForGroupReviewConfirmation(draft);
+  return draft;
 }
 
 function getResourceIndexById(resourceId){
@@ -366,7 +369,10 @@ function applyResourceDraft(idx, draft){
   if("verifiedDate" in res) delete res.verifiedDate;
   res.categories = draft.categories;
   res.categoryFilters = draft.categoryFilters || {};
-  res.forGroups = normalizeTaxonomyLabels(draft.forGroups);
+  res.forGroups = effectiveForGroups(draft.forGroups, data.forGroups);
+  if(draft.forGroupReviewConfirmed && !hasCurrentForGroupReview(res, data.forGroups, data.forGroupDefinitions)){
+    recordForGroupReview(res, data.forGroups, data.forGroupDefinitions);
+  }
   res.lastModified = nowISO();
   refreshAdminCategoryResourceList();
 }
@@ -492,6 +498,7 @@ function commitPendingEditsIfChanged(){
       return false;
     }
     if(nextSnapshot !== editorSnapshot){
+      if(!requireDraftForGroupReview(draft)) return false;
       if(!confirmBlankUpdateDescription(draft)) return false;
       const resource = data.resources[editing.idx];
       const resourceId = resource && resource.id ? resource.id : "";

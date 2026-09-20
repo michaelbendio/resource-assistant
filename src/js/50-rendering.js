@@ -586,7 +586,7 @@ function showAdminHelp(options = {}){
               <li><strong>Verified</strong> stores a <code>MM/YY</code> date. Click <strong>Update</strong> to fill in the current month and year.</li>
               <li><strong>Description</strong> is the short public summary.</li>
               <li><strong>Describe this update</strong> is used in the change log and package update summary.</li>
-              <li><strong>For</strong> identifies who the resource is for.</li>
+              <li><strong>For</strong> identifies who the resource is for. Read each group definition, select every applicable group, and confirm the review before saving. If none applies, explicitly confirm that no specific group applies. Relevant content or group changes require another confirmation.</li>
               <li><strong>Categories</strong> determines which categories the resource will be part of and shows the Types available for each selected category.</li>
               <li><strong>Information</strong> is the detailed public service text.</li>
               <li><strong>PDFs</strong> lets you attach, open, or remove PDF files. Attached PDFs are included when you save a resource package.</li>
@@ -613,6 +613,7 @@ function showAdminHelp(options = {}){
         <details>
           <summary>For</summary>
           <div class="admin-help-section-body">
+            <p>Use definitions to explain when each group applies. Changes to available groups or their definitions make previous group reviews outdated. Under <strong>Resources</strong>, the review count and <strong>Review next</strong> button help you check missing or outdated reviews after a package merge.</p>
             <p><strong>For</strong> manages the governed list of groups a resource can be for.</p>
             <p>Use <strong>For</strong> for cross-category people-served groups, such as veterans or families with children. Use <strong>Types</strong> for the specific service being offered.</p>
             <p>Select a group to see which resources use it. <strong>Delete</strong> tags the selected group for deletion; it remains active until an admin approves it after merging the package.</p>
@@ -880,7 +881,9 @@ function getCategoryFilterOptions(categoryId){
     const key = kind === "for" ? makeForGroupFilterKey(label) : makeCategorySpecificFilterKey(label);
     const opposite = active.filter(selected => kind === "for" ? selected.startsWith("filter:") : selected.startsWith("for:"));
     const has = resource => (kind === "for" ? getResourceForGroupFilterKeys(resource) : getResourceCategoryFilterKeys(resource, categoryId)).has(key);
-    const count = resources.filter(resource => has(resource) && resourceMatchesSelectedCategoryFilters(resource, categoryId, opposite)).length;
+    const scope = kind === "for" && forGroupMatchMode === "all"
+      ? [...active.filter(selected => selected !== key), key] : opposite;
+    const count = resources.filter(resource => has(resource) && resourceMatchesSelectedCategoryFilters(resource, categoryId, scope)).length;
     const categoryCount = resources.filter(has).length;
     if(kind === "filter" && !categoryCount && !active.includes(key)) return;
     if(kind === "for" && !count && !active.includes(key)) return;
@@ -904,7 +907,8 @@ function getResourceCategoryFilterKeys(resource, categoryId){
 }
 
 function getResourceForGroupFilterKeys(resource){
-  return new Set(normalizeTaxonomyLabels(resource && resource.forGroups).map(makeForGroupFilterKey));
+  const catalog = typeof data === "undefined" ? [] : data.forGroups;
+  return new Set(effectiveForGroups(resource && resource.forGroups, catalog).map(makeForGroupFilterKey));
 }
 
 function countSelectedCategoryFilterMatches(resource, categoryId, activeFilterKeys){
@@ -921,13 +925,12 @@ function countSelectedCategoryFilterMatches(resource, categoryId, activeFilterKe
 }
 
 function resourceMatchesSelectedCategoryFilters(resource, categoryId, selectedFilterKeys){
-  const activeFilterKeys = new Set(normalizeTaxonomyLabels(selectedFilterKeys));
-  const types = [...activeFilterKeys].filter(key => key.startsWith("filter:"));
-  const groups = [...activeFilterKeys].filter(key => key.startsWith("for:"));
-  const typeKeys = getResourceCategoryFilterKeys(resource, categoryId);
-  const groupKeys = getResourceForGroupFilterKeys(resource);
-  return (!types.length || types.some(key => typeKeys.has(key)))
-    && (!groups.length || groups.some(key => groupKeys.has(key)));
+  const selected = normalizeTaxonomyLabels(selectedFilterKeys);
+  const types = selected.filter(key => key.startsWith("filter:"));
+  const groups = selected.filter(key => key.startsWith("for:"));
+  const availableTypes = getResourceCategoryFilterKeys(resource, categoryId);
+  return (!types.length || types.some(key => availableTypes.has(key)))
+    && matchesSelectedForGroupKeys(resource, groups);
 }
 
 function filterResourcesBySelectedCategoryFilters(resources, categoryId, selectedFilterKeys){

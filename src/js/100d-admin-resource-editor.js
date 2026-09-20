@@ -13,6 +13,7 @@ function renderAdminResources(container){
       <div class="admin-panel">
         <div class="admin-box">
           <h3 class="admin-panel-title">Resources</h3>
+          ${forGroupReviewSummaryHTML()}
       <div class="resource-browse-wrap">
         <label class="admin-option-row" style="display:block;">
           <input type="checkbox" id="resSortShowVerified">
@@ -277,14 +278,13 @@ function cancelResourceEditor(){
 }
 
 function renderResourceForGroupChecks(res){
-  const selectedForKeys = new Set(normalizeTaxonomyLabels(res.forGroups).map(group => group.toLowerCase()));
-  return normalizeTaxonomyLabels(data.forGroups)
-    .map(group => `
-      <label style="display:block; margin:2px 0;">
-        <input type="checkbox" class="resForGroup" value="${escapeHTML(group)}" ${selectedForKeys.has(group.toLowerCase()) ? "checked" : ""}>
-        ${escapeHTML(group)}
-      </label>
-    `).join("");
+  const selectedForKeys = new Set(effectiveForGroups(res.forGroups, data.forGroups).map(group => group.toLowerCase()));
+  return normalizeTaxonomyLabels(data.forGroups).map(group => `
+    <label style="display:block; margin:4px 2px;">
+      <input type="checkbox" class="resForGroup" value="${escapeHTML(group)}" ${selectedForKeys.has(group.toLowerCase()) ? "checked" : ""}>
+      ${escapeHTML(group)}
+      ${forGroupDefinition(data, group) ? `<small style="display:block;margin-left:24px;">${escapeHTML(forGroupDefinition(data, group))}</small>` : ""}
+    </label>`).join("");
 }
 
 function renderResourceCategoryChecks(res){
@@ -451,6 +451,7 @@ function renderResourceEditorMarkup(res){
     renderResourceBasicsSection(res, verifiedDisplay),
     renderResourceUpdateSection(),
     renderResourceForGroupsSection(renderResourceForGroupChecks(res)),
+    renderForGroupReviewSection(res),
     renderResourceCategoriesSection(renderResourceCategoryChecks(res)),
     renderResourcePDFSection(res),
     renderResourceInformationSection(informationDraft)
@@ -704,6 +705,7 @@ function editResource(idx){
   setupResourceCategoryControls(editor, validateEditorState);
   setupResourceVerifiedControls(elements, validateEditorState);
   setupResourceEditorValidation(editor, elements, validateEditorState);
+  setupForGroupReviewControls(validateEditorState);
   setupResourcePDFControls(idx);
 
   editorSnapshot = snapshotResourceEditor();

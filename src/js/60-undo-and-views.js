@@ -223,6 +223,7 @@ function renderBrowseGroupButtons(){
   heading.className = "group-browse-heading";
   heading.textContent = "Choose one or more groups";
   panel.appendChild(heading);
+  renderForGroupMatchControl(panel);
   const buttons = document.createElement("div");
   buttons.className = "group-browse-buttons";
   normalizeTaxonomyLabels(data.forGroups).forEach(group => {
@@ -253,10 +254,7 @@ function getGroupBrowseCategoryRows(){
     .map(category => {
       const seen = new Set();
       const resources = getCategoryResources(category.id)
-        .filter(resource => {
-          const keys = getResourceForGroupFilterKeys(resource);
-          return Array.from(selectedKeys).some(key => keys.has(key));
-        })
+        .filter(resource => matchesSelectedForGroupKeys(resource, selectedKeys))
         .filter(resource => {
           const id = String(resource && resource.id || "");
           if(!id || seen.has(id)) return false;
@@ -291,9 +289,11 @@ function renderGroupBrowseResults(){
   const rows = getGroupBrowseCategoryRows();
   const summary = document.createElement("p");
   summary.className = "group-browse-summary";
+  const uniqueCount = new Set(rows.flatMap(row => row.resources.map(resource => resource.id))).size;
+  summary.setAttribute("role", "status");
   summary.textContent = rows.length
-    ? "Matching resources are organized below by the needs they address. Select a need to narrow it by Type."
-    : "No resources match the selected groups.";
+    ? `${uniqueCount} matching resources are organized below by the needs they address. Select a need to narrow it by Type.`
+    : `No resources are tagged with ${forGroupMatchMode === "all" ? "all" : "any"} of these groups. ${forGroupMatchMode === "all" ? "Try Match any selected group or remove a group." : "Try another group."}`;
   appView.appendChild(summary);
   if(!rows.length) return;
   const results = document.createElement("div");
@@ -459,10 +459,11 @@ function renderCategoryFilterControls(categoryFilterOptions, activeFilters){
   filterArea.className = "category-filter-controls";
   const explanation = document.createElement("p");
   explanation.className = "category-filter-note";
-  explanation.textContent = "Choose any Types and any groups. Resources must match both when you use both. Counts reflect the other selections.";
+  explanation.textContent = "Choose any Types, then choose how to match groups. Resources must match both the Type and group choices. Counts reflect the other selections.";
   filterArea.appendChild(explanation);
   appendCategoryFilterGroup(filterArea, "Type", categoryFilterOptions.filter(option => option.kind === "filter"), activeFilters);
   const groups = categoryFilterOptions.filter(option => option.kind === "for");
+  if(groups.length) renderForGroupMatchControl(filterArea);
   appendCategoryFilterGroup(filterArea, "Groups", groups, activeFilters);
   const count = filterResourcesBySelectedCategoryFilters(getCategoryResources(currentCategory), currentCategory, activeFilters).length;
   const status = document.createElement("p");
@@ -545,7 +546,7 @@ function renderCategoryResources(filtered, activeFilters){
 }
 
 function renderCategoryView(){
-  // OR within Types and within groups; AND between the two dimensions.
+  // Types use OR; groups default to AND with optional ANY; dimensions use AND.
   renderCategoryBackButton();
   renderCategoryTitle();
   const categoryFilterOptions = getCategoryFilterOptions(currentCategory);

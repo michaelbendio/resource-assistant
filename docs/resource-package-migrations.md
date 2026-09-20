@@ -118,3 +118,29 @@ Unknown safe extension fields receive the ordinary package-field treatment;
 the app does not interpret them. Resource records still merge by their usual
 ID and modification-time rules. Clean curated exports are the responsibility
 of the exporting workbench.
+
+
+## Optional For-group review metadata
+
+Schema 4 retains two optional extension fields. Older packages need no migration:
+absence means the groups have not been explicitly reviewed in this workflow.
+
+- `forGroupDefinitions`: map from label to `{description, lastModified}`. Import
+  validates the shape and timestamp. Merge keeps the later definition; equal-time,
+  different definitions are an explicit conflict, never a silent choice.
+- Resource `forGroupReview`: `{version:1, decision:"groups"|"none", contentKey,
+  reviewedAt}`. Only an editor's explicit confirmation creates a review. Its change
+  detector covers the relevant resource content, Types, groups and group catalog
+  definitions. It is not authentication or proof of eligibility.
+
+Missing/stale reviews remain visible under Admin → Resources after import/merge.
+Relevant resource or catalog changes invalidate a review; contact-only changes
+preserve one. Group confirmation is separate from Verified and Scout's Curated.
+A human can explicitly confirm that no population-specific group applies.
+
+The shared module `src/js/28-for-group-checks.js` is also embedded in Scout's generated
+HTML. Keep both copies synchronized. Only the approved Deaf & hard of hearing →
+People with disabilities and Blind & low vision → People with disabilities rules
+are automatic, and only when both labels already exist. No new group is invented.
+Browse group matching defaults to AND with an optional Match any (OR) control.
+Type choices still use OR; the Type and group dimensions combine with AND.

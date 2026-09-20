@@ -7,7 +7,7 @@ function getResourcesUsingForGroup(group){
   const groupKey = normalizedGroup.toLowerCase();
   if(!groupKey) return [];
   return (Array.isArray(data.resources) ? data.resources : [])
-    .filter(resource => normalizeTaxonomyLabels(resource && resource.forGroups).some(resourceGroup => resourceGroup.toLowerCase() === groupKey))
+    .filter(resource => effectiveForGroups(resource && resource.forGroups, data.forGroups).some(resourceGroup => resourceGroup.toLowerCase() === groupKey))
     .sort((a,b)=>String(a && a.name || "").localeCompare(String(b && b.name || ""), undefined, { sensitivity:"base" }));
 }
 
@@ -16,10 +16,15 @@ function formatResourceCount(count){
 }
 
 function forGroupsEditorDraft(){
-  const groups = Array.from(document.querySelectorAll(".forGroupInput"))
-    .map(input => input.value)
-    .filter(value => String(value || "").trim());
-  return { forGroups: normalizeTaxonomyLabels(groups) };
+  const groups = [];
+  const definitions = {};
+  document.querySelectorAll(".for-group-row").forEach(row => {
+    const group = canonicalizeTaxonomyLabel(row.querySelector(".forGroupInput").value);
+    if(!group) return;
+    groups.push(group);
+    definitions[group] = (row.querySelector(".forGroupDefinitionInput")?.value || "").trim();
+  });
+  return {forGroups:normalizeTaxonomyLabels(groups), definitions};
 }
 
 function snapshotForGroupsEditor(){
@@ -39,6 +44,15 @@ function applyForGroupsDraft(draft){
     ), "requestedAt");
   }
   data.forGroups = normalizeTaxonomyLabels([...nextGroups, ...removedGroups]);
+  const definitions = {...(data.forGroupDefinitions || {})};
+  Object.entries(draft.definitions || {}).forEach(([label, description]) => {
+    if(description !== forGroupDefinition(data, label)){
+      const previous = Object.keys(definitions).find(key => key.toLowerCase() === label.toLowerCase());
+      if(previous) delete definitions[previous];
+      definitions[label] = {description, lastModified:nowISO()};
+    }
+  });
+  data.forGroupDefinitions = definitions;
 }
 
 function validateForGroupsDraft(draft){
@@ -84,6 +98,7 @@ function addForGroupRow(value){
   row.tabIndex = 0;
   row.innerHTML = `
     <input type="text" class="forGroupInput" value="${escapeHTML(value || "")}" aria-label="For group">
+    <textarea class="forGroupDefinitionInput" aria-label="For group definition" placeholder="Who this group is for; when to apply it" style="display:block;width:100%;box-sizing:border-box;margin-top:6px;">${escapeHTML(forGroupDefinition(data, value || ""))}</textarea>
   `;
   if(value && hasDeletionRequest("forGroup", { label:value })){
     const status = document.createElement("span");
@@ -91,6 +106,8 @@ function addForGroupRow(value){
     status.textContent = "tagged for deletion";
     row.appendChild(status);
   }
+  const definitionInput = row.querySelector(".forGroupDefinitionInput");
+  if(definitionInput) definitionInput.addEventListener("input", updateForGroupsEditorActionBar);
   const input = row.querySelector(".forGroupInput");
   if(input){
     input.addEventListener("input", () => {

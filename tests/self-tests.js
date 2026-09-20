@@ -18,6 +18,49 @@ async function runSelfTests(){
     if(JSON.stringify(merged[0].externalMetadata) !== JSON.stringify(resource.externalMetadata)) throw Error("Opaque metadata changed during transfer");
   }});
 
+  tests.push({name:"FOR GROUP APPROVED RELATIONSHIPS AND REVIEW VALIDITY", fn:() => {
+    const catalog = ["Deaf & hard of hearing", "Blind & low vision", "People with disabilities", "Children & teens"];
+    const hearing = {id:"hearing", name:"Hearing aid program", categories:["medical"], categoryFilters:{medical:["Hearing"]}, forGroups:[catalog[0]], description:"For children", informationText:"Eligibility: hearing loss"};
+    if(effectiveForGroups(hearing.forGroups, catalog).join("|") !== [catalog[0],catalog[2]].join("|")) throw Error("Missing approved disability parent");
+    if(effectiveForGroups([catalog[0]], [catalog[0]]).length !== 1) throw Error("Created an unavailable group");
+    if(effectiveForGroups([catalog[3]], catalog).length !== 1) throw Error("Inferred an unapproved relationship");
+    if(hasCurrentForGroupReview(hearing, catalog)) throw Error("Legacy resource was silently reviewed");
+    recordForGroupReview(hearing, catalog);
+    if(!hearing.forGroups.includes(catalog[2]) || !hasCurrentForGroupReview(hearing, catalog)) throw Error("Review did not save approved groups");
+    const contact = {...hearing, phone:"555-1234", hours:"9-5"};
+    if(!hasCurrentForGroupReview(contact, catalog)) throw Error("Contact edit unnecessarily invalidated review");
+    for(const changes of [{name:"New program"}, {description:"New service"}, {informationText:"New eligibility"}, {categories:["housing"]}, {forGroups:[]}, {categoryFilters:{medical:["Dental"]}}]){
+      if(hasCurrentForGroupReview({...hearing, ...changes}, catalog)) throw Error("Relevant edit kept a stale review: " + JSON.stringify(changes));
+    }
+    if(hasCurrentForGroupReview(hearing, [...catalog,"Veterans"])) throw Error("New catalog option was not reviewed");
+    if(hasCurrentForGroupReview(hearing, catalog, {[catalog[0]]:{description:"Updated meaning"}})) throw Error("Changed definition kept a stale review");
+    const none={id:"general", name:"General pantry", categories:["food"], forGroups:[]};
+    recordForGroupReview(none, catalog);
+    if(none.forGroupReview.decision !== "none" || !hasCurrentForGroupReview(none, catalog)) throw Error("Explicit no-group review not retained");
+  }});
+  tests.push({name:"FOR GROUP REVIEW PACKAGE ROUND TRIP AND MERGE", fn:() => {
+    const catalog=["Deaf & hard of hearing","People with disabilities"];
+    const definitions = {[catalog[0]]:{description:"Hearing-specific services",lastModified:"2026-09-20T10:00:00Z"}};
+    const r={id:"reviewed",name:"Program",description:"Hearing services",categories:["medical"],forGroups:[catalog[0]],lastModified:"2026-09-20T10:00:00Z"};
+    recordForGroupReview(r,catalog,definitions);
+    const source={categories:[{id:"medical",label:"Medical",filters:[]}],forGroups:catalog,forGroupDefinitions:definitions,resources:[r]};
+    const reopened=processResourcePackageData(buildResourcePackageData(source),{sourceName:"Group review round trip"}).data;
+    if(!hasCurrentForGroupReview(reopened.resources[0],reopened.forGroups,reopened.forGroupDefinitions)) throw Error("Package round trip lost current group review");
+    const incoming=JSON.parse(JSON.stringify(reopened));
+    incoming.resources[0].informationText="New eligibility";
+    incoming.resources[0].lastModified="2026-09-21T10:00:00Z";
+    const merged=mergeResourcePackages(reopened,incoming).mergedData;
+    if(resourcesNeedingForGroupReview(merged).length!==1) throw Error("Merge silently preserved stale review");
+    const changedDefs=JSON.parse(JSON.stringify(reopened));
+    changedDefs.forGroupDefinitions[catalog[0]]={description:"New meaning",lastModified:"2026-09-21T10:00:00Z"};
+    const redefined=mergeResourcePackages(reopened,changedDefs).mergedData;
+    if(forGroupDefinition(redefined,catalog[0])!=="New meaning" || resourcesNeedingForGroupReview(redefined).length!==1) throw Error("Definition merge failed to invalidate prior review");
+    const conflict=JSON.parse(JSON.stringify(reopened));
+    conflict.forGroupDefinitions[catalog[0]].description="Conflicting meaning";
+    let rejected=false;try{mergeResourcePackages(reopened,conflict);}catch(error){rejected=/Conflicting definitions/.test(error.message);}
+    if(!rejected) throw Error("Same-time conflicting definitions were silently merged");
+  }});
+
   function withSelfTestHtmlFileName(fileName, callback){
     const previousGetCurrentHtmlFileName = getCurrentHtmlFileName;
     try{
@@ -4334,7 +4377,12 @@ async function runSelfTests(){
       ]).map(r => r.name);
       if(JSON.stringify(matching) !== JSON.stringify(["Both"])) throw new Error("Types and groups must both match");
       const groupsOnly = filterResourcesBySelectedCategoryFilters(resources, "housing", [makeForGroupFilterKey("Women"), makeForGroupFilterKey("Food")]);
-      if(groupsOnly.length !== 3) throw new Error("Groups must use OR");
+      if(groupsOnly.length !== 0) throw new Error("Groups must default to AND");
+      const previousMode = forGroupMatchMode;
+      try{
+        forGroupMatchMode = "any";
+        if(filterResourcesBySelectedCategoryFilters(resources, "housing", [makeForGroupFilterKey("Women"), makeForGroupFilterKey("Food")]).length !== 3) throw new Error("Optional any mode must use OR");
+      }finally{ forGroupMatchMode = previousMode; }
       const typesOnly = [{ categoryFilters:{ housing:["Shelter"] } }, { categoryFilters:{ housing:["Rent"] } }];
       if(filterResourcesBySelectedCategoryFilters(typesOnly, "housing", [makeCategorySpecificFilterKey("Shelter"), makeCategorySpecificFilterKey("Rent")]).length !== 2) throw new Error("Types must use OR");
 

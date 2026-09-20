@@ -738,6 +738,7 @@ function mergeResourcePackages(localData, incomingData){
     resources: resourceMerge.merged,
     changes: mergeChanges(local.changes, incoming.changes),
     forGroups: normalizeTaxonomyLabels([...(local.forGroups || []), ...(incoming.forGroups || [])]),
+    forGroupDefinitions: mergeForGroupDefinitions(local, incoming),
     deletionRequests,
     deletions,
     resourcePackageSchemaVersion: RESOURCE_PACKAGE_SCHEMA_VERSION

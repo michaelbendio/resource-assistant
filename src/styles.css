@@ -591,7 +591,7 @@ textarea.information-editor { min-height:320px; resize:vertical; }
 .resource-category-filter-list { margin:4px 0 8px 28px; }
 .resource-category-filter-list label { display:block; margin:2px 0; }
 .editor-sticky-bar { position:sticky; bottom:0; background:#fff; border-top:1px solid #ddd; padding:10px 0 0; margin-top:12px; display:flex; gap:8px; justify-content:flex-end; z-index:5; }
-.for-group-row { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+.for-group-row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:8px; }
 .for-group-row.selected { background:#eef4ff; outline:2px solid #99b8e8; outline-offset:2px; }
 .for-group-row input[type="text"] { flex:1; min-width:0; }
 .deletion-tag-status { color:#9a3412; font-size:13px; font-weight:bold; white-space:nowrap; }

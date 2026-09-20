@@ -19,6 +19,7 @@ APP_JS_SOURCES = [
     "src/js/20-normalization.js",
     "src/js/25-deletion-core.js",
     "src/js/27-package-pipeline.js",
+    "src/js/28-for-group-checks.js",
     "src/js/30-state.js",
     "src/js/40-safety.js",
     "src/js/50-rendering.js",

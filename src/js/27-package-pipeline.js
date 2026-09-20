@@ -390,6 +390,19 @@ function validateResourcePackageData(packageData){
   if(!Array.isArray(packageData.categories)) errors.push("Missing or invalid 'categories' array.");
   if(!Array.isArray(packageData.resources)) errors.push("Missing or invalid 'resources' array.");
   if(!Array.isArray(packageData.forGroups)) errors.push("Invalid normalized 'forGroups' array.");
+  if(packageData.forGroupDefinitions != null){
+    const definitions = packageData.forGroupDefinitions;
+    if(typeof definitions !== "object" || Array.isArray(definitions)){
+      errors.push("For-group definitions must be an object.");
+    }else{
+      Object.entries(definitions).forEach(([label, entry]) => {
+        if(!entry || typeof entry !== "object" || typeof entry.description !== "string"
+          || typeof entry.lastModified !== "string" || !Number.isFinite(Date.parse(entry.lastModified))){
+          errors.push(`Invalid definition for For group '${label}'.`);
+        }
+      });
+    }
+  }
   if(!Array.isArray(packageData.deletionRequests)) errors.push("Invalid normalized 'deletionRequests' array.");
   if(!Array.isArray(packageData.deletions)) errors.push("Invalid normalized 'deletions' array.");
 

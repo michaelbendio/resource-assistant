@@ -1,9 +1,14 @@
 {
-  "version": "2.3.8",
-  "build": 158,
-  "date": "2026-09-14",
-  "message": "Clarify browsing guidance and move the feedback reminder above the tip",
+  "version": "2.3.9",
+  "build": 159,
+  "date": "2026-09-20",
+  "message": "Default group searches to AND and require explicit group review",
   "appChanges": [
+    {
+      "date": "2026-09-20",
+      "version": "2.3.9",
+      "message": "Narrow results to all selected groups, with Match any available. Review group assignments with definitions and automatic hearing/vision disability parent tags."
+    },
     {
       "date": "2026-09-14",
       "version": "2.3.8",
