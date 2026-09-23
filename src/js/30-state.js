@@ -40,11 +40,6 @@ function getConfiguredOfficeName(){
   return meta ? String(meta.getAttribute("content") || "").trim() : "";
 }
 
-function getConfiguredSharePointPackageUrl(){
-  const meta = document.querySelector('meta[name="tso-sharepoint-package-url"]');
-  return meta ? String(meta.getAttribute("content") || "").trim() : "";
-}
-
 function getConfiguredCommitHash(){
   const meta = document.querySelector('meta[name="tso-commit"]');
   const commit = meta ? String(meta.getAttribute("content") || "").trim() : "";
@@ -75,7 +70,6 @@ const UNDO_STORAGE_KEY = getStorageKey("Undo");
 const PRE_MERGE_STORAGE_KEY = getStorageKey("PreMerge");
 const DELETION_REVIEW_STORAGE_KEY = getStorageKey("DeletionReview");
 const DISMISSED_TIPS_STORAGE_KEY = getStorageKey("DismissedTips");
-const NEW_ADMIN_TRAINING_PENDING_KEY = "tsoResourcesNewAdminTrainingPending";
 const STARTUP_STATE_STORAGE_KEYS = [
   UPDATE_SEEN_STORAGE_KEY,
   PRINT_SELECTION_STORAGE_KEY,
@@ -110,7 +104,6 @@ function clearCurrentLocalState({ clearFavorites = false } = {}){
   localStorage.removeItem(TSO_NAME_STORAGE_KEY);
   localStorage.removeItem(PRE_MERGE_STORAGE_KEY);
   localStorage.removeItem(DISMISSED_TIPS_STORAGE_KEY);
-  localStorage.removeItem(NEW_ADMIN_TRAINING_PENDING_KEY);
   if(clearFavorites) localStorage.removeItem(FAVORITE_RESOURCE_IDS_STORAGE_KEY);
 }
 
@@ -161,7 +154,7 @@ let data = JSON.parse(localStorage.getItem(DATA_STORAGE_KEY) || "null");
 const TIP_TEXT = {
   user: "Choose a category under “Browse by need,” or select “Find resources for” and choose one or more groups. Click a resource for details. Use the printer button to select it for printing. Use the star to add it to or remove it from Favorites.",
   newAdminWelcome: "Welcome to you, new admin. Press Ctrl+Alt+A to enter admin mode",
-  newAdminMode: "Click \"Office Setup\" to name this TSO Resources. Then close this tab or window and rename new.html to the changed name, keeping the .html extension. Open it and enter admin mode again."
+  newAdminMode: "Open Admin Help for first-time admin training. Use an office-specific HTML file to keep your office’s resources separate."
 };
 const DEFAULT_RESOURCE_PACKAGE_FILENAME = "tso-resources.json";
 const CATEGORY_REMINDER_TEXT = "Report bugs or request enhancements to Elder Bendio (michaelbendio@gmail.com)"
@@ -245,24 +238,6 @@ function getCurrentHtmlFileName(){
 
 function isNewTemplateFile(){
   return getCurrentHtmlFileName().toLowerCase() === "new.html";
-}
-
-function getTrainingStorageIdFromName(value){
-  return normalizeStorageId(value);
-}
-
-function markRenamedAdminTrainingPending(tsoName){
-  const storageId = getTrainingStorageIdFromName(tsoName);
-  if(storageId) localStorage.setItem(NEW_ADMIN_TRAINING_PENDING_KEY, storageId);
-}
-
-function consumeRenamedAdminTrainingPending(fileName = getCurrentHtmlFileName()){
-  if(String(fileName || "").toLowerCase() === "new.html") return false;
-  const pendingStorageId = localStorage.getItem(NEW_ADMIN_TRAINING_PENDING_KEY);
-  if(!pendingStorageId) return false;
-  if(pendingStorageId !== getStorageKeyPrefix(fileName)) return false;
-  localStorage.removeItem(NEW_ADMIN_TRAINING_PENDING_KEY);
-  return true;
 }
 
 let adminHelpPrintRestoreState = null;

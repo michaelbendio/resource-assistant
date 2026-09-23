@@ -6,8 +6,7 @@ TSO Resources imports package JSON through one ordered pipeline:
 read → migrate schema versions → normalize → apply deletion tombstones → validate
 ```
 
-The same processor is used for direct package merges, guided SharePoint
-publishing, saved browser data, merge results, and package export. A compatibility
+The same processor is used for direct package merges, saved browser data, merge results, and package export. A compatibility
 change belongs in a schema migration rather than in a later normalization step.
 
 Current packages also record `packageCreatedAt`, an ISO timestamp written when

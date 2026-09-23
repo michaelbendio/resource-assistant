@@ -35,7 +35,6 @@ class MakeLocalTsoTests(unittest.TestCase):
             source.write_text(
                 '<html><head><meta name="tso-storage-id" content="">'
                 '<meta name="tso-office-name" content="">'
-                '<meta name="tso-sharepoint-package-url" content="">'
                 '<meta name="tso-commit" content="">'
                 '<title>&lt;New&gt; TSO Resources</title></head><body></body></html>',
                 encoding="utf-8",
@@ -55,8 +54,6 @@ class MakeLocalTsoTests(unittest.TestCase):
                     self.assertIn(f'<meta name="tso-storage-id" content="{office}">', document)
                     office_name = title.removesuffix(" TSO Resources")
                     self.assertIn(f'<meta name="tso-office-name" content="{office_name}">', document)
-                    self.assertIn(f"{office}-resource-package.zip", document)
-                    self.assertIn("churchofjesuschrist.sharepoint.com", document)
                     commit = subprocess.run(
                         ["git", "rev-parse", "--short=7", "HEAD"],
                         cwd=ROOT,
@@ -75,7 +72,6 @@ class MakeLocalTsoTests(unittest.TestCase):
             source.write_text(
                 '<meta name="tso-storage-id" content="">'
                 '<meta name="tso-office-name" content="">'
-                '<meta name="tso-sharepoint-package-url" content="">'
                 '<meta name="tso-commit" content="">'
                 '<title>&lt;New&gt; TSO Resources</title>',
                 encoding="utf-8",
@@ -92,7 +88,6 @@ class MakeLocalTsoTests(unittest.TestCase):
             document = output.read_text(encoding="utf-8")
             self.assertIn('content="salt-lake"', document)
             self.assertIn('content="Salt Lake"', document)
-            self.assertIn("salt-lake-resource-package.zip", document)
             self.assertIn("<title>Salt Lake TSO Resources</title>", document)
 
     def test_refuses_to_overwrite_the_template(self) -> None:
@@ -101,7 +96,6 @@ class MakeLocalTsoTests(unittest.TestCase):
             original = (
                 '<meta name="tso-storage-id" content="">'
                 '<meta name="tso-office-name" content="">'
-                '<meta name="tso-sharepoint-package-url" content="">'
                 '<meta name="tso-commit" content="">'
                 '<title>Template</title>'
             )

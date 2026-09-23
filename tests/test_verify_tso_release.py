@@ -44,7 +44,6 @@ def sample_html(release: dict[str, object]) -> str:
     return (
         '<meta name="tso-storage-id" content="">'
         '<meta name="tso-office-name" content="">'
-        '<meta name="tso-sharepoint-package-url" content="">'
         '<meta name="tso-commit" content="">'
         "<title>&lt;New&gt; TSO Resources</title>"
         f'<script id="app-release-data" type="application/json">{json.dumps(payload)}</script>'

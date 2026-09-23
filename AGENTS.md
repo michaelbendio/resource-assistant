@@ -29,8 +29,8 @@ and changes the page title to:
 <title>Mesa TSO Resources</title>
 ```
 
-It also embeds the office name and the office's WSR_TSO SharePoint resource-
-package URL. These office-wide values travel with the generated HTML file.
+It also embeds the office name. These office-wide values travel with the generated
+HTML file.
 
 The helper only generates the requested office file. It does not copy to
 iCloud, removable storage, or another office location. For a different output
@@ -138,11 +138,9 @@ regression coverage for safe-field preservation and failure behavior.
 
 ## Office-local administrative state
 
-The office name, storage ID, expected package filename, and SharePoint package
-URL are office-wide configuration embedded in each generated office HTML file.
-Download-folder handles, publishing history, and recovery points remain local to
-the office file and browser on each computer. Keep that computer-specific state
-in office-scoped browser storage and never export it in resource packages. A
-generated office may derive its own configuration without introducing a central
-office registry. Preserve compatibility with existing SharePoint destination
-keys and legacy single pre-merge snapshots.
+The office name and storage ID are office-wide configuration embedded in each
+generated office HTML file. Recovery points remain local to the office file and
+browser on each computer. Keep that computer-specific state in office-scoped
+browser storage and never export it in resource packages. A generated office may
+derive its own configuration without introducing a central office registry.
+Preserve compatibility with legacy single pre-merge snapshots.

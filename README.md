@@ -68,9 +68,8 @@ python3 make-local-tso albuquerque
 
 The helper first rebuilds `new.html`, then creates `albuquerque.html`, sets the
 local storage ID to `albuquerque`, and sets the page title to
-`Albuquerque TSO Resources`. It also embeds the office name and SharePoint
-resource-package URL so those settings travel with the office HTML file. It
-refuses to overwrite the master template. The same command works for a future
+`Albuquerque TSO Resources`. It also embeds the office name so it travels with the
+office HTML file. It refuses to overwrite the master template. The same command works for a future
 office such as `mesa`; there is no central office registry.
 
 Generation does not copy the office file anywhere. After a pushed application
@@ -101,8 +100,7 @@ Open the local `.html` file directly in a browser. The file starts with the stan
 
 1. Press `Ctrl+Alt+A` to show the `Admin` button in the blue bar.
 2. Click `Admin`.
-3. Click `Office Setup`. Review the office name, storage ID, expected resource-package filename, and SharePoint package URL carried by the HTML file, then authorize this computer's download folder.
-4. Click `Help` in Admin mode for the admin reference and printable first-time admin training guide.
+3. Click `Admin Help` in Admin mode for the admin reference and printable first-time admin training guide.
 
 Before editing live resources, load the latest resource package:
 
@@ -122,21 +120,10 @@ After a batch of edits, share the updated resources:
 1. Click `Show change log` and review the listed changes.
 2. Resource missionaries click `Save Resource Package`, save the exported ZIP, and send it to the office admin.
 3. The office admin merges submitted packages and reviews tagged deletions.
-4. In the office-specific HTML file, the admin clicks `Publish to SharePoint`, downloads the current canonical package when prompted, and waits for `Merge complete`.
-5. The admin reviews the publication summary, clicks `Upload to SharePoint`, uploads the saved canonical package, and chooses `Replace`.
-6. The admin clicks `I replaced the package` to record the manual action locally. The app cannot independently verify the SharePoint upload.
+4. The admin clicks `Save Resource Package`, then manually uploads the saved ZIP to the office SharePoint library and replaces the current package.
 
-The generated office HTML carries its office name, storage ID, expected package
-filename, and SharePoint package URL. On first use on each computer, `Office
-Setup` authorizes that computer's download folder. `Test Configuration` reports
-whether setup is complete. The app validates the WSR_TSO location, expected
-office package filename, and containing folder. Download-folder authorization
-and local publishing history remain in office-scoped browser storage and are
-never included in exported packages. TSO Resources watches the authorized folder
-for the completed canonical package,
-merges it with the prepared local data, reapplies approved deletion tombstones, and
-saves the combined package automatically. SharePoint upload and replacement remain
-manual and are authorized by the signed-in user's SharePoint permissions.
+The generated office HTML carries its office name and storage ID. Recovery points
+remain in office-scoped browser storage and are never included in exported packages.
 
 Delete actions tag resources, categories, Types, and For groups for deletion. The
 tagged item remains active until an admin merges the package and approves the
@@ -168,7 +155,7 @@ By default, the output uses the input filename with the other extension. Use
 ## Church-hosted direction
 
 See [`docs/church-hosting.md`](docs/church-hosting.md) for the SharePoint document-library
-and guided publishing workflow.
+and manual package upload workflow.
 
 ## Browsing and editor conveniences
 

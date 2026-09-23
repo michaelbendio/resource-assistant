@@ -11,7 +11,6 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from urllib.parse import quote, urlencode
 
 
 ROOT = Path(__file__).resolve().parent
@@ -27,20 +26,8 @@ ACTIVE_OFFICES = {
 }
 
 
-def expected_sharepoint_url(storage_id: str, office_name: str) -> str:
-    office_folder = f"{office_name} TSO"
-    parent_path = f"/sites/WSR_TSO/{office_folder}"
-    package_path = f"{parent_path}/{storage_id}-resource-package.zip"
-    page_path = f"/sites/WSR_TSO/{quote(office_folder)}/Forms/AllItems.aspx"
-    return (
-        f"https://churchofjesuschrist.sharepoint.com{page_path}?"
-        f"{urlencode({'id': package_path, 'parent': parent_path})}"
-    )
-
-
 class PublicationError(RuntimeError):
     """Raised when the active office files cannot be safely published."""
-
 
 def load_copy_helper():
     loader = importlib.machinery.SourceFileLoader("copy_local_tso", str(COPY_HELPER_PATH))
@@ -50,7 +37,6 @@ def load_copy_helper():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
-
 
 def release_identity() -> tuple[str, int]:
     try:
@@ -64,7 +50,6 @@ def release_identity() -> tuple[str, int]:
     if not isinstance(build, int) or isinstance(build, bool) or build < 1:
         raise PublicationError("src/release.json does not contain a valid app build.")
     return version, build
-
 
 def current_commit() -> str:
     try:
@@ -80,7 +65,6 @@ def current_commit() -> str:
     if not re.fullmatch(r"[0-9a-f]{7}", commit):
         raise PublicationError("Git returned an invalid release commit hash.")
     return commit
-
 
 def publish_office_files(destination: Path) -> list[Path]:
     copy_helper = load_copy_helper()
@@ -118,7 +102,7 @@ def publish_office_files(destination: Path) -> list[Path]:
                 f"expected {(build, commit)!r}."
             )
         try:
-            office_name, sharepoint_url = copy_helper.office_file_configuration(source)
+            office_name = copy_helper.office_file_configuration(source)
         except copy_helper.CopyError as error:
             raise PublicationError(str(error)) from error
         expected_office_name = expected_identity[1].removesuffix(" TSO Resources")
@@ -126,11 +110,6 @@ def publish_office_files(destination: Path) -> list[Path]:
             raise PublicationError(
                 f"{source} has embedded office name {office_name!r}; "
                 f"expected {expected_office_name!r}."
-            )
-        expected_url = expected_sharepoint_url(storage_id, expected_office_name)
-        if sharepoint_url != expected_url:
-            raise PublicationError(
-                f"{source} does not have the expected {expected_office_name} SharePoint package URL."
             )
         sources.append(source)
 
@@ -147,7 +126,6 @@ def publish_office_files(destination: Path) -> list[Path]:
         )
         published.append(copied)
     return published
-
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import importlib.machinery
 import importlib.util
-import html
 import json
 import tempfile
 import unittest
@@ -28,11 +27,9 @@ TEST_COMMIT = "a" * 7
 def office_html(storage_id: str, title: str, version: str = "2.3.1", build: int = 211) -> str:
     payload = json.dumps({"version": version, "build": build, "changes": []})
     office_name = title.removesuffix(" TSO Resources")
-    sharepoint_url = publish_tso_offices.expected_sharepoint_url(storage_id, office_name)
     return (
         f'<meta name="tso-storage-id" content="{storage_id}">'
         f'<meta name="tso-office-name" content="{office_name}">'
-        f'<meta name="tso-sharepoint-package-url" content="{html.escape(sharepoint_url, quote=True)}">'
         f'<meta name="tso-commit" content="{TEST_COMMIT}">'
         f"<title>{title}</title>"
         f'<script id="app-release-data" type="application/json">{payload}</script>'

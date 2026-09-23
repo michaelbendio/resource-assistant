@@ -18,15 +18,12 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from urllib.parse import quote, urlencode
-
 
 def slugify(value: str) -> str:
     parts = re.findall(r"[A-Za-z0-9]+", value.strip())
     if not parts:
         raise SystemExit("TSO name must contain at least one letter or number.")
     return "-".join(part.lower() for part in parts)
-
 
 def display_name(value: str) -> str:
     parts = re.findall(r"[A-Za-z0-9]+", value.strip())
@@ -35,23 +32,11 @@ def display_name(value: str) -> str:
     return " ".join(part[:1].upper() + part[1:].lower() for part in parts)
 
 
-def sharepoint_package_url(storage_id: str, office_name: str) -> str:
-    office_folder = f"{office_name} TSO"
-    parent_path = f"/sites/WSR_TSO/{office_folder}"
-    package_path = f"{parent_path}/{storage_id}-resource-package.zip"
-    page_path = f"/sites/WSR_TSO/{quote(office_folder)}/Forms/AllItems.aspx"
-    return (
-        f"https://churchofjesuschrist.sharepoint.com{page_path}?"
-        f"{urlencode({'id': package_path, 'parent': parent_path})}"
-    )
-
-
 def replace_once(pattern: str, replacement: str, text: str, description: str) -> str:
     updated, count = re.subn(pattern, replacement, text, count=1, flags=re.IGNORECASE)
     if count != 1:
         raise SystemExit(f"Could not update {description}; expected exactly one match.")
     return updated
-
 
 def current_commit() -> str:
     root = Path(__file__).resolve().parent
@@ -69,7 +54,6 @@ def current_commit() -> str:
         raise SystemExit("Git returned an invalid commit hash for this office build.")
     return commit
 
-
 def main() -> int:
     parser = argparse.ArgumentParser(description="Create a local TSO HTML file from new.html.")
     parser.add_argument("name", help="Local TSO name, such as albuquerque or salt-lake")
@@ -79,7 +63,6 @@ def main() -> int:
 
     storage_id = slugify(args.name)
     title_name = display_name(args.name)
-    sharepoint_url = sharepoint_package_url(storage_id, title_name)
     source_path = Path(args.source) if args.source else Path(__file__).resolve().parent / "new.html"
     destination_path = Path(args.output or f"{storage_id}.html")
 
@@ -105,12 +88,6 @@ def main() -> int:
         html,
         "tso-office-name meta tag",
     )
-    html = replace_once(
-        r'<meta\s+name=["\']tso-sharepoint-package-url["\']\s+content=["\'][^"\']*["\']\s*>',
-        f'<meta name="tso-sharepoint-package-url" content="{html_module.escape(sharepoint_url, quote=True)}">',
-        html,
-        "tso-sharepoint-package-url meta tag",
-    )
     commit = current_commit()
     html = replace_once(
         r'<meta\s+name=["\']tso-commit["\']\s+content=["\'][^"\']*["\']\s*>',
@@ -128,7 +105,7 @@ def main() -> int:
     destination_path.write_text(html, encoding="utf-8")
     print(
         f"Wrote {destination_path} with storage id {storage_id!r}, "
-        f"title {title_name!r}, build commit {commit}, and embedded SharePoint package URL."
+        f"title {title_name!r}, build commit {commit}."
     )
     return 0
 

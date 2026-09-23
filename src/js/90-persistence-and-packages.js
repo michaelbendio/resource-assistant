@@ -847,12 +847,12 @@ function prepareMergedResourceStorage(mergedData, options = {}){
       previous = new Map(keys.map(key => [key, localStorage.getItem(key)]));
       let area = "resources and merge settings";
       try{
-        if(options.fileName && !options.skipPreMergeSnapshot){
+        if(options.fileName){
           area = "pre-merge recovery copies";
           AdminRecoveryStore.add(options.fileName);
         }
         area = "resources and merge settings";
-        if(options.fileName && !options.skipDeletionReview){
+        if(options.fileName){
           saveDeletionReview(options.fileName, options.packageVersion, options.deletionRequests);
         }
         // A completed merge expires deletion Undo. Do not discard it on failure.
@@ -943,8 +943,7 @@ async function saveResourcePackageBlob(target, blob){
   downloadResourcePackageBlob(fileName, blob);
 }
 
-async function saveCurrentResourcePackage(target, options = {}){
-  const showSuccessToast = options.showSuccessToast !== false;
+async function saveCurrentResourcePackage(target){
   if(typeof JSZip === "undefined"){
     throw new Error("ZIP support is unavailable. Reload the app and try again.");
   }
@@ -985,9 +984,7 @@ async function saveCurrentResourcePackage(target, options = {}){
     });
     await saveResourcePackageBlob(target, blob);
     persist();
-    if(showSuccessToast){
-      showToast(`Resource package saved (${resourceCount} ${resourceCount === 1 ? "resource" : "resources"})`);
-    }
+    showToast(`Resource package saved (${resourceCount} ${resourceCount === 1 ? "resource" : "resources"})`);
     return {
       blob,
       packageVersion:data.packageVersion,
@@ -1052,7 +1049,7 @@ async function beginMergeImportPackage(){
   input.click();
 }
 
-async function mergeImportPackage(event, options = {}){
+async function mergeImportPackage(event){
   // Imports package ZIP, validates JSON, merges data, then stores referenced PDFs.
   if(!commitPendingEditsIfChanged()){
     event.target.remove();
@@ -1081,12 +1078,6 @@ async function mergeImportPackage(event, options = {}){
     const imported = processedPackage.data;
     const removedUnnamedCategoryIds = processedPackage.removedUnnamedCategoryIds;
     const incomingDeletionRequests = cloneDataObject(imported.deletionRequests || []);
-    const preparedChanges = options.preservePreparedChanges
-      ? cloneDataObject(Array.isArray(data && data.changes) ? data.changes : [])
-      : null;
-    const preparedPackageInfo = options.preservePreparedChanges && data && data.lastLoadedPackageInfo
-      ? cloneDataObject(data.lastLoadedPackageInfo)
-      : null;
     const importedChangeIds = new Set((imported.changes || []).map(entry => String(entry && entry.id || "")).filter(Boolean));
     const importedPackageVersion = normalizePackageVersionValue(imported.packageVersion);
     const currentPackageInfo = (data && data.lastLoadedPackageInfo && typeof data.lastLoadedPackageInfo === "object")
@@ -1122,9 +1113,7 @@ async function mergeImportPackage(event, options = {}){
     const loadedChangeSummaries = loadedChanges.length
       ? loadedChanges.map(formatPackageChangeSummary)
       : buildPackageMergeSummary(mergeSummary);
-    if(options.preservePreparedChanges){
-      mergedData.lastLoadedPackageInfo = preparedPackageInfo;
-    }else if(shouldReplaceLatestPackageInfo(currentPackageInfo, importedPackageVersion)){
+    if(shouldReplaceLatestPackageInfo(currentPackageInfo, importedPackageVersion)){
       const persistentChangeSummaries = !loadedChangeSummaries.length
         ? (imported.changes || []).map(formatPackageChangeSummary)
         : loadedChangeSummaries;
@@ -1138,9 +1127,9 @@ async function mergeImportPackage(event, options = {}){
       mergedData.lastLoadedPackageInfo = currentPackageInfo;
     }
     normalizeLastLoadedPackageInfo(mergedData);
-    mergedData.changes = options.preservePreparedChanges ? preparedChanges : [];
+    mergedData.changes = [];
     const storage = prepareMergedResourceStorage(mergedData, {
-      ...options, fileName:file.name, packageVersion:importedPackageVersion,
+      fileName:file.name, packageVersion:importedPackageVersion,
       deletionRequests:incomingDeletionRequests.filter(request => mergedPendingDeletionKeys.has(request.key))
     });
     try{
@@ -1154,7 +1143,7 @@ async function mergeImportPackage(event, options = {}){
     }
     storage.activate();
     safeRender();
-    if(!options.silent && loadedChangeSummaries.length){
+    if(loadedChangeSummaries.length){
       pendingRecentUpdates = [];
       recentUpdateDetail = null;
       showUpdateInfo = true;
@@ -1182,19 +1171,15 @@ async function mergeImportPackage(event, options = {}){
         missingPdfPaths.map(path => `• ${path}`).join("\n")
       );
     }
-    if(warningBlocks.length && typeof options.onWarnings === "function"){
-      options.onWarnings(warningBlocks.slice());
-    }else if(warningBlocks.length){
+    if(warningBlocks.length){
       alert(warningBlocks.join("\n\n"));
     }
-    if(!options.silent){
-      showToast(
-        loadedChangeSummaries.length
-          ? "Resource package merged."
-          : `No resource package updates were loaded from Resource Package ${importedPackageVersion}.`
-      );
-      if(getOutstandingDeletionReview()) setTimeout(showDeletionReview, 0);
-    }
+    showToast(
+      loadedChangeSummaries.length
+        ? "Resource package merged."
+        : `No resource package updates were loaded from Resource Package ${importedPackageVersion}.`
+    );
+    if(getOutstandingDeletionReview()) setTimeout(showDeletionReview, 0);
     return {
       mergeSummary,
       importedPackageVersion,

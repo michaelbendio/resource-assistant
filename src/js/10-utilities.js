@@ -69,3 +69,8 @@ function showToast(message, options = {}){
     }, 4500);
   }
 }
+
+function formatLocalDateTime(value){
+  const date = new Date(String(value || ""));
+  return Number.isFinite(date.getTime()) ? date.toLocaleString() : "Unknown time";
+}
