@@ -55,10 +55,6 @@ function applyForGroupsDraft(draft){
   data.forGroupDefinitions = definitions;
 }
 
-function validateForGroupsDraft(draft){
-  return { valid:!!draft, message:"" };
-}
-
 function cancelForGroupsEditor(){
   editing = null;
   editorSnapshot = "";

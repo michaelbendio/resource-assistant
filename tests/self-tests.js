@@ -7,6 +7,28 @@
 // Tests temporarily replace global state and then restore it, so each test must
 // save every global it mutates in a finally block.
 
+// Runs a package through the import pipeline and reports instead of throwing.
+function validateImportData(imported, options = {}){
+  try{
+    const processed = processResourcePackageData(imported, options);
+    return { ok:true, errors:[], warnings:processed.warnings, data:processed.data };
+  }catch(error){
+    const details = error && Array.isArray(error.details) && error.details.length
+      ? error.details
+      : [error && error.message ? error.message : String(error)];
+    return { ok:false, errors:details, warnings:[] };
+  }
+}
+
+// Stores and activates merged data the way the package import does.
+function applyMergedData(mergedData){
+  const storage = prepareMergedResourceStorage(mergedData);
+  try{ storage.commit(); }
+  catch(error){ storage.rollback(); throw error; }
+  storage.activate();
+  safeRender();
+}
+
 async function runSelfTests(){
   const tests = [];
   tests.push({name:"OPAQUE EXTENSIONS SURVIVE ORDINARY OFFICE PACKAGE TRANSFERS", fn:() => {
@@ -429,7 +451,6 @@ async function runSelfTests(){
       const previousData = data;
       const previousView = view;
       const previousRecentUpdateDetail = recentUpdateDetail;
-      const previousPendingRecentUpdates = pendingRecentUpdates;
       const previousShowUpdateInfo = showUpdateInfo;
       const previousShowRecentChangeLog = showRecentChangeLog;
       try{
@@ -438,7 +459,6 @@ async function runSelfTests(){
         showUpdateInfo = false;
         showRecentChangeLog = false;
         recentUpdateDetail = [];
-        pendingRecentUpdates = [];
         render();
         if(/App version:/.test(appView.textContent || "")){
           throw new Error("package info should be hidden before title toggle");
@@ -449,7 +469,6 @@ async function runSelfTests(){
         showUpdateInfo = true;
         showRecentChangeLog = true;
         recentUpdateDetail = [];
-        pendingRecentUpdates = [];
         render();
         const appChangesHeading = Array.from(appView.querySelectorAll("strong"))
           .find(element => element.textContent.trim() === "App Changes");
@@ -523,7 +542,6 @@ async function runSelfTests(){
         data = previousData;
         view = previousView;
         recentUpdateDetail = previousRecentUpdateDetail;
-        pendingRecentUpdates = previousPendingRecentUpdates;
         showUpdateInfo = previousShowUpdateInfo;
         showRecentChangeLog = previousShowRecentChangeLog;
       }
@@ -627,12 +645,12 @@ async function runSelfTests(){
             type: this.getAttribute("type")
           };
         };
-        const expectedFileName = getResourcePackageFilename();
-        downloadResourcePackageBlob(expectedFileName, new Blob(["{}"], { type:"application/json" }));
+        const expectedFileName = "tso-resource-package.zip";
+        downloadResourcePackageBlob(expectedFileName, new Blob(["zip"], { type:"application/zip" }));
         if(!clicked) throw new Error("download link was not clicked");
         if(clicked.href !== "blob:tso-test") throw new Error("download link did not use object URL");
         if(clicked.download !== expectedFileName) throw new Error(`download filename was '${clicked.download}'`);
-        if(clicked.type !== "application/json") throw new Error("download link should advertise JSON");
+        if(clicked.type !== "application/zip") throw new Error("download link should advertise a ZIP");
       }finally{
         URL.createObjectURL = originalCreateObjectURL;
         URL.revokeObjectURL = originalRevokeObjectURL;
@@ -647,16 +665,10 @@ async function runSelfTests(){
       const previousTsoName = localStorage.getItem(TSO_NAME_STORAGE_KEY);
       try{
         localStorage.removeItem(TSO_NAME_STORAGE_KEY);
-        if(isNewTemplateFile() && getResourcePackageFilename() !== "tso-resources.json"){
-          throw new Error(`new.html package filename was ${getResourcePackageFilename()}`);
-        }
         if(isNewTemplateFile() && getResourcePackageZipFilename() !== "tso-resource-package.zip"){
           throw new Error(`new.html package zip filename was ${getResourcePackageZipFilename()}`);
         }
         localStorage.setItem(TSO_NAME_STORAGE_KEY, "Provo");
-        if(getResourcePackageFilename() !== "provo-resources.json"){
-          throw new Error(`Provo package filename was ${getResourcePackageFilename()}`);
-        }
         if(getResourcePackageZipFilename() !== "provo-resource-package.zip"){
           throw new Error(`Provo package zip filename was ${getResourcePackageZipFilename()}`);
         }
@@ -1184,7 +1196,6 @@ async function runSelfTests(){
       const previousShowUpdateInfo = showUpdateInfo;
       const previousShowRecentChangeLog = showRecentChangeLog;
       const previousRecentUpdateDetail = recentUpdateDetail;
-      const previousPendingRecentUpdates = pendingRecentUpdates;
       try{
         view = "categories";
         showUpdateInfo = false;
@@ -1203,7 +1214,6 @@ async function runSelfTests(){
         showUpdateInfo = previousShowUpdateInfo;
         showRecentChangeLog = previousShowRecentChangeLog;
         recentUpdateDetail = previousRecentUpdateDetail;
-        pendingRecentUpdates = previousPendingRecentUpdates;
       }
     }
   });
@@ -1295,10 +1305,7 @@ async function runSelfTests(){
   tests.push({
     name: "CATEGORY DELETE CHANGE LOG ENTRY",
     fn: () => {
-      const description = getCategoryDeleteChangeDescription("");
-      if(description !== "Deleted category."){
-        throw new Error(`unexpected fallback description '${description}'`);
-      }
+      const description = "Deleted category.";
       const entry = createChangeEntry("category", "removed", "holiday-needs", "Holiday Needs", description);
       if(!entry) throw new Error("category deletion should create a change entry");
       if(entry.targetName !== "Holiday Needs" || entry.action !== "removed"){
@@ -2955,10 +2962,10 @@ async function runSelfTests(){
           resources:[{ id:"before", name:"Before Merge", categories:[], categoryFilters:{}, forGroups:[], informationText:"" }],
           changes:[], deletionRequests:[], deletions:[]
         };
-        if(!savePreMergeSnapshot("incoming.zip")) throw new Error("pre-merge snapshot was not saved");
+        AdminRecoveryStore.add("incoming.zip");
         data.resources = [{ id:"after", name:"After Merge", categories:[], categoryFilters:{}, forGroups:[], informationText:"" }];
         window.confirm = () => true;
-        restorePreMergeState();
+        restoreRecoveryPoint(getRecoveryPoints()[0].id);
         if(!data.resources.some(resource => resource.id === "before") || data.resources.some(resource => resource.id === "after")){
           throw new Error("pre-merge state was not restored");
         }
@@ -3004,7 +3011,7 @@ async function runSelfTests(){
             }],
             changes:[], deletionRequests:[], deletions:[]
           };
-          if(!savePreMergeSnapshot(`package-${index}.zip`)) throw new Error("recovery point save failed");
+          AdminRecoveryStore.add(`package-${index}.zip`);
         }
         const points = getRecoveryPoints();
         if(points.length !== 5) throw new Error(`expected five recovery points, got ${points.length}`);
@@ -3116,18 +3123,6 @@ async function runSelfTests(){
     }
   });
   tests.push({
-    name: "BLANK RESOURCE CLEANUP DETECTION",
-    fn: () => {
-      const blank = { name:"", description:"", phone:"", address:"", website:"", hours:"", informationText:"", categories:[] };
-      const named = { ...blank, name:"Named Resource" };
-      const categorized = { ...blank, categories:["food"] };
-      if(!isBlankResourceDraft(blank)) throw new Error("empty resource was not detected");
-      if(isBlankResourceDraft(named)) throw new Error("named resource was treated as blank");
-      if(isBlankResourceDraft(categorized)) throw new Error("categorized resource was treated as blank");
-    }
-  });
-
-  tests.push({
     name: "NEW RESOURCE CANCEL CLEANUP",
     fn: () => {
       const previousData = data;
@@ -3154,16 +3149,6 @@ async function runSelfTests(){
         newResourceIds = previousNewResourceIds;
         selectedResourceId = previousSelectedResourceId;
         adminResourceEditMode = previousAdminResourceEditMode;
-      }
-    }
-  });
-
-  tests.push({
-    name: "UTC LAST MODIFIED FORMAT",
-    fn: () => {
-      const formatted = formatDateTimeUTC("2026-05-09T05:16:20.130Z");
-      if(formatted !== "May 9, 2026, 5:16 UTC"){
-        throw new Error(`unexpected formatted date '${formatted}'`);
       }
     }
   });
@@ -3226,9 +3211,9 @@ async function runSelfTests(){
   tests.push({
     name: "PRINT PREVIEW STARTS WITH RESOURCE CONTENT",
     fn: () => {
-      PrintWorkflow.openPreview([
+      PrintWorkflow.renderPrintSelectionPacket([
         { id:"print-start", name:"Print Start", categories:[], informationText:"" }
-      ]);
+      ], []);
       if(/Suggested Resources/.test(printContent.textContent || "")){
         throw new Error("print preview still includes Suggested Resources header");
       }
@@ -3270,44 +3255,16 @@ async function runSelfTests(){
     name: "PRINT PAGE STARTS WITHOUT PREVIEW SPACING",
     fn: () => {
       let printModalRule = null;
-      let printProgressRule = null;
       Array.from(document.styleSheets).forEach(sheet => {
         Array.from(sheet.cssRules || []).forEach(rule => {
           if(rule.type !== CSSRule.MEDIA_RULE || !/\bprint\b/i.test(rule.media.mediaText)) return;
           Array.from(rule.cssRules || []).forEach(nestedRule => {
             if(nestedRule.selectorText === "#printModal") printModalRule = nestedRule.style;
-            if(nestedRule.selectorText === "#printProgress") printProgressRule = nestedRule.style;
           });
         });
       });
       if(!printModalRule || Number.parseFloat(printModalRule.padding) !== 0 || Number.parseFloat(printModalRule.margin) !== 0){
         throw new Error("print modal retained screen spacing before the first resource");
-      }
-      if(!printProgressRule || printProgressRule.display !== "none" || printProgressRule.getPropertyPriority("display") !== "important"){
-        throw new Error("empty print progress row can consume the top of page one");
-      }
-    }
-  });
-
-  tests.push({
-    name: "PRINT PREVIEW HAS NO PROGRESS MESSAGE",
-    fn: () => {
-      const previousQueue = PrintWorkflow.queue;
-      const previousCurrentIndex = PrintWorkflow.currentIndex;
-      try{
-        PrintWorkflow.queue = [{
-          label:"Print Selection",
-          render: () => {}
-        }];
-        PrintWorkflow.currentIndex = 0;
-        PrintWorkflow.updateUI();
-        if((printProgress.textContent || "").trim()){
-          throw new Error(`unexpected print progress '${printProgress.textContent}'`);
-        }
-      }finally{
-        PrintWorkflow.queue = previousQueue;
-        PrintWorkflow.currentIndex = previousCurrentIndex;
-        PrintWorkflow.updateUI();
       }
     }
   });
@@ -4025,7 +3982,6 @@ async function runSelfTests(){
       const previousCategory = currentCategory;
       const previousExpanded = expandedSearchResourceId;
       const previousFilters = selectedCategoryFilters;
-      const previousSearchOpen = isSearchOpen;
       const previousSearchQuery = searchQuery;
       const previousSearchResults = searchResults;
       const previousSearchDetail = searchDetailResourceId;
@@ -4067,7 +4023,6 @@ async function runSelfTests(){
         currentCategory = previousCategory;
         expandedSearchResourceId = previousExpanded;
         selectedCategoryFilters = previousFilters;
-        isSearchOpen = previousSearchOpen;
         searchQuery = previousSearchQuery;
         searchResults = previousSearchResults;
         searchDetailResourceId = previousSearchDetail;

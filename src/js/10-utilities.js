@@ -46,7 +46,7 @@ function pdfNameFromPath(path){
 function buildPDFStoragePath(resourceId, attachmentId, fileName){
   return `pdfs/${encodeURIComponent(resourceId || "resource")}/${attachmentId}-${safePDFFileName(fileName)}`;
 }
-function showToast(message, options = {}){
+function showToast(message){
   let toast = document.getElementById("appToast");
   if(!toast){
     toast = document.createElement("div");
@@ -57,17 +57,9 @@ function showToast(message, options = {}){
     document.body.appendChild(toast);
   }
   toast.textContent = message;
-  toast.classList.toggle("important", !!options.important);
   toast.classList.remove("hidden");
   if(showToast.timer) clearTimeout(showToast.timer);
-  if(options.sticky){
-    showToast.timer = null;
-  }else{
-    showToast.timer = setTimeout(() => {
-      toast.classList.add("hidden");
-      toast.classList.remove("important");
-    }, 4500);
-  }
+  showToast.timer = setTimeout(() => toast.classList.add("hidden"), 4500);
 }
 
 function formatLocalDateTime(value){

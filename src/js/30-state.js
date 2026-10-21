@@ -78,13 +78,9 @@ const STARTUP_STATE_STORAGE_KEYS = [
   DELETION_REVIEW_STORAGE_KEY
 ];
 
-function shouldResetTemplateStorageOnStartup(fileName = getCurrentHtmlFileName()){
-  return String(fileName || "").toLowerCase() === "new.html";
-}
-
 function runStartupStateReset(fileName = getCurrentHtmlFileName()){
   STARTUP_STATE_STORAGE_KEYS.forEach(key => localStorage.removeItem(key));
-  if(shouldResetTemplateStorageOnStartup(fileName)){
+  if(isNewTemplateFile(fileName)){
     localStorage.removeItem(DATA_STORAGE_KEY);
     localStorage.removeItem(TSO_NAME_STORAGE_KEY);
     localStorage.removeItem(PRE_MERGE_STORAGE_KEY);
@@ -156,7 +152,6 @@ const TIP_TEXT = {
   newAdminWelcome: "Welcome to you, new admin. Press Ctrl+Alt+A to enter admin mode",
   newAdminMode: "Open Admin Help for first-time admin training. Use an office-specific HTML file to keep your office’s resources separate."
 };
-const DEFAULT_RESOURCE_PACKAGE_FILENAME = "tso-resources.json";
 const CATEGORY_REMINDER_TEXT = "Report bugs or request enhancements to Elder Bendio (michaelbendio@gmail.com)"
 
 if(!data){
@@ -183,7 +178,6 @@ const LISTS_CATEGORY_ID = "__lists__";
 
 // Public navigation/search state. The selected category filters are deliberately
 // transient: they narrow the current view but are never exported in a package.
-let isSearchOpen = false;
 let searchQuery = "";
 let searchResults = null;
 let expandedSearchResourceId = "";
@@ -222,7 +216,6 @@ let selectedForGroupIndex = 0;
 
 // Recent-update state. Package imports set these fields so the next public render
 // can show what changed; the recent-updates view clears them after displaying.
-let pendingRecentUpdates = [];
 let recentUpdateDetail = null;
 let showUpdateInfo = false;
 let showRecentChangeLog = true;
@@ -236,8 +229,8 @@ function getCurrentHtmlFileName(){
   }
 }
 
-function isNewTemplateFile(){
-  return getCurrentHtmlFileName().toLowerCase() === "new.html";
+function isNewTemplateFile(fileName = getCurrentHtmlFileName()){
+  return String(fileName || "").toLowerCase() === "new.html";
 }
 
 let adminHelpPrintRestoreState = null;

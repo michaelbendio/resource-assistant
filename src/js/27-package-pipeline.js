@@ -499,15 +499,3 @@ function normalizePackageData(nextData){
   Object.assign(nextData, processed.data);
   return nextData;
 }
-
-function validateImportData(imported, options = {}){
-  try{
-    const processed = processResourcePackageData(imported, options);
-    return { ok:true, errors:[], warnings:processed.warnings, data:processed.data };
-  }catch(error){
-    const details = error && Array.isArray(error.details) && error.details.length
-      ? error.details
-      : [error && error.message ? error.message : String(error)];
-    return { ok:false, errors:details, warnings:[] };
-  }
-}

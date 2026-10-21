@@ -56,6 +56,12 @@ class PublishTsoOfficesTests(unittest.TestCase):
             (root / "mesa.html").write_text(
                 office_html("mesa", "Mesa TSO Resources"), encoding="utf-8"
             )
+            (root / "st-george.html").write_text(
+                office_html("st-george", "St George TSO Resources"), encoding="utf-8"
+            )
+            (root / "welfare-square.html").write_text(
+                office_html("welfare-square", "Welfare Square TSO Resources"), encoding="utf-8"
+            )
 
             with (
                 patch.object(publish_tso_offices, "ROOT", root),
@@ -65,7 +71,7 @@ class PublishTsoOfficesTests(unittest.TestCase):
 
             self.assertEqual(
                 [path.name for path in published],
-                ["provo.html", "albuquerque.html", "mesa.html"],
+                list(publish_tso_offices.ACTIVE_OFFICES),
             )
             for filename in publish_tso_offices.ACTIVE_OFFICES:
                 self.assertEqual(

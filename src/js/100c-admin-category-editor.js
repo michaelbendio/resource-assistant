@@ -184,10 +184,6 @@ function cancelCategoryEdit(){
   editCategory(editing.idx);
 }
 
-function getCategoryDeleteChangeDescription(description){
-  return String(description || "").trim() || "Deleted category.";
-}
-
 function closeCategoryDeletePrompt(){
   const modal = document.getElementById("categoryDeletePrompt");
   if(modal) modal.remove();

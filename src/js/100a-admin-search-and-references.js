@@ -328,7 +328,6 @@ function openSearchResult(resourceId){
   if(!nextResource) return;
   searchDetailResourceId = nextResource;
   searchResultReturnResourceId = nextResource;
-  isSearchOpen = false;
   view = "search-detail";
   safeRender();
 }
@@ -341,7 +340,6 @@ function openSearchResultInCategory(categoryId, resourceId){
   setSelectedCategoryFilters(currentCategory, []);
   expandedSearchResourceId = nextResource;
   searchDetailResourceId = "";
-  isSearchOpen = false;
   view = "category";
   safeRender();
   window.setTimeout(() => {
@@ -351,10 +349,6 @@ function openSearchResultInCategory(categoryId, resourceId){
     if(typeof card.scrollIntoView === "function") card.scrollIntoView({ block:"center" });
     if(typeof card.focus === "function") card.focus({ preventScroll:true });
   }, 0);
-}
-
-function resourceIsListStyle(resource){
-  return resourceMatchesListsHeuristic(resource);
 }
 
 function findReferencingLists(resourceOrName){
@@ -372,7 +366,7 @@ function findReferencingLists(resourceOrName){
   (Array.isArray(data.resources) ? data.resources : []).forEach(resource => {
     const resourceId = String(resource && resource.id || "");
     if(targetId && resourceId === targetId) return;
-    if(!resourceIsListStyle(resource)) return;
+    if(!resourceMatchesListsHeuristic(resource)) return;
     const informationText = String(resource && resource.informationText || "");
     if(!informationTextReferencesName(informationText, needle)) return;
 

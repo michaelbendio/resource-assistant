@@ -119,20 +119,13 @@ function togglePrintSelection(id, { rerender = true } = {}){
 
 /* ---------- Print ---------- */
 
-// PrintWorkflow is a small queue-based state machine for print preview/packet flow.
-// Each queue entry has a label and render function so print steps stay data-driven.
-// The queue currently has one visible step, but keeping this as a queue preserves
-// the separation between normal resource cards and list-style flyer output.
+// PrintWorkflow owns the print preview. `step` renders what the preview shows, so a
+// print toggle inside the preview can redraw it; it is null when nothing can print.
+// Resource cards print first, then list-style resources as flyers.
 const PrintWorkflow = {
-  queue: [],
-  currentIndex: -1,
-  initiatedByButton: false,
+  step: null,
   editorPreview: false,
   returnFocus: null,
-
-  isListResource(res){
-    return resourceMatchesListsHeuristic(res);
-  },
 
   getPrintSelectionGroups(){
     // "List" resources are separated so print selection packet output can render flyers.
@@ -140,7 +133,7 @@ const PrintWorkflow = {
     const listSelections = [];
 
     getPrintSelectionResources().forEach(res => {
-      if(this.isListResource(res)){
+      if(resourceMatchesListsHeuristic(res)){
         listSelections.push(res);
       }else{
         normalSelections.push(res);
@@ -150,38 +143,12 @@ const PrintWorkflow = {
     return { normalSelections, listSelections };
   },
 
-  buildQueue(){
-    const { normalSelections, listSelections } = this.getPrintSelectionGroups();
-    if(!normalSelections.length && !listSelections.length) return [];
-    if(!listSelections.length){
-      return [{
-        label:"Print Selection",
-        render: () => this.renderPrintSelection(normalSelections)
-      }];
-    }
-    return [{
-      label:"Print Selection",
-      render: () => this.renderPrintSelectionPacket(normalSelections, listSelections)
-    }];
-  },
-
   updateUI(){
-    const active = this.queue.length > 0 && this.currentIndex >= 0 && this.currentIndex < this.queue.length;
-    const isLastStep = active && this.currentIndex === this.queue.length - 1;
-    printCloseBtn.classList.toggle("hidden", active && !isLastStep);
-    printActionBtn.classList.toggle("hidden", !active);
-    printNextBtn.classList.toggle("hidden", !active || isLastStep);
-    if(!active){
-      printProgress.textContent = "";
-      return;
-    }
-    printProgress.textContent = "";
+    printActionBtn.classList.toggle("hidden", !this.step);
   },
 
   showStep(){
-    const step = this.queue[this.currentIndex];
-    if(!step || typeof step.render !== "function") return;
-    step.render();
+    if(typeof this.step === "function") this.step();
   },
 
   openPreviewContent(render){
@@ -189,12 +156,6 @@ const PrintWorkflow = {
     printContent.innerHTML="";
     if(typeof render === "function") render(printContent);
     printModal.classList.remove("hidden");
-  },
-
-  openPreview(resources){
-    this.openPreviewContent(container => {
-      this.renderPrintableResourceCards(container, resources);
-    });
   },
 
   renderPrintableResourceCards(container, resources){
@@ -218,10 +179,6 @@ const PrintWorkflow = {
       }
       container.appendChild(card);
     });
-  },
-
-  renderPrintSelection(normalSelections){
-    this.openPreview(normalSelections);
   },
 
   buildListFlyer(resource, shouldPageBreak, { interactive = true } = {}){
@@ -270,23 +227,17 @@ const PrintWorkflow = {
     });
   },
 
-  renderSingleListResource(resourceId){
-    const { listSelections } = this.getPrintSelectionGroups();
-    const resource = listSelections.find(res => res.id === resourceId);
-    if(!resource) return;
-    this.openPreview([resource]);
-  },
-
   startPrintSelection(){
     this.editorPreview = false;
-    this.queue = this.buildQueue();
-    if(!this.queue.length){
+    const { normalSelections, listSelections } = this.getPrintSelectionGroups();
+    if(!normalSelections.length && !listSelections.length){
+      this.step = null;
       this.openPreviewContent(container => {
         container.innerHTML = "<p>No resources are selected for printing.</p><p class=\"print-empty-instruction\">Click the gray printer button next to a resource to include it in the printed handout.</p>";
       });
       return;
     }
-    this.currentIndex = 0;
+    this.step = () => this.renderPrintSelectionPacket(normalSelections, listSelections);
     this.showStep();
   },
 
@@ -294,10 +245,8 @@ const PrintWorkflow = {
     if(!resource) return;
     this.editorPreview = true;
     this.returnFocus = document.activeElement;
-    this.queue = [{
-      label:"Resource Preview",
-      render: () => this.openPreviewContent(container => {
-        if(this.isListResource(resource)){
+    this.step = () => this.openPreviewContent(container => {
+        if(resourceMatchesListsHeuristic(resource)){
           container.appendChild(this.buildListFlyer(resource, false, { interactive:false }));
           return;
         }
@@ -307,21 +256,12 @@ const PrintWorkflow = {
           showPrintToggle:false,
           showFavoriteToggle:false
         }));
-      })
-    }];
-    this.currentIndex = 0;
-    this.showStep();
-  },
-
-  next(){
-    if(this.currentIndex >= this.queue.length - 1) return this.close();
-    this.currentIndex += 1;
+      });
     this.showStep();
   },
 
   close(){
-    this.queue = [];
-    this.currentIndex = -1;
+    this.step = null;
     this.updateUI();
     printModal.classList.add("hidden");
     if(this.returnFocus && this.returnFocus.isConnected) this.returnFocus.focus();
@@ -330,21 +270,14 @@ const PrintWorkflow = {
   },
 
   doPrint(){
-    this.initiatedByButton = true;
     const disabled = Array.from(printContent.querySelectorAll(".print-disabled"));
     disabled.forEach(el => el.setAttribute("data-print-hidden", "true"));
     window.print();
-    if(!this.editorPreview) clearAllCategoryFilters(false);
-  },
-
-  handleAfterPrint(){
-    if(!this.initiatedByButton) return;
-    this.initiatedByButton = false;
+    if(!this.editorPreview) clearAllCategoryFilters();
   }
 };
 
 function startPrintSelectionPreview(){ PrintWorkflow.startPrintSelection(); }
-function nextPrintStep(){ PrintWorkflow.next(); }
 function closePrintPreview(){ PrintWorkflow.close(); }
 function doPrint(){ PrintWorkflow.doPrint(); }
 

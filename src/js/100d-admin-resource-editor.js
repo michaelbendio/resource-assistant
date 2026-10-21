@@ -213,18 +213,6 @@ function discardNewResourceDraft(resourceId){
   return true;
 }
 
-function isBlankResourceDraft(resource){
-  if(!resource) return false;
-  const hasText = ["name", "description", "phone", "address", "website", "hours", "informationText"]
-    .some(key => String(resource[key] || "").trim());
-  const hasLists = ["categories", "forGroups", "pdfs"]
-    .some(key => Array.isArray(resource[key]) && resource[key].length);
-  const hasCategoryFilters = resource.categoryFilters
-    && typeof resource.categoryFilters === "object"
-    && Object.keys(resource.categoryFilters).some(key => normalizeCategoryFilters(resource.categoryFilters[key]).length);
-  return !hasText && !hasLists && !hasCategoryFilters;
-}
-
 function deleteResource(){
   if(!commitPendingEditsIfChanged()) return;
   if(!selectedResourceId) return;

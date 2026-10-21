@@ -178,18 +178,6 @@ function formatDateOnly(isoString){
   return date.toLocaleDateString(undefined, { year:"numeric", month:"long", day:"numeric" });
 }
 
-function formatDateTimeUTC(isoString){
-  if(!isoString) return "(none)";
-  const date = new Date(isoString);
-  if(Number.isNaN(date.getTime())) return String(isoString);
-  const month = date.toLocaleString(undefined, { month:"long", timeZone:"UTC" });
-  const day = date.getUTCDate();
-  const year = date.getUTCFullYear();
-  const hour = date.getUTCHours();
-  const minute = String(date.getUTCMinutes()).padStart(2, "0");
-  return `${month} ${day}, ${year}, ${hour}:${minute} UTC`;
-}
-
 function parseMMYYToMonthIndex(mmyy){
   const match = String(mmyy || "").trim().match(/^(0[1-9]|1[0-2])\/(\d{2})$/);
   if(!match) return null;

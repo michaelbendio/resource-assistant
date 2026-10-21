@@ -93,18 +93,20 @@ python3 make-local-tso albuquerque --output albq.html
 ```
 
 The generator does not copy the result. The required active-office publication
-workflow generates all three office files and then copies them to
+workflow generates all five office files and then copies them to
 `iCloud Drive/Documents/TSO`:
 
 ```sh
 python3 make-local-tso provo
 python3 make-local-tso albuquerque
 python3 make-local-tso mesa
+python3 make-local-tso st-george
+python3 make-local-tso welfare-square
 python3 publish-tso-offices
 ```
 
-`publish-tso-offices` validates the Provo, Albuquerque, and Mesa storage IDs,
-titles, and release versions, copies all three files atomically, and verifies byte parity. It
+`publish-tso-offices` validates the Albuquerque, Mesa, Provo, St George and Welfare
+Square storage IDs, titles, and release versions, copies all five files atomically, and verifies byte parity. It
 does not copy `new.html`. If iCloud Drive Documents is unavailable, stop rather
 than substituting another destination. Use `copy-local-tso` only for a separately
 requested one-off copy.

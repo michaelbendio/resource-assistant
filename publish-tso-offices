@@ -12,7 +12,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parent
 COPY_HELPER_PATH = ROOT / "copy-local-tso"
 ICLOUD_DOCUMENTS_DIR = (
@@ -20,11 +19,12 @@ ICLOUD_DOCUMENTS_DIR = (
 )
 DEFAULT_ICLOUD_TSO_DIR = ICLOUD_DOCUMENTS_DIR / "TSO"
 ACTIVE_OFFICES = {
-    "provo.html": ("provo", "Provo TSO Resources"),
     "albuquerque.html": ("albuquerque", "Albuquerque TSO Resources"),
     "mesa.html": ("mesa", "Mesa TSO Resources"),
+    "provo.html": ("provo", "Provo TSO Resources"),
+    "st-george.html": ("st-george", "St George TSO Resources"),
+    "welfare-square.html": ("welfare-square", "Welfare Square TSO Resources")
 }
-
 
 class PublicationError(RuntimeError):
     """Raised when the active office files cannot be safely published."""

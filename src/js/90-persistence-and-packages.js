@@ -66,10 +66,10 @@ function openAssetsDB(){
   });
 }
 
-async function saveAsset(key, blob){
+async function savePDF(key, blob){
   const db = await openAssetsDB();
   const tx = db.transaction("files", "readwrite");
-  tx.objectStore("files").put(blob, key);
+  tx.objectStore("files").put(ensurePDFBlob(blob), key);
 
   return new Promise((resolve, reject) => {
     tx.oncomplete = () => {
@@ -87,7 +87,7 @@ async function saveAsset(key, blob){
   });
 }
 
-async function loadAsset(key){
+async function getPDF(key){
   const db = await openAssetsDB();
   const tx = db.transaction("files", "readonly");
   const req = tx.objectStore("files").get(key);
@@ -113,15 +113,7 @@ function ensurePDFBlob(value){
   return new Blob([value], { type: "application/pdf" });
 }
 
-async function savePDF(key, blob){
-  return saveAsset(key, ensurePDFBlob(blob));
-}
-
-async function getPDF(key){
-  return loadAsset(key);
-}
-
-async function deleteAsset(key){
+async function deletePDF(key){
   const db = await openAssetsDB();
   const tx = db.transaction("files", "readwrite");
   tx.objectStore("files").delete(key);
@@ -140,10 +132,6 @@ async function deleteAsset(key){
       reject(tx.error);
     };
   });
-}
-
-async function deletePDF(key){
-  return deleteAsset(key);
 }
 
 async function openPDF(path){
@@ -878,14 +866,6 @@ function prepareMergedResourceStorage(mergedData, options = {}){
   };
 }
 
-function applyMergedData(mergedData){
-  const storage = prepareMergedResourceStorage(mergedData);
-  try{ storage.commit(); }
-  catch(error){ storage.rollback(); throw error; }
-  storage.activate();
-  safeRender();
-}
-
 async function beginResourcePackageSave(){
   // Request a save target up front so browsers can honor the user gesture.
   const suggestedName = getResourcePackageZipFilename();
@@ -915,7 +895,7 @@ function downloadResourcePackageBlob(fileName, blob){
   const a = document.createElement("a");
   a.href = url;
   a.download = cleanFileName;
-  a.type = "application/json";
+  a.type = "application/zip";
   a.rel = "noopener";
   a.style.display = "none";
   document.body.appendChild(a);
@@ -964,7 +944,7 @@ async function saveCurrentResourcePackage(target){
       if(!shouldSaveEmpty){
         data.packageVersion = previousPackageVersion;
         packageVersionBumped = false;
-        return null;
+        return;
       }
     }
     zip.file("tso-resources.json", JSON.stringify(packageData, null, 2));
@@ -985,11 +965,6 @@ async function saveCurrentResourcePackage(target){
     await saveResourcePackageBlob(target, blob);
     persist();
     showToast(`Resource package saved (${resourceCount} ${resourceCount === 1 ? "resource" : "resources"})`);
-    return {
-      blob,
-      packageVersion:data.packageVersion,
-      resourceCount
-    };
   }catch(err){
     if(packageVersionBumped) data.packageVersion = previousPackageVersion;
     throw err;
@@ -1002,7 +977,7 @@ async function exportPackage(){
 
   try{
     const saveTarget = await beginResourcePackageSave();
-    return await saveCurrentResourcePackage(saveTarget);
+    await saveCurrentResourcePackage(saveTarget);
   }catch(err){
     if(err && err.name === "AbortError") return;
     alert("Save failed: " + err.message);
@@ -1144,7 +1119,6 @@ async function mergeImportPackage(event){
     storage.activate();
     safeRender();
     if(loadedChangeSummaries.length){
-      pendingRecentUpdates = [];
       recentUpdateDetail = null;
       showUpdateInfo = true;
       showRecentChangeLog = false;

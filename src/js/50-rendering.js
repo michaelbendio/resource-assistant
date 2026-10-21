@@ -42,7 +42,6 @@ function flashAdminButton(){
 const tabPrintSelection = document.getElementById("tabPrintSelection");
 const tabFavorites = document.getElementById("tabFavorites");
 const helpButton = document.getElementById("helpButton");
-const tabSearch = document.getElementById("tabSearch");
 tabCategories.onclick = ()=>{ setView("categories"); };
 if(tabFavorites){
   tabFavorites.appendChild(createInterfaceIcon("star-outline"));
@@ -51,35 +50,6 @@ if(tabFavorites){
 if(tabPrintSelection) tabPrintSelection.onclick = ()=>{ startPrintSelectionPreview(); };
 if(helpButton) helpButton.onclick = ()=>{ showUserHelp(); };
 tabAdmin.onclick = ()=>{ setView("admin"); };
-
-function syncSearchPanel(){
-  const panel = document.getElementById("searchPanel");
-  const input = document.getElementById("searchInput");
-  if(!panel) return;
-  panel.classList.toggle("hidden", !isSearchOpen);
-  if(input && isSearchOpen && document.activeElement !== input){
-    input.value = searchQuery;
-  }
-}
-
-function closeSearchPanel(){
-  isSearchOpen = false;
-  syncSearchPanel();
-}
-
-function toggleSearchPanel(){
-  isSearchOpen = !isSearchOpen;
-  syncSearchPanel();
-  if(isSearchOpen){
-    window.setTimeout(() => {
-      const input = document.getElementById("searchInput");
-      if(input){
-        input.focus();
-        input.select();
-      }
-    }, 0);
-  }
-}
 
 function performSearch(query){
   if(view === "admin" && !commitPendingEditsIfChanged()) return;
@@ -92,24 +62,6 @@ function performSearch(query){
   safeRender();
 }
 
-if(tabSearch) tabSearch.onclick = toggleSearchPanel;
-const searchButton = document.getElementById("searchButton");
-if(searchButton){
-  searchButton.onclick = () => {
-    const input = document.getElementById("searchInput");
-    performSearch(input ? input.value : "");
-  };
-}
-const searchCancelButton = document.getElementById("searchCancelButton");
-if(searchCancelButton) searchCancelButton.onclick = closeSearchPanel;
-const searchInput = document.getElementById("searchInput");
-if(searchInput){
-  searchInput.addEventListener("keydown", event => {
-    if(event.key !== "Enter") return;
-    event.preventDefault();
-    performSearch(searchInput.value);
-  });
-}
 const appTitle = document.getElementById("appTitle");
 const topbar = document.querySelector(".topbar");
 const TOPBAR_ADMIN_SWIPE_MIN_X = 80;
@@ -200,16 +152,8 @@ function slugifyFileStem(value, fallback){
   return cleaned || fallback;
 }
 
-function getResourcePackageFilename(){
-  const baseName = getTsoName() || (isNewTemplateFile() ? "tso" : getTsoNameFromHtmlFileName(getCurrentHtmlFileName()));
-  const stem = slugifyFileStem(baseName, "tso");
-  return stem === "tso" ? DEFAULT_RESOURCE_PACKAGE_FILENAME : `${stem}-resources.json`;
-}
-
 function getResourcePackageZipFilename(){
-  const baseName = getTsoName() || (isNewTemplateFile() ? "tso" : getTsoNameFromHtmlFileName(getCurrentHtmlFileName()));
-  const stem = slugifyFileStem(baseName, "tso");
-  return `${stem}-resource-package.zip`;
+  return `${slugifyFileStem(getTsoName(), "tso")}-resource-package.zip`;
 }
 
 function getAppTitleText(){
@@ -356,7 +300,6 @@ function toggleUpdateInfoView(){
     showUpdateInfo = false;
     showRecentChangeLog = false;
     recentUpdateDetail = null;
-    pendingRecentUpdates = [];
     view = "categories";
     safeRender();
     return;
@@ -394,8 +337,8 @@ function showUserHelp(){
         <h3>Finding Resources</h3>
         <p>Select a category to view available resources.</p>
         <p>The <strong>Lists</strong> category appears automatically when a resource is a list rather than a normal service record.</p>
-        <p>Some category pages include <strong>Type</strong> and <strong>For</strong> buttons that narrow the resources shown. For example, in Education, <strong>GED</strong> is a <strong>Type</strong> of educational resource, while <strong>Veterans</strong> identifies a group the resource is <strong>For</strong>.</p>
-        <p>If you select more than one <strong>Type</strong> or <strong>For</strong> button, resources matching any selection are shown. Resources matching more of your selections appear first.</p>
+        <p>Some category pages include <strong>Type</strong> and <strong>Groups</strong> buttons that narrow the resources shown. For example, in Education, <strong>GED</strong> is a <strong>Type</strong> of educational resource, while <strong>Veterans</strong> is a group the resource serves.</p>
+        <p>If you select more than one <strong>Type</strong>, resources of any selected Type are shown. If you select more than one group, only resources for all of them are shown, unless you choose <strong>Match any selected group</strong>. With both, a resource must match a selected Type and the groups. Resources matching more of your selections appear first.</p>
         <h3>Search</h3>
         <p>Search is available on the <strong>Categories</strong> screen.</p>
         <p>Search checks resource names, descriptions, categories, <strong>Types</strong>, <strong>For</strong> groups, phone numbers, addresses, websites, hours, PDF names, and resource information. It also searches the automatically generated <strong>Lists</strong> category.</p>
@@ -423,12 +366,8 @@ function showUserHelp(){
   modal.classList.remove("hidden");
 }
 
-function showAdminHelp(options = {}){
-  const expandTraining = !!(options && options.expandTraining);
+function showAdminHelp(){
   const modal = getReferenceModal();
-  const adminEntryTipHTML = expandTraining && isNewTemplateFile()
-    ? `<div class="red-tip new-admin-tip">${escapeHTML(TIP_TEXT.newAdminMode)}</div>`
-    : "";
   modal.innerHTML = `
     <div class="reference-modal-panel" role="dialog" aria-modal="true" aria-labelledby="adminHelpTitle">
       <div class="reference-modal-header">
@@ -439,10 +378,9 @@ function showAdminHelp(options = {}){
         </div>
       </div>
       <div class="reference-modal-body admin-help-content">
-        ${adminEntryTipHTML}
         <p><strong>NOTE:</strong> The <strong>Lists</strong> category is generated automatically. It is not edited in <strong>Categories</strong>. A resource appears in <strong>Lists</strong> when it has no phone, website, or hours, which usually means it is a list such as food pantries, shelters, rooms, or temp agencies.</p>
 
-        <details class="admin-training-section" ${expandTraining ? "open" : ""}>
+        <details class="admin-training-section">
           <summary>First-Time Admin Training</summary>
           <div class="admin-help-section-body">
             <div class="admin-training-actions">
@@ -481,7 +419,7 @@ function showAdminHelp(options = {}){
               <li>Click <strong>Admin</strong> in the blue bar again. Click <strong>Show change log</strong>. Click <strong>Save Resource Package</strong> and choose the location for the resource package. Remember where you put it.</li>
               <li>Click <strong>Resources</strong>, select your practice resource, and click <strong>Delete</strong>. The resource remains active and is labeled <strong>tagged for deletion</strong>. Click <strong>Undo tagged resource ... for deletion</strong> so the practice resource is no longer tagged. Press <kbd>Ctrl+Alt+A</kbd> to exit admin mode.</li>
               <li>Under the category buttons, on the right side, click <strong>Merge Resources</strong>. Choose the resource package zip you saved.</li>
-              <li>In the Education category, click the gray square on the left of your practice resource. Use the printer icon in the blue bar to print your practice resource.</li>
+              <li>In the Education category, click the gray printer button next to your practice resource. Use the printer icon in the blue bar to print your practice resource.</li>
             </ol>
           </div>
         </details>
@@ -633,11 +571,6 @@ function showAdminHelp(options = {}){
   if(trainingPrintBtn) trainingPrintBtn.addEventListener("click", printAdminTraining);
   modal.classList.remove("hidden");
   if(closeBtn) closeBtn.focus();
-}
-
-function getUnseenUpdates(){
-  const seen = getSeenUpdateIds();
-  return getRecentChanges().filter(entry => !seen.has(String(entry.id)));
 }
 
 function getCategoryUpdateMap(){
@@ -830,9 +763,8 @@ function setSelectedCategoryFilters(categoryId, filterKeys){
   }
 }
 
-function clearAllCategoryFilters(shouldRender = true){
+function clearAllCategoryFilters(){
   selectedCategoryFilters = {};
-  if(shouldRender && view === "category") safeRender();
 }
 
 function makeCategorySpecificFilterKey(filter){

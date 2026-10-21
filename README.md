@@ -73,18 +73,21 @@ office HTML file. It refuses to overwrite the master template. The same command 
 office such as `mesa`; there is no central office registry.
 
 Generation does not copy the office file anywhere. After a pushed application
-release has been verified, generate all three active office files and publish them to
+release has been verified, generate all five active office files and publish them to
 `iCloud Drive/Documents/TSO`:
 
 ```sh
 python3 make-local-tso provo
 python3 make-local-tso albuquerque
 python3 make-local-tso mesa
+python3 make-local-tso st-george
+python3 make-local-tso welfare-square
 python3 publish-tso-offices
 ```
 
-The publication helper validates all three office identities and release versions,
-copies `provo.html`, `albuquerque.html`, and `mesa.html` atomically, and verifies byte parity.
+The publication helper validates all five office identities and release versions,
+copies `albuquerque.html`, `mesa.html`, `provo.html`, `st-george.html` and
+`welfare-square.html` atomically, and verifies byte parity.
 It does not copy `new.html`, and it fails when iCloud Drive Documents is
 unavailable. For a separately requested one-off copy to another destination,
 use `copy-local-tso` with an explicit source and destination.

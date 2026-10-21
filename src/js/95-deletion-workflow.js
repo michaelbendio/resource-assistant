@@ -163,22 +163,8 @@ const AdminRecoveryStore = Object.freeze({
   }
 });
 
-function savePreMergeSnapshot(fileName){
-  try{
-    AdminRecoveryStore.add(String(fileName || "resource package"));
-    return true;
-  }catch(_err){
-    alert("The merge cannot begin because at least three recovery points could not be retained. Free browser storage and try again.");
-    return false;
-  }
-}
-
 function getRecoveryPoints(){
   return AdminRecoveryStore.load();
-}
-
-function getPreMergeSnapshot(){
-  return getRecoveryPoints()[0] || null;
 }
 
 function recoveryPointLabel(point){
@@ -211,11 +197,6 @@ function restoreRecoveryPoint(recoveryId){
   closeReferenceModal();
   showToast("Recovery point restored.");
   safeRender();
-}
-
-function restorePreMergeState(){
-  const latest = getPreMergeSnapshot();
-  if(latest) restoreRecoveryPoint(latest.id);
 }
 
 function showRecoveryPoints(){
@@ -397,8 +378,7 @@ function approveSelectedDeletions(){
 function printProposedDeletions(){
   const review = getOutstandingDeletionReview();
   if(!review) return;
-  PrintWorkflow.queue = [];
-  PrintWorkflow.currentIndex = -1;
+  PrintWorkflow.step = null;
   PrintWorkflow.openPreviewContent(container => {
     const heading = document.createElement("section");
     heading.className = "deletion-report";

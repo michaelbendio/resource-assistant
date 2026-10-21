@@ -3,10 +3,7 @@
 // ============================================================
 // Top-level DOM events feed stateful subsystems, which then trigger render updates.
 
-window.addEventListener("afterprint", () => {
-  PrintWorkflow.handleAfterPrint();
-  restoreAdminHelpPrintState();
-});
+window.addEventListener("afterprint", restoreAdminHelpPrintState);
 
 // ============================================================
 // ADMIN MODE
@@ -97,7 +94,6 @@ function showChangeLog(){
 function clearChangeLog(){
   if(!confirm("Clear change log?")) return;
   data.changes = [];
-  pendingRecentUpdates = [];
   recentUpdateDetail = null;
   localStorage.removeItem(UPDATE_SEEN_STORAGE_KEY);
   persist();

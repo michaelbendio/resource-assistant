@@ -228,12 +228,6 @@ function isCurrentCategoryNewDraft(){
   return !!(cat && newCategoryIds.has(cat.id));
 }
 
-function isCurrentResourceNewDraft(){
-  if(!editing || editing.kind !== "resource") return false;
-  const resource = data.resources[editing.idx];
-  return !!(resource && newResourceIds.has(resource.id));
-}
-
 function updateCategoryEditorActionBar(){
   const currentSnapshot = snapshotCategoryEditor();
   const validation = currentSnapshot ? validateCategoryDraft(JSON.parse(currentSnapshot)) : { valid:true };
@@ -518,8 +512,6 @@ function commitPendingEditsIfChanged(){
     nextSnapshot = snapshotForGroupsEditor();
     if(!nextSnapshot) return true;
     const draft = JSON.parse(nextSnapshot);
-    const validation = validateForGroupsDraft(draft);
-    if(!validation.valid) return false;
     if(nextSnapshot !== editorSnapshot){
       applyForGroupsDraft(draft);
       persist();

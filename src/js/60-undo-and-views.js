@@ -69,7 +69,6 @@ function prepareRenderShell(){
   updatePrintSelectionIndicator();
   if(tabFavorites) tabFavorites.setAttribute("aria-current", view === "favorites" ? "page" : "false");
   tabAdmin.style.display = isAdminVisible ? "" : "none";
-  syncSearchPanel();
   appView.classList.toggle("hidden", view==="admin");
   adminView.classList.toggle("hidden", !isAdminVisible || view!=="admin");
 
@@ -110,14 +109,6 @@ function renderCategoryTip(){
       : createTip(categoryTipId);
     if(tip) appView.appendChild(tip);
   }
-}
-
-function renderPendingUpdatesNotice(){
-  if(!pendingRecentUpdates.length) return;
-  const note = document.createElement("div");
-  note.className = "category-card";
-  note.innerHTML = `<div>${pendingRecentUpdates.length} new updates loaded.</div><div>Click &lt;New&gt; TSO Resources at any time to review updates.</div>`;
-  appView.appendChild(note);
 }
 
 function getCategoryCardsForRender(){
@@ -365,11 +356,10 @@ function renderCategoriesGrid(){
 }
 
 function renderCategoriesView(){
-  // Main public landing screen: contact reminder, tip, update notice, category grid,
+  // Main public landing screen: contact reminder, tip, browse by need or group,
   // and resource-package merge entry point.
   renderCategoryReminder();
   renderCategoryTip();
-  renderPendingUpdatesNotice();
   renderBrowseModeSwitch();
   renderLandingSearch();
   if(categoryBrowseMode === "need"){
@@ -415,10 +405,6 @@ function renderPublicResourceTitle(label){
 function renderCategoryTitle(){
   const cat = getCurrentCategoryForRender();
   if(cat) renderPublicResourceTitle(cat.label);
-}
-
-function getActiveCategoryFilters(){
-  return getSelectedCategoryFilters(currentCategory);
 }
 
 function appendCategoryFilterGroup(filterArea, title, options, activeFilters){
@@ -550,7 +536,7 @@ function renderCategoryView(){
   renderCategoryBackButton();
   renderCategoryTitle();
   const categoryFilterOptions = getCategoryFilterOptions(currentCategory);
-  const activeFilters = getActiveCategoryFilters(categoryFilterOptions);
+  const activeFilters = getSelectedCategoryFilters(currentCategory);
   const categoryResources = getCategoryResources(currentCategory);
   const filtered = filterResourcesBySelectedCategoryFilters(categoryResources, currentCategory, activeFilters);
 
@@ -665,7 +651,6 @@ function renderRecentUpdatesView(){
   if(showUpdateInfo) renderUpdateInfo(packageInfo, packageChanges);
   renderRecentChangeLog(entries);
   recentUpdateDetail = null;
-  pendingRecentUpdates = [];
 }
 
 function renderPrintSelectionView(){
