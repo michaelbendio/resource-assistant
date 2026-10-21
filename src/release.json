@@ -1,8 +1,8 @@
 {
   "version": "2.3.11",
-  "build": 161,
-  "date": "2026-10-20",
-  "message": "Remove unused, stale and redundant code from the HTML app",
+  "build": 162,
+  "date": "2026-10-21",
+  "message": "Add the PDF summary drafts",
   "appChanges": [
     {
       "date": "2026-09-23",
